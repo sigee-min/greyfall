@@ -31,6 +31,7 @@ export class HostRouter {
     quorum: 'majority' | 'all';
     votes: Map<string, boolean | undefined>;
   } | null = null;
+  private travelPollTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(args: {
     send: Send;
@@ -224,10 +225,33 @@ export class HostRouter {
           const votes = new Map<string, boolean | undefined>();
           for (const m of members) votes.set(m, undefined);
           votes.set(String(requesterId), true);
-          const q: 'majority' | 'all' = quorum ?? 'majority';
+          // Force majority quorum per design
+          const q: 'majority' | 'all' = 'majority';
           this.travelPoll = { inviteId, targetMapId: targetId, quorum: q, votes };
           const { yes, no, total } = this.computeVoteCounts();
           this.send('map:travel:update' as any, { inviteId, status: 'proposed', targetMapId: targetId, yes, no, total, quorum: q } as any, 'travel:update');
+          // Start timeout (1 minute)
+          if (this.travelPollTimer) {
+            clearTimeout(this.travelPollTimer);
+            this.travelPollTimer = null;
+          }
+          this.travelPollTimer = setTimeout(() => {
+            if (!this.travelPoll) return;
+            // On timeout, if not approved, reject
+            const status = this.evaluateTravelVote();
+            const { yes, no, total } = this.computeVoteCounts();
+            if (status === 'approved') {
+              const ok = this.party.travel(undefined as any, this.travelPoll.targetMapId);
+              this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+            } else {
+              this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+            }
+            this.travelPoll = null;
+            if (this.travelPollTimer) {
+              clearTimeout(this.travelPollTimer);
+              this.travelPollTimer = null;
+            }
+          }, 60_000);
           break;
         }
         case 'map:travel:vote': {
@@ -246,10 +270,18 @@ export class HostRouter {
             const { yes, no, total } = this.computeVoteCounts();
             this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
             this.travelPoll = null;
+            if (this.travelPollTimer) {
+              clearTimeout(this.travelPollTimer);
+              this.travelPollTimer = null;
+            }
           } else if (status === 'rejected') {
             const { yes, no, total } = this.computeVoteCounts();
             this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
             this.travelPoll = null;
+            if (this.travelPollTimer) {
+              clearTimeout(this.travelPollTimer);
+              this.travelPollTimer = null;
+            }
           }
           break;
         }

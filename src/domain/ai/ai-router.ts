@@ -57,7 +57,7 @@ function extractFirstJsonObject(input: string): string | null {
 export function parseAICommand(text: string): AICommand | null {
   const log = (...args: unknown[]) => DEBUG && console.debug('[ai-parser]', ...args);
   const original = String(text ?? '');
-  log('raw', original);
+  if (DEBUG) console.info('[ai-parser] raw', original);
   // 1) direct parse
   try {
     const obj = JSON.parse(original) as unknown;

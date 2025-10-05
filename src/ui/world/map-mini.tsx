@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { WORLD_STATIC } from '../../domain/world/data';
 import { worldPositionsClient } from '../../domain/net-objects/world-positions-client';
-import type { PublishLobbyMessage } from '../../domain/chat/use-lobby-chat';
+import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/chat/use-lobby-chat';
 import type { SessionParticipant } from '../../domain/session/types';
 import type { LobbyMessage } from '../../protocol';
 
@@ -9,9 +9,10 @@ type Props = {
   localParticipantId: string | null;
   participants: SessionParticipant[];
   publish: PublishLobbyMessage;
+  register: RegisterLobbyHandler;
 };
 
-export function MapMini({ localParticipantId, participants, publish }: Props) {
+export function MapMini({ localParticipantId, participants, publish, register }: Props) {
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
   const [vote, setVote] = useState<{ inviteId: string; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all'; status: 'proposed' | 'approved' | 'rejected' | 'cancelled' } | null>(null);
@@ -21,27 +22,15 @@ export function MapMini({ localParticipantId, participants, publish }: Props) {
   const mapIndex = Math.max(0, WORLD_STATIC.maps.findIndex((m) => m.id === mapId));
 
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      let payload: any = null;
-      try {
-        payload = JSON.parse(e.data);
-      } catch {
-        return;
+    const unsubscribe = register('map:travel:update' as any, (msg: any) => {
+      const b: any = msg.body;
+      setVote({ inviteId: String(b.inviteId), targetMapId: String(b.targetMapId), yes: Number(b.yes), no: Number(b.no), total: Number(b.total), quorum: b.quorum, status: b.status });
+      if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
+        setTimeout(() => setVote(null), 2000);
       }
-      const msg = payload as LobbyMessage;
-      if (msg?.kind === 'map:travel:update') {
-        const b: any = msg.body;
-        setVote({ inviteId: String(b.inviteId), targetMapId: String(b.targetMapId), yes: Number(b.yes), no: Number(b.no), total: Number(b.total), quorum: b.quorum, status: b.status });
-        if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-          // clear after short delay
-          setTimeout(() => setVote(null), 2000);
-        }
-      }
-    };
-    // Attach to global datachannel if available via window? we don't have direct channel here
-    // As a simple approach, rely on registerLobbyHandler elsewhere; leaving this as no-op.
-    return () => {};
-  }, []);
+    });
+    return unsubscribe;
+  }, [register]);
 
   const handleTravel = (dir: 'next' | 'prev') => {
     if (!localParticipantId) return;

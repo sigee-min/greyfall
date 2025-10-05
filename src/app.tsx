@@ -375,6 +375,7 @@ function App() {
                   localParticipantId={localParticipantId}
                   participants={participants}
                   publish={publishLobbyMessage}
+                  register={registerLobbyHandler}
                 />
               </div>
               <div className="pointer-events-auto absolute bottom-6 left-6 w-[360px]">
