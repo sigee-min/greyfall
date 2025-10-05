@@ -3,6 +3,7 @@ import type { LobbyStore } from '../session/session-store';
 import type { HostObject } from './types';
 import { HostParticipantsObject } from './participants-host.js';
 import { HostChatObject } from './chat-host.js';
+import { HostWorldPositionsObject } from './world-positions-host.js';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
 
@@ -15,6 +16,7 @@ export class HostRouter {
   private readonly publishToBus: Publish;
   private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
+  private readonly world: HostWorldPositionsObject;
   private readonly limiter: SlidingWindowLimiter;
   private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   private readonly map = new PeerParticipantMap();
@@ -38,6 +40,8 @@ export class HostRouter {
     this.onAck = args.onAck;
     this.register(this.participants);
     this.register(this.chat);
+    this.world = new HostWorldPositionsObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore });
+    this.register(this.world);
   }
 
   register(object: HostObject) {
@@ -72,6 +76,8 @@ export class HostRouter {
           this.lobbyStore.upsertFromWire(p);
           this.participants.upsert(p, 'hello:merge');
           if (peerId) this.map.set(peerId, p.id);
+          // Ensure world position at map head's entry field
+          this.world.ensureParticipant(p.id, 'LUMENFORD');
           break;
         }
         case 'ready': {
@@ -123,6 +129,20 @@ export class HostRouter {
             },
             'chat-append'
           );
+          break;
+        }
+        case 'field:move:request': {
+          const body = message.body as any;
+          const { playerId, mapId, fromFieldId, toFieldId } = body;
+          if (!this.limiter.allow(`move:${playerId}`)) {
+            console.warn('[move] rate limited', { playerId });
+            break;
+          }
+          // Ensure player exists
+          const exists = this.lobbyStore.participantsRef.current.some((p) => p.id === playerId);
+          if (!exists) break;
+          const ok = this.world.moveField(String(playerId), String(mapId), String(fromFieldId), String(toFieldId));
+          if (!ok) console.warn('[move] rejected', { playerId, mapId, fromFieldId, toFieldId });
           break;
         }
         case 'object:ack': {

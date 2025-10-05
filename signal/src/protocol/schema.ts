@@ -230,6 +230,17 @@ const lobbyChatAppendRequestSchema = lobbyEnvelopeSchema.extend({
   body: z.object({ body: z.string().min(1).max(2000), authorId: z.string().min(1) })
 });
 
+// Field move request (client -> host)
+const lobbyFieldMoveRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('field:move:request'),
+  body: z.object({
+    playerId: z.string().min(1),
+    mapId: z.string().min(1),
+    fromFieldId: z.string().min(1),
+    toFieldId: z.string().min(1)
+  })
+});
+
 export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyHelloSchema,
   lobbyStateSchema,
@@ -241,7 +252,8 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyObjectReplaceSchema,
   lobbyObjectRequestSchema,
   lobbyObjectAckSchema,
-  lobbyChatAppendRequestSchema
+  lobbyChatAppendRequestSchema,
+  lobbyFieldMoveRequestSchema
 ]);
 
 export type LobbyMessage = z.infer<typeof lobbyMessageSchema>;
@@ -259,6 +271,7 @@ export type LobbyMessageBodies = {
   'object:request': { id: string; sinceRev?: number };
   'object:ack': { id: string; rev: number };
   'chat:append:request': { body: string; authorId: string };
+  'field:move:request': { playerId: string; mapId: string; fromFieldId: string; toFieldId: string };
 };
 
 export function createLobbyMessage<K extends LobbyMessageKind>(

@@ -3,6 +3,7 @@ import { parseLobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
 import { ClientParticipantsObject } from './participants-client.js';
+import { worldPositionsClient, WORLD_POSITIONS_OBJECT_ID } from './world-positions-client';
 import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 
 export type Publish = <K extends LobbyMessageKind>(
@@ -35,6 +36,10 @@ export class ClientNetController {
       onReplace: (rev, value) => participants.onReplace(rev, value),
       onPatch: (rev, ops) => participants.onPatch?.(rev, ops)
     });
+    this.registry.set(WORLD_POSITIONS_OBJECT_ID, {
+      onReplace: (rev, value) => worldPositionsClient.onReplace(rev, value),
+      onPatch: (rev, ops) => worldPositionsClient.onPatch?.(rev, ops as any)
+    });
   }
 
   bindChannel(channel: RTCDataChannel) {
@@ -53,6 +58,7 @@ export class ClientNetController {
   requestSnapshots() {
     this.publish('object:request', { id: PARTICIPANTS_OBJECT_ID }, 'request participants');
     this.publish('object:request', { id: 'chatlog' }, 'request chatlog');
+    this.publish('object:request', { id: WORLD_POSITIONS_OBJECT_ID }, 'request world positions');
   }
 
   private handlePayload(payload: unknown, _channel?: RTCDataChannel) {

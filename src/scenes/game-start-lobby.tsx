@@ -11,6 +11,7 @@ import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 import type { RegisterLobbyHandler } from '../domain/chat/use-lobby-chat';
+import { FieldGraph } from '../ui/world/field-graph';
 
 type GameStartLobbyProps = {
   background: string;
@@ -249,6 +250,13 @@ export function GameStartLobby({
                 </button>
               </div>
             </header>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <FieldGraph
+                localParticipantId={localParticipantId}
+                participants={participants}
+                publish={publishLobbyMessage}
+              />
+            </div>
 
             <section className="grid gap-8 lg:grid-cols-[minmax(0,1.25fr),minmax(380px,460px)]">
               <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
