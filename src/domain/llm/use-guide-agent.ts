@@ -89,7 +89,7 @@ export function useGuideAgent({
           const parsed = await requestAICommand({
             manager,
             userInstruction:
-              '사용자에게 응답하세요. 반드시 JSON 한 줄로 {"cmd":...,"body":{}} 형식만 출력하세요. chat은 {"text": string} 고정.',
+              '사용자에게 응답하세요. 반드시 JSON 한 줄로 {"cmd":...,"body":...} 형식만 출력하세요. chat은 string 고정.',
             contextText: context,
             temperature: 0.4,
             maxTokens: fullPolicy.maxTokens,

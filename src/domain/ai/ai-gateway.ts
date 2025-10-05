@@ -34,8 +34,8 @@ export async function requestAICommand({
     capabilities,
     '',
     '출력은 반드시 JSON 한 줄로만 작성:',
-    '{"cmd": "<명령>", "body": {}}',
-    '각 명령의 body는 고정 타입을 따릅니다(예: chat → {"text": string}).',
+    '{"cmd": "<명령>", "body": <고정타입>}',
+    '각 명령의 body는 고정 타입을 따릅니다(예: chat → string).',
   ].join('\n');
 
   const user = [

@@ -3,39 +3,35 @@ import type { CommandSpec } from '../command-registry';
 import { guideDisplayName } from '../../llm/guide-profile';
 import { nanoid } from 'nanoid';
 
-// 단일 고정 타입: object with { text: string }
-const ChatBodySchema = z
-  .object({
-    text: z.string().min(1)
-  })
-  .passthrough();
+// 단일 고정 타입: string (프로토콜의 body와 동일)
+const ChatBodySchema = z.string().min(1);
 
-function coerceToChatBody(input: unknown): unknown {
-  if (typeof input === 'string') return { text: input };
+function coerceToString(input: unknown): unknown {
+  if (typeof input === 'string') return input.trim();
   if (input && typeof input === 'object') {
     const obj = input as Record<string, unknown>;
-    const text = ['text', 'content', 'message'].map((k) => obj[k]).find((v) => typeof v === 'string' && v.trim()) as
-      | string
-      | undefined;
-    if (text && text.trim()) return { ...obj, text: text.trim() };
+    const text = ['text', 'content', 'message']
+      .map((k) => obj[k])
+      .find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+    if (text) return text.trim();
     try {
-      return { text: JSON.stringify(input) };
+      return JSON.stringify(input);
     } catch {
-      return { text: '' };
+      return '';
     }
   }
-  return { text: '' };
+  return '';
 }
 
-export const ChatCommand: CommandSpec<{ text: string }> = {
+export const ChatCommand: CommandSpec<string> = {
   cmd: 'chat',
   schema: ChatBodySchema,
-  doc: 'chat — 안내인 이름으로 채팅 전송. body는 { text: string } 고정.',
+  doc: 'chat — 안내인 이름으로 채팅 전송. body는 string 고정.',
   policy: { role: 'host', cooldownMs: 2500 },
-  coerce: coerceToChatBody,
-  handler: (args, ctx) => {
-    const text = args.text.trim();
-    if (!text) return false;
+  coerce: coerceToString,
+  handler: (text, ctx) => {
+    const body = (text ?? '').toString().trim();
+    if (!body) return false;
     const guide = guideDisplayName(ctx.manager);
     const authorId = ctx.localParticipantId ? `guide:${ctx.localParticipantId}` : 'guide:host';
     const entry = {
@@ -44,7 +40,7 @@ export const ChatCommand: CommandSpec<{ text: string }> = {
       authorName: guide,
       authorTag: '#GUIDE',
       authorRole: 'host' as const,
-      body: text,
+      body,
       at: Date.now()
     };
     return ctx.publishLobbyMessage('chat', { entry }, 'ai:chat');

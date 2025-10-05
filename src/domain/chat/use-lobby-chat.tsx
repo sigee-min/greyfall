@@ -121,6 +121,59 @@ export function useLobbyChat({
     return unsubscribe;
   }, [registerLobbyHandler]);
 
+  // Host-authoritative chat object: patch handler (append/remove)
+  useEffect(() => {
+    const unsubscribe = registerLobbyHandler('object:patch', (message) => {
+      if (message.body.id !== 'chatlog') return;
+      const ops = (message.body as any).ops as any[];
+      if (!Array.isArray(ops) || ops.length === 0) return;
+      setChatMessages((prev) => {
+        let next = prev.slice();
+        for (const op of ops) {
+          if (op?.op === 'insert') {
+            const val = op.value;
+            const list = Array.isArray(val) ? val : [val];
+            for (const e of list) {
+              const mapped: SessionChatLogEntry = {
+                id: String(e.id),
+                authorId: String(e.authorId),
+                authorName: String(e.authorName),
+                authorTag: String(e.authorTag),
+                authorRole: e.authorRole,
+                body: String(e.body),
+                at: Number(e.at),
+                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
+              };
+              next.push(mapped);
+            }
+          } else if (op?.op === 'set') {
+            // Treat as replace if full object provided
+            const value: any = op.value;
+            const entries = Array.isArray(value?.entries)
+              ? (value.entries as any[])
+              : Array.isArray(value?.list)
+                ? (value.list as any[])
+                : null;
+            if (entries) {
+              next = entries.map((e: any) => ({
+                id: String(e.id),
+                authorId: String(e.authorId),
+                authorName: String(e.authorName),
+                authorTag: String(e.authorTag),
+                authorRole: e.authorRole,
+                body: String(e.body),
+                at: Number(e.at),
+                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
+              }));
+            }
+          }
+        }
+        return next;
+      });
+    });
+    return unsubscribe;
+  }, [registerLobbyHandler]);
+
   const sendChatMessage = useCallback(
     (body: string) => {
       const trimmed = body.trim();
