@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LlmManagerKind } from '../../llm/qwen-webgpu';
-import { loadQwenEngineByManager, resetQwenEngine, ensureChatApiReady, probeChatApiActive } from '../../llm/qwen-webgpu';
+// LLM 모듈은 동적 import로 지연 로딩합니다.
 
 export type GuideLoaderState = {
   ready: boolean;
@@ -36,6 +36,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         setStatus('엔진 초기화 중…');
         lastUpdateAtRef.current = Date.now();
 
+        const { loadQwenEngineByManager, ensureChatApiReady, probeChatApiActive, resetQwenEngine } = await import('../../llm/qwen-webgpu');
         await loadQwenEngineByManager(manager, (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
           setProgress((prev) => {
@@ -88,7 +89,15 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         // 30초 이상 진전이 없으면 재시도
         attemptsRef.current += 1;
         setStatus('진행이 지연되어 재시도합니다…');
-        resetQwenEngine();
+        // 동적 임포트 스코프 바깥이므로 비동기로 호출
+        void (async () => {
+          try {
+            const mod = await import('../../llm/qwen-webgpu');
+            mod.resetQwenEngine();
+          } catch {
+            // ignore
+          }
+        })();
         startedRef.current = false;
         setProgress(0);
         setSeq((n) => n + 1);

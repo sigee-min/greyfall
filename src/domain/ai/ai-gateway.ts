@@ -1,12 +1,8 @@
 import { commandRegistry } from './command-registry';
 import { parseAICommand, type AICommand } from './ai-router';
-import {
-  generateQwenChat,
-  ensureChatApiReady,
-  loadQwenEngineByManager,
-  probeChatApiActive
-} from '../../llm/qwen-webgpu';
-import type { LlmManagerKind } from '../../llm/qwen-webgpu';
+// LLM 모듈은 동적 import로 지연 로딩해 초기 번들을 줄입니다.
+// 타입은 이 파일에서 별도로 정의해 정적 의존성을 제거합니다.
+export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
 import { getPersona } from './personas';
 
 // 매니저별 동시 실행 방지용 락 (StrictMode/HMR 중복 호출 대응)
@@ -19,6 +15,7 @@ export type AIGatewayParams = {
   temperature?: number;
   maxTokens?: number;
   fallbackChatText?: string;
+  timeoutMs?: number;
 };
 
 export async function requestAICommand({
@@ -27,8 +24,16 @@ export async function requestAICommand({
   contextText,
   temperature = 0.5,
   maxTokens = 128,
-  fallbackChatText = '채널에 합류했습니다.'
+  fallbackChatText = '채널에 합류했습니다.',
+  timeoutMs = 20000
 }: AIGatewayParams): Promise<AICommand> {
+  // 동적 import로 LLM 런타임 지연 로딩
+  const {
+    generateQwenChat,
+    ensureChatApiReady,
+    loadQwenEngineByManager,
+    probeChatApiActive
+  } = await import('../../llm/qwen-webgpu');
   // 0) 동일 매니저 키로 줄 세워 실행 (중복·동시 호출 방지)
   if (!inflightByManager.has(manager)) {
     inflightByManager.set(manager, Promise.resolve());
@@ -69,6 +74,9 @@ export async function requestAICommand({
     .join('\n');
 
   let raw = '';
+  const ctl = new AbortController();
+  const timeout = Math.max(1000, Math.min(120000, timeoutMs));
+  const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), timeout);
   try {
     // 1) 엔진 예열 및 Chat API 준비 보장
     await loadQwenEngineByManager(manager);
@@ -83,7 +91,14 @@ export async function requestAICommand({
     }
 
     // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateQwenChat 내부 + 아래 보강)
-    raw = (await generateQwenChat(user, { systemPrompt: sys, temperature, maxTokens })).trim();
+    raw = (
+      await generateQwenChat(user, {
+        systemPrompt: sys,
+        temperature,
+        maxTokens,
+        signal: ctl.signal
+      })
+    ).trim();
   } catch (e) {
     // Log error for visibility, then fall back to a safe command to keep UX responsive.
     const message = e instanceof Error ? e.message : String(e);
@@ -103,12 +118,20 @@ export async function requestAICommand({
         if (!(await probeChatApiActive(1_000))) {
           await new Promise((r) => setTimeout(r, 300));
         }
-        raw = (await generateQwenChat(user, { systemPrompt: sys, temperature, maxTokens })).trim();
+        raw = (
+          await generateQwenChat(user, {
+            systemPrompt: sys,
+            temperature,
+            maxTokens,
+            signal: ctl.signal
+          })
+        ).trim();
       } catch {
         // 두 번째도 실패하면 폴백으로 진행
       }
     }
   }
+  clearTimeout(timerId);
   const parsed = parseAICommand(raw);
   if (parsed) {
     release();

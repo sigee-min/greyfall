@@ -289,7 +289,7 @@ function App() {
           onJoin={handleJoinGame}
           onOptions={() => setOptionsOpen(true)}
           onAbout={() => setDeveloperOpen(true)}
-          background="/assets/backgrounds/lobby.gif"
+          background="/assets/bg/lobby.gif"
         />
       );
     }
@@ -304,7 +304,7 @@ function App() {
 
       return (
         <GameStartLobby
-          background="/assets/backgrounds/lobby.gif"
+          background="/assets/bg/lobby.gif"
           mode={sessionMeta.mode}
           lobbyCode={sessionMeta.code}
           answerCode={answerCode}
@@ -330,7 +330,7 @@ function App() {
     }
 
     return (
-      <StageViewport background="/assets/backgrounds/stage-ops.png" className="cursor-crosshair">
+      <StageViewport background="/assets/bg/stage-ops.png" className="cursor-crosshair">
         <div className="pointer-events-none absolute inset-0">
           <div className="pointer-events-auto mx-6 mt-6 flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/50">
             <div>
