@@ -16,21 +16,34 @@ export function MapMini({ localParticipantId, participants, publish, register }:
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
   const [vote, setVote] = useState<{ inviteId: string; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all'; status: 'proposed' | 'approved' | 'rejected' | 'cancelled' } | null>(null);
+  const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
+  const [now, setNow] = useState<number>(Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const local = useMemo(() => (localParticipantId ? worldPositionsClient.getFor(localParticipantId) : null), [positions, localParticipantId]);
   const mapId = local?.mapId ?? WORLD_STATIC.head;
   const mapIndex = Math.max(0, WORLD_STATIC.maps.findIndex((m) => m.id === mapId));
+  const localRole = useMemo(() => participants.find((p) => p.id === localParticipantId)?.role ?? 'guest', [participants, localParticipantId]);
 
   useEffect(() => {
     const unsubscribe = register('map:travel:update' as any, (msg: any) => {
       const b: any = msg.body;
       setVote({ inviteId: String(b.inviteId), targetMapId: String(b.targetMapId), yes: Number(b.yes), no: Number(b.no), total: Number(b.total), quorum: b.quorum, status: b.status });
+      if (b.status === 'proposed' && deadlineAt == null) {
+        setDeadlineAt(Date.now() + 60_000);
+      }
       if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-        setTimeout(() => setVote(null), 2000);
+        setTimeout(() => {
+          setVote(null);
+          setDeadlineAt(null);
+        }, 2000);
       }
     });
     return unsubscribe;
-  }, [register]);
+  }, [deadlineAt, register]);
 
   const handleTravel = (dir: 'next' | 'prev') => {
     if (!localParticipantId) return;
@@ -44,6 +57,12 @@ export function MapMini({ localParticipantId, participants, publish, register }:
   const voteNo = () => {
     if (!localParticipantId || !vote) return;
     publish('map:travel:vote' as any, { inviteId: vote.inviteId, voterId: localParticipantId, approve: false } as any, 'ui:travel:vote');
+  };
+
+  const cancelTravel = () => {
+    if (!localParticipantId || !vote) return;
+    if (localRole !== 'host') return;
+    publish('map:travel:cancel' as any, { inviteId: vote.inviteId, byId: localParticipantId } as any, 'ui:travel:cancel');
   };
 
   const occupancyByField = useMemo(() => {
@@ -74,12 +93,15 @@ export function MapMini({ localParticipantId, participants, publish, register }:
         <div className="mb-3 rounded-md border border-primary/60 bg-primary/10 px-3 py-2 text-xs">
           <div className="flex items-center justify-between">
             <span>Travel vote → {WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId}</span>
-            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} yes</span>
+            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} yes{deadlineAt ? ` · ${Math.max(0, Math.ceil((deadlineAt - now) / 1000))}s` : ''}</span>
           </div>
           {vote.status === 'proposed' && (
             <div className="mt-2 flex gap-2">
               <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteYes}>Yes</button>
               <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteNo}>No</button>
+              {localRole === 'host' && (
+                <button className="ml-auto rounded-md border border-destructive/60 px-2 py-1 text-[11px] text-destructive hover:border-destructive hover:bg-destructive/10" onClick={cancelTravel}>Cancel</button>
+              )}
             </div>
           )}
           {vote.status !== 'proposed' && (

@@ -287,6 +287,11 @@ const lobbyMapTravelUpdateSchema = lobbyEnvelopeSchema.extend({
   })
 });
 
+const lobbyMapTravelCancelSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('map:travel:cancel'),
+  body: z.object({ inviteId: z.string().min(6), byId: z.string().min(1) })
+});
+
 // Interaction handshake (invite/accept/cancel/confirmed)
 const lobbyInteractInviteSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('interact:invite'),
@@ -331,6 +336,7 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyMapTravelProposeSchema,
   lobbyMapTravelVoteSchema,
   lobbyMapTravelUpdateSchema,
+  lobbyMapTravelCancelSchema,
   lobbyMapTravelRequestSchema,
   lobbyInteractInviteSchema,
   lobbyInteractAcceptSchema,
@@ -358,6 +364,7 @@ export type LobbyMessageBodies = {
   'map:travel:propose': { requesterId: string; direction?: 'next' | 'prev'; toMapId?: string; quorum?: 'majority' | 'all' };
   'map:travel:vote': { inviteId: string; voterId: string; approve: boolean };
   'map:travel:update': { inviteId: string; status: 'proposed' | 'approved' | 'rejected' | 'cancelled'; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all' };
+  'map:travel:cancel': { inviteId: string; byId: string };
   'interact:invite': { inviteId: string; fromId: string; toId: string; mapId: string; fieldId: string; verb: string };
   'interact:accept': { inviteId: string; toId: string };
   'interact:cancel': { inviteId: string; byId: string };

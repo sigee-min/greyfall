@@ -285,6 +285,22 @@ export class HostRouter {
           }
           break;
         }
+        case 'map:travel:cancel': {
+          if (!this.travelPoll) break;
+          const { inviteId, byId } = message.body as any;
+          if (inviteId !== this.travelPoll.inviteId) break;
+          // Only host can cancel
+          const isHost = this.lobbyStore.participantsRef.current.some((p) => p.id === String(byId) && p.role === 'host');
+          if (!isHost) break;
+          const { yes, no, total } = this.computeVoteCounts();
+          this.send('map:travel:update' as any, { inviteId, status: 'cancelled', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+          this.travelPoll = null;
+          if (this.travelPollTimer) {
+            clearTimeout(this.travelPollTimer);
+            this.travelPollTimer = null;
+          }
+          break;
+        }
         case 'interact:invite': {
           const { inviteId, fromId, toId, mapId, fieldId, verb } = message.body as any;
           // Validate same field
