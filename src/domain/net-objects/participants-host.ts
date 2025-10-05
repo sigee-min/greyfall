@@ -1,6 +1,6 @@
-import { PARTICIPANTS_OBJECT_ID, makeParticipantsSnapshot } from './participants';
+import { PARTICIPANTS_OBJECT_ID, makeParticipantsSnapshot } from './participants.js';
 import type { CommonDeps, HostObject } from './types';
-import { HostReplicator } from './replicator';
+import { HostReplicator } from './replicator.js';
 
 export class HostParticipantsObject implements HostObject {
   readonly id = PARTICIPANTS_OBJECT_ID;

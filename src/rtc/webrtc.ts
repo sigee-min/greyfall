@@ -199,7 +199,12 @@ export async function joinHostSession(
           console.error('Failed to parse message', error);
         }
       });
-      resolve(channel);
+      const resolveWhenOpen = () => resolve(channel);
+      if (channel.readyState === 'open') {
+        resolveWhenOpen();
+      } else {
+        channel.addEventListener('open', resolveWhenOpen, { once: true });
+      }
     });
   });
 
@@ -235,6 +240,12 @@ export async function joinHostSession(
 export function createHostPeer(events: RTCBridgeEvents, iceServers: RTCIceServer[] = ICE_SERVERS) {
   const peer = new RTCPeerConnection({ iceServers });
   const channel = peer.createDataChannel('greyfall');
+  // Set a low threshold for backpressure signaling; consumers may attach listeners
+  try {
+    (channel as any).bufferedAmountLowThreshold = 64 * 1024; // 64KB
+  } catch (_err) {
+    // ignore if unavailable
+  }
   channel.addEventListener('open', () => events.onOpen?.(channel));
   channel.addEventListener('close', (ev) => events.onClose?.(ev));
   channel.addEventListener('error', (ev) => events.onError?.(ev));

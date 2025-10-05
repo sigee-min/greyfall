@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LlmManagerKind } from '../../llm/qwen-webgpu';
-import { loadQwenEngineByManager, resetQwenEngine } from '../../llm/qwen-webgpu';
+import { loadQwenEngineByManager, resetQwenEngine, ensureChatApiReady, probeChatApiActive } from '../../llm/qwen-webgpu';
 
 export type GuideLoaderState = {
   ready: boolean;
@@ -47,6 +47,12 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
           if (report.text) setStatus(report.text);
           lastUpdateAtRef.current = Date.now();
         });
+        // Ensure chat API is actually callable before reporting ready
+        await ensureChatApiReady(8000);
+        // Active probe to avoid proxy timing race
+        if (!(await probeChatApiActive(1200))) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
 
         if (cancelled) return;
         setReady(true);
@@ -57,7 +63,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
-        setStatus('안내인 영입 실패');
+        setStatus('심판자 영입 실패');
         setReady(false);
         startedRef.current = false; // 재시도 허용
       }

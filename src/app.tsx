@@ -68,7 +68,7 @@ function App() {
     registerLobbyHandler
   } = useSession({ startHostSession, joinHostSession });
 
-  const { chatMessages, sendChatMessage, canSendChat, channelOpen } = useLobbyChat({
+  const { chatMessages, sendChatMessage, canSendChat, channelOpen, probeChannel } = useLobbyChat({
     registerLobbyHandler,
     publishLobbyMessage,
     participants,
@@ -297,6 +297,7 @@ function App() {
     if (scene === 'startLobby' && sessionMeta) {
       const signalSessionId = (sessionMeta as { signalSessionId?: string | null }).signalSessionId ?? null;
       const autoConnect = Boolean(signalSessionId);
+      const sessionReady = Boolean(signalSessionId);
       const answerCode = sessionMeta.mode === 'guest' && !autoConnect ? sessionMeta.answerCode : undefined;
       const acceptAnswer =
         sessionMeta.mode === 'host' && !autoConnect ? handleManualAnswer : undefined;
@@ -311,6 +312,7 @@ function App() {
           localParticipantId={localParticipantId}
           canSendChat={canSendChat}
           channelReady={channelOpen}
+          sessionReady={sessionReady}
           chatMessages={chatMessages}
           onToggleReady={toggleReady}
           onStartGame={startMission}
@@ -321,6 +323,8 @@ function App() {
           onSendChat={sendChatMessage}
           llmManager={selectedManager}
           publishLobbyMessage={publishLobbyMessage}
+          registerLobbyHandler={registerLobbyHandler}
+          probeChannel={probeChannel}
         />
       );
     }

@@ -42,7 +42,7 @@ export function useGuideAgent({
   const fullPolicy: GuideAgentPolicy = useMemo(
     () => ({
       respondOnMention: true,
-      mentionAliases: ['안내인', '가이드', 'guide', 'bot'],
+      mentionAliases: ['심판자', '안내인', '가이드', 'guide', 'bot'],
       cooldownMs: 3500,
       maxContext: 8,
       maxTokens: 160,
@@ -84,7 +84,7 @@ export function useGuideAgent({
         try {
           const context = historyRef.current
             .slice(-fullPolicy.maxContext)
-            .map((m) => `- ${m.role === 'assistant' ? '(안내인) ' : ''}${m.content}`)
+            .map((m) => `- ${m.role === 'assistant' ? '(심판자) ' : ''}${m.content}`)
             .join('\n');
           const parsed = await requestAICommand({
             manager,

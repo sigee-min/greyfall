@@ -2,6 +2,7 @@ class Registry {
     constructor() {
         this.specs = new Map();
         this.lastExecAt = new Map();
+        this.executedIds = new Set();
     }
     register(spec) {
         this.specs.set(spec.cmd.toLowerCase(), spec);
@@ -13,6 +14,10 @@ class Registry {
         return this.specs.get(cmd.toLowerCase());
     }
     async execute(envelope, ctx) {
+        if (this.executedIds.has(envelope.id)) {
+            console.info('[ai] duplicate id ignored', { id: envelope.id });
+            return false;
+        }
         const spec = this.get(envelope.cmd);
         if (!spec) {
             console.warn('[ai] unknown command', envelope.cmd);
@@ -28,6 +33,10 @@ class Registry {
             console.warn('[ai] policy denied', { cmd: envelope.cmd, policy: spec.policy });
             return false;
         }
+        if (spec.preconditions && !spec.preconditions(ctx)) {
+            console.warn('[ai] preconditions not met', { cmd: envelope.cmd });
+            return false;
+        }
         const now = Date.now();
         if (spec.policy?.cooldownMs) {
             const key = spec.cmd.toLowerCase();
@@ -39,7 +48,15 @@ class Registry {
             this.lastExecAt.set(key, now);
         }
         try {
-            return await spec.handler(parsed.data, ctx);
+            const ok = await spec.handler(parsed.data, ctx);
+            if (ok) {
+                this.executedIds.add(envelope.id);
+                // Best-effort cap to avoid unbounded growth
+                if (this.executedIds.size > 1024) {
+                    this.executedIds.clear();
+                }
+            }
+            return ok;
         }
         catch (err) {
             console.error('[ai] handler failed', { cmd: spec.cmd, err });

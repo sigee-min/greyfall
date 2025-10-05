@@ -19,7 +19,12 @@ function findTests(dir) {
 async function main() {
   const harnessUrl = pathToFileURL(resolve(testsDir, 'test-harness.js')).href;
   const harness = await import(harnessUrl);
-  const files = findTests(testsDir);
+  let files = findTests(testsDir);
+  const pattern = process.env.CORETEST_FILES;
+  if (pattern) {
+    const re = new RegExp(pattern);
+    files = files.filter((f) => re.test(f));
+  }
   for (const f of files) {
     await import(pathToFileURL(f).href);
   }
@@ -45,4 +50,3 @@ main().catch((e) => {
   console.error('Runner crashed:', e);
   process.exit(1);
 });
-

@@ -1,7 +1,7 @@
-import { parseLobbyMessage } from '../../protocol';
+import { parseLobbyMessage } from '../../protocol/index.js';
 import { ClientNetObjectStore } from './client-store';
-import { ClientParticipantsObject } from './participants-client';
-import { PARTICIPANTS_OBJECT_ID } from './participants';
+import { ClientParticipantsObject } from './participants-client.js';
+import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 export class ClientNetController {
     constructor({ publish, lobbyStore, busPublish }) {
         this.store = new ClientNetObjectStore();
@@ -45,6 +45,8 @@ export class ClientNetController {
                     break;
                 const obj = this.registry.get(id);
                 obj?.onReplace(rev, value);
+                // acknowledge successful apply
+                this.publish('object:ack', { id, rev }, 'object-ack replace');
                 break;
             }
             case 'object:patch': {
@@ -57,6 +59,7 @@ export class ClientNetController {
                 else {
                     const obj = this.registry.get(id);
                     obj?.onPatch?.(rev, ops);
+                    this.publish('object:ack', { id, rev }, 'object-ack patch');
                 }
                 break;
             }
@@ -70,5 +73,8 @@ export class ClientNetController {
         }
         // Forward to lobby bus for other features (chat, agents, etc.)
         this.busPublish(message);
+    }
+    register(object) {
+        this.registry.set(object.id, { onReplace: object.onReplace, onPatch: object.onPatch });
     }
 }

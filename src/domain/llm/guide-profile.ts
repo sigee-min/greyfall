@@ -9,7 +9,6 @@ export function guideDisplayName(kind: LlmManagerKind): string {
     case 'smart':
       return '흑무상';
     default:
-      return '안내인';
+      return '심판자';
   }
 }
-

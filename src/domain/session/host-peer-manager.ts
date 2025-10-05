@@ -14,6 +14,8 @@ export type HostPeerManagerEvents = RTCBridgeEvents & {
 
 export class HostPeerManager {
   private peers = new Map<string, HostPeer>();
+  private pending = new Map<string, string[]>();
+  private readonly maxQueue = 256;
   constructor(private events: HostPeerManagerEvents) {}
 
   has(peerId: string) {
@@ -29,6 +31,9 @@ export class HostPeerManager {
     const { peer, channel } = createHostPeer(this.events);
     const entry: HostPeer = { peerId, peer, channel };
     this.peers.set(peerId, entry);
+    // Attach backpressure listener to drain per-peer queue
+    const drain = () => this.flush(peerId);
+    (channel as any).addEventListener?.('bufferedamountlow', drain as any);
     this.events.onPeerCreated?.(entry);
     return entry;
   }
@@ -68,10 +73,57 @@ export class HostPeerManager {
 
   sendAll(payload: unknown) {
     const data = JSON.stringify(payload);
-    this.peers.forEach(({ channel }) => {
-      if (channel.readyState === 'open') {
-        channel.send(data);
-      }
+    this.peers.forEach(({ channel, peerId }) => {
+      this.sendTo(peerId, data);
     });
+  }
+
+  private sendTo(peerId: string, data: string) {
+    const entry = this.peers.get(peerId);
+    if (!entry) return;
+    const { channel } = entry;
+    if (channel.readyState !== 'open') return; // do not queue closed channels for now
+    const buffered = (channel as any).bufferedAmount ?? 0;
+    const threshold = (channel as any).bufferedAmountLowThreshold ?? 64 * 1024;
+    if (buffered > threshold * 4) {
+      // queue
+      const q = this.pending.get(peerId) ?? [];
+      if (q.length < this.maxQueue) q.push(data);
+      else q.shift(), q.push(data);
+      this.pending.set(peerId, q);
+      return;
+    }
+    try {
+      channel.send(data);
+    } catch (_err) {
+      // enqueue on failure
+      const q = this.pending.get(peerId) ?? [];
+      if (q.length < this.maxQueue) q.push(data);
+      else q.shift(), q.push(data);
+      this.pending.set(peerId, q);
+    }
+  }
+
+  private flush(peerId: string) {
+    const entry = this.peers.get(peerId);
+    if (!entry) return;
+    const { channel } = entry;
+    if (channel.readyState !== 'open') return;
+    const q = this.pending.get(peerId);
+    if (!q || q.length === 0) return;
+    const threshold = (channel as any).bufferedAmountLowThreshold ?? 64 * 1024;
+    while (q.length > 0) {
+      const buffered = (channel as any).bufferedAmount ?? 0;
+      if (buffered > threshold * 2) break;
+      const next = q.shift()!;
+      try {
+        channel.send(next);
+      } catch (_err) {
+        // push back and break
+        q.unshift(next);
+        break;
+      }
+    }
+    if (q.length === 0) this.pending.delete(peerId);
   }
 }

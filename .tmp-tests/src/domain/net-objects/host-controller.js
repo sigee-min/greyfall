@@ -1,89 +1,96 @@
-import { parseLobbyMessage } from '../../protocol';
-import { PARTICIPANTS_OBJECT_ID } from './participants';
-import { ChatHostStore } from './chat';
-import { HostParticipantsObject } from './participants-host';
+import { HostParticipantsObject } from './participants-host.js';
+import { HostChatObject } from './chat-host.js';
+import { HostRouter } from './host-router.js';
 export class HostNetController {
     constructor({ publish, lobbyStore, busPublish }) {
-        this.publish = publish;
+        this.ackTimers = new Map();
+        this.lastSent = new Map();
+        // wrap publish to track object acks
+        this.publish = ((kind, body, ctx) => {
+            const ok = publish(kind, body, ctx);
+            if (kind === 'object:replace' || kind === 'object:patch') {
+                const b = body;
+                const id = String(b.id);
+                const rev = Number(b.rev);
+                this.lastSent.set(id, rev);
+                this.scheduleAck(id, rev);
+            }
+            return ok;
+        });
         this.lobbyStore = lobbyStore;
         this.busPublish = busPublish;
         this.participants = new HostParticipantsObject({ publish: this.publish, lobbyStore: this.lobbyStore });
-        this.chat = new ChatHostStore((kind, body, context) => this.publish(kind, body, context));
+        this.chat = new HostChatObject({ publish: this.publish, lobbyStore: this.lobbyStore });
+        this.router = new HostRouter({
+            send: (kind, body, ctx) => this.publish(kind, body, ctx),
+            lobbyStore: this.lobbyStore,
+            publishToBus: (message) => this.busPublish(message),
+            participants: this.participants,
+            chat: this.chat,
+            limiter: undefined,
+            onAck: (id, rev) => this.resolveAck(id, rev)
+        });
     }
-    bindChannel(channel) {
+    bindChannel(channel, peerId) {
         const onMessage = (event) => {
             let payload = event.data;
             try {
                 payload = JSON.parse(event.data);
             }
             catch (_err) {
-                // Ignore non-JSON payloads
+                // ignore non-JSON payloads
             }
-            this.handlePayload(payload);
+            this.router.handle(payload, peerId);
         };
         channel.addEventListener('message', onMessage);
     }
-    onPeerConnected(_peerId) {
-        // Optionally push current participants snapshot when a peer connects
-        this.participants.broadcast('peer-connected');
+    onPeerConnected(peerId) {
+        this.router.onPeerConnected(peerId);
     }
-    requestObjectSnapshot(id, sinceRev) {
-        if (id === PARTICIPANTS_OBJECT_ID) {
-            this.participants.onRequest(sinceRev);
-        }
-        else if (id === 'chatlog') {
-            this.chat.onRequest(sinceRev, 'object-request chatlog');
-        }
-    }
-    handlePayload(payload) {
-        const message = parseLobbyMessage(payload);
-        if (!message)
-            return;
-        switch (message.kind) {
-            case 'hello': {
-                this.lobbyStore.upsertFromWire(message.body.participant);
-                this.participants.onHello();
-                break;
-            }
-            case 'ready': {
-                const { participantId, ready } = message.body;
-                const raw = this.lobbyStore.snapshotWire().map((p) => p.id === participantId ? { ...p, ready } : p);
-                this.lobbyStore.replaceFromWire(raw);
-                this.participants.onReady();
-                break;
-            }
-            case 'leave': {
-                this.lobbyStore.remove(message.body.participantId);
-                this.participants.onLeave();
-                break;
-            }
-            case 'object:request': {
-                const { id, sinceRev } = message.body;
-                this.requestObjectSnapshot(id, sinceRev);
-                break;
-            }
-            case 'chat:append:request': {
-                const authorId = String(message.body.authorId ?? this.lobbyStore.localParticipantIdRef.current ?? 'host');
-                const self = this.lobbyStore.participantsRef.current.find((p) => p.id === authorId);
-                const entry = {
-                    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                    authorId,
-                    authorName: self?.name ?? 'Host',
-                    authorTag: self?.tag ?? '#HOST',
-                    authorRole: 'host',
-                    body: String(message.body.body ?? ''),
-                    at: Date.now()
-                };
-                this.chat.append(entry, 'chat-append');
-                break;
-            }
-            default:
-                break;
-        }
-        // Always forward to lobby bus so feature hooks remain reactive
-        this.busPublish(message);
-    }
+    // Message handling moved into HostRouter
     broadcastParticipants(context = 'participants-sync') {
         this.participants.broadcast(context);
+    }
+    register(object) {
+        this.router.register(object);
+    }
+    onPeerDisconnected(peerId) {
+        this.router.onPeerDisconnected(peerId);
+    }
+    updateParticipantReady(participantId, ready, context = 'ready:host-toggle') {
+        this.router.updateParticipantReady(participantId, ready, context);
+    }
+    scheduleAck(id, rev, attempt = 1) {
+        const key = `${id}:${rev}`;
+        if (this.ackTimers.has(key)) {
+            clearTimeout(this.ackTimers.get(key));
+        }
+        const timeout = Math.min(5000, 1000 * attempt); // linear backoff up to 5s
+        const timer = setTimeout(() => {
+            const last = this.lastSent.get(id);
+            if (last !== rev)
+                return; // newer rev sent
+            // resend snapshot for this object
+            if (id === 'participants')
+                this.participants.broadcast('ack:resend');
+            else if (id === 'chatlog')
+                this.chat.onRequest(undefined);
+            // schedule next attempt (max 3)
+            if (attempt < 3)
+                this.scheduleAck(id, rev, attempt + 1);
+            else
+                this.ackTimers.delete(key);
+        }, timeout);
+        this.ackTimers.set(key, timer);
+    }
+    resolveAck(id, rev) {
+        const last = this.lastSent.get(id);
+        if (last !== rev)
+            return;
+        const key = `${id}:${rev}`;
+        const t = this.ackTimers.get(key);
+        if (t)
+            clearTimeout(t);
+        this.ackTimers.delete(key);
     }
 }

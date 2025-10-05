@@ -8,5 +8,16 @@ export default defineConfig({
   server: {
     host: true,
     // basicSsl() plugin enables HTTPS; explicit boolean can conflict with types
+  },
+  build: {
+    chunkSizeWarningLimit: 3000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-mlc': ['@mlc-ai/web-llm'],
+          'vendor-pixi': ['pixi.js', '@pixi/filter-kawase-blur', '@pixi/filter-noise', '@pixi/layers']
+        }
+      }
+    }
   }
 });

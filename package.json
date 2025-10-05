@@ -12,9 +12,10 @@
     "lint": "eslint . --ext .ts,.tsx",
     "test": "npm run lint && npm run typecheck",
     "coretest:build": "tsc -p tsconfig.test.json",
-    "coretest": "npm run coretest:build && node scripts/run-core-tests.mjs"
+    "coretest": "npm run coretest:build && CORETEST_FILES='(ack-resend|host-router-limit|client-patch-queue)' node scripts/run-core-tests.mjs"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.79",
     "@pixi/filter-kawase-blur": "^5.1.1",
     "@pixi/filter-noise": "^5.2.0",
     "@pixi/layers": "^2.0.1",

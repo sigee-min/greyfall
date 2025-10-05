@@ -13,6 +13,10 @@ export type CommandContext = {
   publishLobbyMessage: PublishLobbyMessage;
   participants: SessionParticipant[];
   localParticipantId: string | null;
+  flags?: {
+    llmReady?: boolean;
+    everyoneReady?: boolean;
+  };
 };
 
 export type AICommandEnvelope = {
@@ -32,12 +36,14 @@ export type CommandSpec<T = unknown> = {
   doc: string;
   policy?: CommandPolicy;
   coerce?: (raw: unknown) => unknown;
+  preconditions?: (ctx: CommandContext) => boolean;
   handler: (args: T, ctx: CommandContext) => boolean | Promise<boolean>;
 };
 
 class Registry {
   private specs = new Map<string, CommandSpec<unknown>>();
   private lastExecAt = new Map<string, number>();
+  private executedIds = new Set<string>();
 
   register<T>(spec: CommandSpec<T>) {
     this.specs.set(spec.cmd.toLowerCase(), spec as unknown as CommandSpec<unknown>);
@@ -52,6 +58,10 @@ class Registry {
   }
 
   async execute(envelope: AICommandEnvelope, ctx: CommandContext): Promise<boolean> {
+    if (this.executedIds.has(envelope.id)) {
+      console.info('[ai] duplicate id ignored', { id: envelope.id });
+      return false;
+    }
     const spec = this.get(envelope.cmd);
     if (!spec) {
       console.warn('[ai] unknown command', envelope.cmd);
@@ -69,6 +79,11 @@ class Registry {
       return false;
     }
 
+    if (spec.preconditions && !spec.preconditions(ctx)) {
+      console.warn('[ai] preconditions not met', { cmd: envelope.cmd });
+      return false;
+    }
+
     const now = Date.now();
     if (spec.policy?.cooldownMs) {
       const key = spec.cmd.toLowerCase();
@@ -81,10 +96,18 @@ class Registry {
     }
 
     try {
-      return await (spec.handler as (args: unknown, ctx: CommandContext) => Promise<boolean> | boolean)(
+      const ok = await (spec.handler as (args: unknown, ctx: CommandContext) => Promise<boolean> | boolean)(
         parsed.data,
         ctx
       );
+      if (ok) {
+        this.executedIds.add(envelope.id);
+        // Best-effort cap to avoid unbounded growth
+        if (this.executedIds.size > 1024) {
+          this.executedIds.clear();
+        }
+      }
+      return ok;
     } catch (err) {
       console.error('[ai] handler failed', { cmd: spec.cmd, err });
       return false;

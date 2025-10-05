@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">
-  <path d="M12 2l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"/>
-</svg>
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="currentColor" d="M12 2l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"/>
+  <title>Hasty</title>
+  <desc>Glyph adapts to current text color</desc>
+  </svg>

@@ -123,6 +123,18 @@ const lobbyChatSchema = lobbyEnvelopeSchema.extend({
     kind: z.literal('chat'),
     body: z.object({ entry: lobbyChatMessageSchema })
 });
+// LLM progress broadcast (host -> all guests)
+const lobbyLlmProgressSchema = lobbyEnvelopeSchema.extend({
+    kind: z.literal('llm:progress'),
+    body: z
+        .object({
+        ready: z.boolean().optional(),
+        progress: z.number().min(0).max(1).nullable().optional(),
+        status: z.string().min(1).nullable().optional(),
+        error: z.string().min(1).nullable().optional()
+    })
+        .strict()
+});
 // Network object sync (host-authoritative)
 const patchOpSchema = z.object({
     op: z.enum(['set', 'merge', 'insert', 'remove']),
@@ -141,6 +153,10 @@ const lobbyObjectRequestSchema = lobbyEnvelopeSchema.extend({
     kind: z.literal('object:request'),
     body: z.object({ id: z.string().min(1), sinceRev: z.number().int().nonnegative().optional() })
 });
+const lobbyObjectAckSchema = lobbyEnvelopeSchema.extend({
+    kind: z.literal('object:ack'),
+    body: z.object({ id: z.string().min(1), rev: z.number().int().nonnegative() })
+});
 // Client suggestion (host validates & converts to object patch)
 const lobbyChatAppendRequestSchema = lobbyEnvelopeSchema.extend({
     kind: z.literal('chat:append:request'),
@@ -152,9 +168,11 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
     lobbyReadySchema,
     lobbyLeaveSchema,
     lobbyChatSchema,
+    lobbyLlmProgressSchema,
     lobbyObjectPatchSchema,
     lobbyObjectReplaceSchema,
     lobbyObjectRequestSchema,
+    lobbyObjectAckSchema,
     lobbyChatAppendRequestSchema
 ]);
 export function createLobbyMessage(kind, body) {

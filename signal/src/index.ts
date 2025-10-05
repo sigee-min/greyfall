@@ -65,6 +65,8 @@ const server = createServer(app);
 
 const wss = new WebSocketServer({ server, path: '/ws' });
 
+const heartbeats = new WeakMap<WebSocket, number>();
+
 wss.on('connection', (socket, request) => {
   const url = new URL(request.url ?? '', 'http://localhost');
   const sessionId = url.searchParams.get('session');
@@ -129,6 +131,12 @@ wss.on('connection', (socket, request) => {
     }
     flushPendingToGuest(session, peerId);
   }
+
+  heartbeats.set(socket, Date.now());
+
+  socket.on('pong', () => {
+    heartbeats.set(socket, Date.now());
+  });
 
   socket.on('message', (raw) => {
     const parsed = parseSignalClientMessage(safeParseJson(raw.toString()));
@@ -240,6 +248,19 @@ wss.on('connection', (socket, request) => {
   });
 });
 
+// Keepalive: ping clients and terminate stale connections
+setInterval(() => {
+  const now = Date.now();
+  wss.clients.forEach((ws) => {
+    const last = heartbeats.get(ws) ?? 0;
+    if (now - last > 45_000) {
+      try { ws.terminate(); } catch {}
+      return;
+    }
+    try { ws.ping(); } catch {}
+  });
+}, 15_000);
+
 setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessions.entries()) {
@@ -259,8 +280,10 @@ function send(socket: WebSocket, payload: SignalServerMessage) {
     socket.send(JSON.stringify(payload));
   }
 }
+const MAX_PENDING = 256;
 function enqueue(map: Map<string, string[]>, peerId: string, candidate: string) {
   const list = map.get(peerId) ?? [];
+  if (list.length >= MAX_PENDING) list.shift();
   list.push(candidate);
   map.set(peerId, list);
 }

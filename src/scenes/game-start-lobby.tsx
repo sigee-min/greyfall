@@ -5,9 +5,11 @@ import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/qwen-webgpu';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
+import { useBroadcastLlmProgress, useReceiveLlmProgress } from '../domain/llm/use-llm-progress-bridge';
 import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
+import type { RegisterLobbyHandler } from '../domain/chat/use-lobby-chat';
 
 type GameStartLobbyProps = {
   background: string;
@@ -18,6 +20,7 @@ type GameStartLobbyProps = {
   localParticipantId: string | null;
   chatMessages: SessionChatLogEntry[];
   channelReady?: boolean;
+  sessionReady?: boolean;
   canSendChat: boolean;
   onToggleReady: (participantId: string) => void;
   onStartGame: () => void;
@@ -32,6 +35,8 @@ type GameStartLobbyProps = {
     body: LobbyMessageBodies[K],
     context?: string
   ) => boolean;
+  registerLobbyHandler: RegisterLobbyHandler;
+  probeChannel: () => boolean;
 };
 
 export function GameStartLobby({
@@ -44,6 +49,7 @@ export function GameStartLobby({
   chatMessages,
   canSendChat,
   channelReady = false,
+  sessionReady = false,
   onToggleReady,
   onStartGame,
   onLeave,
@@ -52,7 +58,9 @@ export function GameStartLobby({
   autoConnect = false,
   onSendChat,
   llmManager = 'smart',
-  publishLobbyMessage
+  publishLobbyMessage,
+  registerLobbyHandler,
+  probeChannel
 }: GameStartLobbyProps) {
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
@@ -107,7 +115,29 @@ export function GameStartLobby({
     return Math.floor((Date.now() - lastLlmUpdateAt) / 1000);
   }, [lastLlmUpdateAt, tick]);
 
-  const isActiveLoading = llmProgress !== null && !llmError && !llmReady;
+  // Host broadcasts progress; guests subscribe and display
+  const remote = useReceiveLlmProgress({ register: registerLobbyHandler });
+  useEffect(() => {
+    // For guests, tick last update when remote changes so stalled UI works
+    if (mode !== 'host') {
+      if (remote.progress !== undefined || remote.status !== undefined) {
+        setLastLlmUpdateAt(Date.now());
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote.progress, remote.status, mode]);
+  useBroadcastLlmProgress({
+    enabled: mode === 'host',
+    payload: { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError },
+    publish: publishLobbyMessage
+  });
+
+  const uiReady = mode === 'host' ? llmReady : remote.ready;
+  const uiProgress = mode === 'host' ? llmProgress : remote.progress;
+  const uiStatus = mode === 'host' ? llmStatus : remote.status;
+  const uiError = mode === 'host' ? llmError : remote.error;
+
+  const isActiveLoading = !uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus));
   const isStalled = isActiveLoading && (secondsSinceUpdate ?? 0) > 20;
 
   const mapLlmUiText = (text: string | null | undefined) => {
@@ -123,12 +153,12 @@ export function GameStartLobby({
   };
 
   const displayStatus = useMemo(() => {
-    if (llmError) return '안내인 영입 실패';
-    const base = mapLlmUiText(llmStatus);
+    if (uiError) return '심판자 영입 실패';
+    const base = mapLlmUiText(uiStatus);
     return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
-  }, [llmError, llmStatus, isActiveLoading, tick]);
+  }, [uiError, uiStatus, isActiveLoading, tick]);
 
-  // 안내인 로드 완료 시, AI 명령(chat)으로 1회 합류 알림 전송
+  // 심판자 로드 완료 시, AI 명령(chat)으로 1회 합류 알림 전송 (폴링 제거)
   useEffect(() => {
     if (mode !== 'host') return;
     if (!llmReady) return;
@@ -140,7 +170,8 @@ export function GameStartLobby({
     void (async () => {
       const parsed = await requestAICommand({
         manager: llmManager,
-        userInstruction: '팀에 시작 인사를 전하세요. 반드시 JSON 한 줄로 {"cmd","body"}만 출력하세요. chat은 string 고정.',
+        userInstruction:
+          '팀에 시작 인사를 전하세요. 반드시 JSON 한 줄로 {"cmd","body"}만 출력하세요. chat은 string 고정.',
         temperature: 0.5,
         maxTokens: 96,
         fallbackChatText: '채널에 합류했습니다.'
@@ -154,7 +185,7 @@ export function GameStartLobby({
     })();
   }, [llmReady, llmManager, localParticipantId, mode, participants, publishLobbyMessage]);
 
-  // 모든 인원 준비 + (호스트인 경우) 안내인까지 준비되어야 시작 가능
+  // 모든 인원 준비 + (호스트인 경우) 심판자까지 준비되어야 시작 가능
   const canStartMission = useMemo(
     () => (mode === 'host' ? everyoneReady && llmReady : everyoneReady),
     [everyoneReady, llmReady, mode]
@@ -176,12 +207,7 @@ export function GameStartLobby({
     submitChat();
   };
 
-  const chatPlaceholder = useMemo(() => {
-    if (!channelReady) {
-      return '세션 연결 대기 중… (보내면 연결 후 전송됩니다)';
-    }
-    return '메시지를 입력하세요 (Shift+Enter로 줄바꿈)';
-  }, [channelReady]);
+  const chatPlaceholder = useMemo(() => '메시지를 입력하세요 (Shift+Enter로 줄바꿈)', []);
 
   return (
     <div
@@ -206,13 +232,23 @@ export function GameStartLobby({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-                <button
-                  type="button"
-                  onClick={() => setChatOpen(true)}
-                  className="rounded-md border border-primary/60 px-3 py-2 text-primary transition hover:bg-primary/10"
-                >
-                  Lobby Chat
-                </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setChatOpen(true);
+                  if (!channelReady) {
+                    try {
+                      const ok = probeChannel();
+                      if (!ok) console.debug('[chat] probeChannel: channel not open');
+                    } catch (err) {
+                      console.debug('[chat] probeChannel failed', err);
+                    }
+                  }
+                }}
+                className="rounded-md border border-primary/60 px-3 py-2 text-primary transition hover:bg-primary/10"
+              >
+                Lobby Chat
+              </button>
                 {onOptions && (
                   <button type="button" onClick={onOptions} className="rounded-md border border-border/60 px-3 py-2 transition hover:border-primary hover:text-primary">
                     Options
@@ -412,18 +448,18 @@ export function GameStartLobby({
 
       </div>
 
-      {mode === 'host' && (llmProgress !== null || llmError) && (
+      {(isActiveLoading || uiError) && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 w-[min(320px,90vw)] -translate-x-1/2 rounded-lg border border-border/60 bg-card/80 px-4 py-3 text-xs text-muted-foreground shadow-lg backdrop-blur">
           <p className="font-semibold text-foreground">
             {displayStatus}
           </p>
-          {llmError ? (
-            <p className="mt-1 text-[11px] text-destructive">{llmError}</p>
+          {uiError ? (
+            <p className="mt-1 text-[11px] text-destructive">{uiError}</p>
           ) : (
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border/50">
               <div
                 className="h-full rounded-full bg-primary transition-[width] duration-300"
-                style={{ width: `${progressPercent ?? 0}%` }}
+                style={{ width: `${(mode === 'host' ? progressPercent : uiProgress == null ? 0 : Math.round(Math.min(1, Math.max(0, uiProgress)) * 100)) ?? 0}%` }}
               />
             </div>
           )}
@@ -539,7 +575,7 @@ export function GameStartLobby({
               <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <span>Enter 키로 전송 · Shift+Enter로 줄바꿈</span>
                 <div className="flex items-center gap-2">
-                  <span>{channelReady ? '채널 연결됨' : '세션 연결 대기 중'}</span>
+                  <span>Lobby Chat</span>
                   <button
                     type="submit"
                     className={cn(

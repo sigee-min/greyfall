@@ -1,6 +1,6 @@
 import type { ClientObject } from './types';
 import type { LobbyStore } from '../session/session-store';
-import { PARTICIPANTS_OBJECT_ID, isParticipantsSnapshot } from './participants';
+import { PARTICIPANTS_OBJECT_ID, isParticipantsSnapshot } from './participants.js';
 
 export class ClientParticipantsObject implements ClientObject {
   readonly id = PARTICIPANTS_OBJECT_ID;

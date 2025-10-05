@@ -2,6 +2,8 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { commandRegistry } from './command-registry.js';
 import { ChatCommand } from './commands/chat.js';
+import { MissionStartCommand } from './commands/mission-start.js';
+import { ReadyzCommand } from './commands/readyz.js';
 const EnvelopeSchema = z.object({ cmd: z.string().min(1), body: z.any().optional() }).passthrough();
 export function parseAICommand(text) {
     try {
@@ -21,6 +23,8 @@ function ensureRegistry() {
     if (initialised)
         return;
     commandRegistry.register(ChatCommand);
+    commandRegistry.register(MissionStartCommand);
+    commandRegistry.register(ReadyzCommand);
     initialised = true;
 }
 export async function executeAICommand(command, ctx) {

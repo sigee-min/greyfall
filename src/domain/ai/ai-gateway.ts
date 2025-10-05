@@ -1,8 +1,16 @@
 import { commandRegistry } from './command-registry';
 import { parseAICommand, type AICommand } from './ai-router';
-import { generateQwenChat } from '../../llm/qwen-webgpu';
+import {
+  generateQwenChat,
+  ensureChatApiReady,
+  loadQwenEngineByManager,
+  probeChatApiActive
+} from '../../llm/qwen-webgpu';
 import type { LlmManagerKind } from '../../llm/qwen-webgpu';
 import { getPersona } from './personas';
+
+// 매니저별 동시 실행 방지용 락 (StrictMode/HMR 중복 호출 대응)
+const inflightByManager = new Map<LlmManagerKind, Promise<void>>();
 
 export type AIGatewayParams = {
   manager: LlmManagerKind;
@@ -21,6 +29,19 @@ export async function requestAICommand({
   maxTokens = 128,
   fallbackChatText = '채널에 합류했습니다.'
 }: AIGatewayParams): Promise<AICommand> {
+  // 0) 동일 매니저 키로 줄 세워 실행 (중복·동시 호출 방지)
+  if (!inflightByManager.has(manager)) {
+    inflightByManager.set(manager, Promise.resolve());
+  }
+  const prev = inflightByManager.get(manager)!;
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => (release = r));
+  inflightByManager.set(manager, prev.then(() => gate));
+  try {
+    await prev; // 이전 요청 완료까지 대기
+  } catch {
+    // 이전 요청 에러는 게이트웨이 로직에는 영향 없음
+  }
   const persona = getPersona(manager);
   const capabilities = commandRegistry
     .list()
@@ -28,7 +49,7 @@ export async function requestAICommand({
     .join('\n');
 
   const sys = [
-    `당신은 작전 안내인 "${persona.name}"입니다.`,
+    `당신은 작전 심판자 "${persona.name}"입니다.`,
     ...persona.systemDirectives,
     '가능한 명령과 설명:',
     capabilities,
@@ -49,20 +70,50 @@ export async function requestAICommand({
 
   let raw = '';
   try {
+    // 1) 엔진 예열 및 Chat API 준비 보장
+    await loadQwenEngineByManager(manager);
+    await ensureChatApiReady(10_000);
+    // 활성 프로브: 실제 최소 호출이 통과하는지 확인 (타이밍 레이스 방지)
+    if (!(await probeChatApiActive(1_000))) {
+      for (let i = 0; i < 6; i += 1) {
+        await new Promise((r) => setTimeout(r, 250));
+        const ok = await probeChatApiActive(750);
+        if (ok) break;
+      }
+    }
+
+    // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateQwenChat 내부 + 아래 보강)
     raw = (await generateQwenChat(user, { systemPrompt: sys, temperature, maxTokens })).trim();
   } catch (e) {
     // Log error for visibility, then fall back to a safe command to keep UX responsive.
     const message = e instanceof Error ? e.message : String(e);
     // Avoid logging full prompt to reduce noise/PII; include minimal context.
-    console.error('[ai-gateway] LLM request failed; using fallback', {
+    const isTransient = /reading 'engine'|not a function/i.test(message);
+    const log = isTransient ? console.debug : console.error;
+    log('[ai-gateway] LLM request failed; using fallback', {
       manager,
       temperature,
       maxTokens,
       error: message
     });
+    // 트랜지언트면 짧게 한 번 더 준비 대기 후 재시도
+    if (isTransient) {
+      try {
+        await ensureChatApiReady(2_000);
+        if (!(await probeChatApiActive(1_000))) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        raw = (await generateQwenChat(user, { systemPrompt: sys, temperature, maxTokens })).trim();
+      } catch {
+        // 두 번째도 실패하면 폴백으로 진행
+      }
+    }
   }
   const parsed = parseAICommand(raw);
-  if (parsed) return parsed;
+  if (parsed) {
+    release();
+    return parsed;
+  }
   if (raw) {
     // Received output but could not parse the expected JSON envelope
     const preview = typeof raw === 'string' ? raw.slice(0, 160) : String(raw);
@@ -70,5 +121,6 @@ export async function requestAICommand({
   } else {
     console.warn('[ai-gateway] Empty LLM output; falling back to chat');
   }
+  release();
   return { cmd: 'chat', body: { text: fallbackChatText } };
 }

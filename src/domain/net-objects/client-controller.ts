@@ -1,9 +1,9 @@
-import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
-import { parseLobbyMessage } from '../../protocol';
+import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../protocol/index.js';
+import { parseLobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
-import { ClientParticipantsObject } from './participants-client';
-import { PARTICIPANTS_OBJECT_ID } from './participants';
+import { ClientParticipantsObject } from './participants-client.js';
+import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -66,6 +66,8 @@ export class ClientNetController {
         if (!applied) break;
         const obj = this.registry.get(id);
         obj?.onReplace(rev, value);
+        // acknowledge successful apply
+        this.publish('object:ack', { id, rev }, 'object-ack replace');
         break;
       }
       case 'object:patch': {
@@ -77,6 +79,7 @@ export class ClientNetController {
         } else {
           const obj = this.registry.get(id);
           obj?.onPatch?.(rev, ops);
+          this.publish('object:ack', { id, rev }, 'object-ack patch');
         }
         break;
       }

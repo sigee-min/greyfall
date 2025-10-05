@@ -190,21 +190,35 @@ export function useChatNetSync({
         at: Date.now()
       };
       const delivered = publishLobbyMessage('chat:append:request', { body: trimmed, authorId }, 'chat-send');
-      if (!delivered) {
-        console.info('[chat] queued until channel open');
+      if (delivered) {
+        const displayEntry: SessionChatLogEntry = { ...entry, isSelf: true };
+        setChatMessages((prev) => [...prev, displayEntry]);
+        gameBus.publish('lobby:chat', { entry, self: true });
+        return true;
       }
-      return true;
+      console.info('[chat] send skipped – channel not open');
+      return false;
     },
-    [publishLobbyMessage]
+    [gameBus, publishLobbyMessage]
   );
 
   const chatLog = useMemo(() => chatMessages, [chatMessages]);
+  const probeChannel = useCallback(() => {
+    const channel = sessionMeta?.session.channel;
+    if (!channel) {
+      setChannelReady(false);
+      return false;
+    }
+    const state = channel.readyState;
+    setChannelReady(state === 'open');
+    return state === 'open';
+  }, [sessionMeta]);
 
   return {
     chatMessages: chatLog,
     sendChatMessage,
     canSendChat: Boolean(localIdRef.current),
-    channelOpen: channelReady
+    channelOpen: channelReady,
+    probeChannel
   } as const;
 }
-

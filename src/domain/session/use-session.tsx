@@ -121,7 +121,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     pendingOfferRef.current = null;
     renegotiateAttemptsRef.current = 0;
     renegotiateInFlightRef.current = false;
-    pendingMessagesRef.current = [];
+    // no-op: message queuing removed
 
     signalBridge.disconnect(1000, 'session-leave');
 
@@ -147,6 +147,25 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
   const requestIceRestartHost = useCallback(
     async (reason: string) => {
       if (modeRef.current !== 'host') return;
+      // Prefer per-guest restart via HostPeerManager when available
+      const manager = hostPeersRef.current;
+      if (manager) {
+        console.warn('[webrtc] attempting per-guest ICE restart', { reason });
+        try {
+          manager.forEach(async ({ peerId }) => {
+            try {
+              const code = await manager.createOffer(peerId, { iceRestart: true });
+              const ok = signalBridge.sendOffer(code, peerId);
+              if (!ok) console.warn('[signal] failed to send per-guest restart offer', { peerId });
+            } catch (err) {
+              console.error('[webrtc] per-guest ICE restart failed', { peerId, err });
+            }
+          });
+        } catch (err) {
+          console.error('[webrtc] per-guest restart iteration failed', err);
+        }
+        return;
+      }
       const current = sessionRef.current as HostLobbySession | null;
       if (!current) return;
       if (renegotiateInFlightRef.current) return;
@@ -206,12 +225,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     },
     [clearDisconnectTimer, scheduleDisconnectTimeout, requestIceRestartHost]
   );
-  const MAX_PENDING_QUEUE = 100;
-  const pendingMessagesRef = useRef<{
-    context: string;
-    kind: LobbyMessageKind;
-    payload: string;
-  }[]>([]);
+  // Message queuing removed: send only when channel(s) are open
 
   const publishLobbyMessage = useCallback(
     <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context = 'external') => {
@@ -222,7 +236,11 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       // 호스트: 멀티 피어 매니저가 있으면 브로드캐스트
       if (modeRef.current === 'host' && hostPeersRef.current) {
         hostPeersRef.current.sendAll(envelope);
-        console.info('[lobby] broadcast', { context, kind });
+        if (kind === 'llm:progress' || context === 'llm-progress') {
+          console.debug('[lobby] broadcast', { context, kind });
+        } else {
+          console.info('[lobby] broadcast', { context, kind });
+        }
         return true;
       }
 
@@ -233,22 +251,13 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         return false;
       }
       const { channel } = session;
-      if (channel.readyState !== 'open') {
-        while (pendingMessagesRef.current.length >= MAX_PENDING_QUEUE) {
-          pendingMessagesRef.current.shift();
-          console.warn('[lobby] pending queue overflow – dropping oldest message');
-        }
-        pendingMessagesRef.current.push({ context, kind, payload: JSON.stringify(envelope) });
-        console.info('[lobby] queued message – channel not open', {
-          context,
-          state: channel.readyState,
-          kind,
-          queued: pendingMessagesRef.current.length
-        });
-        return false;
-      }
+      if (channel.readyState !== 'open') return false;
       channel.send(JSON.stringify(envelope));
-      console.info('[lobby] send', { context, kind });
+      if (kind === 'llm:progress' || context === 'llm-progress') {
+        console.debug('[lobby] send', { context, kind });
+      } else {
+        console.info('[lobby] send', { context, kind });
+      }
       return true;
     },
     [lobbyBus]
@@ -269,18 +278,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     (channel: RTCDataChannel) => {
       console.info('[lobby] channel open', { mode: modeRef.current, state: channel.readyState });
 
-      // Flush pending messages only for single-channel guest path
-      if (modeRef.current === 'guest' && pendingMessagesRef.current.length > 0) {
-        const pending = pendingMessagesRef.current.splice(0, pendingMessagesRef.current.length);
-        for (const message of pending) {
-          channel.send(message.payload);
-          console.info('[lobby] send', {
-            context: `${message.context}-flush`,
-            kind: message.kind,
-            queued: true
-          });
-        }
-      }
+      // Queuing removed: do not flush any backlog
 
       if (modeRef.current === 'host') {
         // Host binding occurs where peers are created (HostPeerManager onOpen)
@@ -303,14 +301,13 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
   const handleChannelClose = useCallback(
     (event: Event) => {
       console.warn('[lobby] channel closed', { mode: modeRef.current, event });
-      if (modeRef.current === 'host') {
-        const hostOnly = lobbyStore.hostSnapshot();
-        lobbyStore.replaceFromWire(hostOnly);
-      } else {
+      // Host: ignore individual per-guest channel closures here.
+      // Precise removal is handled via signal 'peer-disconnected' in HostRouter.
+      if (modeRef.current === 'guest') {
         leaveSession();
       }
     },
-    [leaveSession, lobbyStore]
+    [leaveSession]
   );
 
   const handleChannelError = useCallback((event: Event) => {
@@ -335,7 +332,6 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     async (name: string) => {
       signalBridge.disconnect(1000, 'session-refresh-host');
       pendingOfferRef.current = null;
-      pendingMessagesRef.current = [];
 
       const tag = generateUserTag();
       const id = nanoid(8);
@@ -343,11 +339,10 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       let signalSessionId: string | null = null;
       let forwardOffer: (() => Promise<void>) | null = null;
 
-      const relayIceCandidate = (candidate: RTCIceCandidateInit) => {
-        if (!signalSessionId) return;
-        if (!signalBridge.sendCandidate(candidate)) {
-          console.debug('[signal] candidate skipped – socket not open (host)');
-        }
+      // For multi-guest architecture, do NOT relay ICE from the legacy base host peer.
+      // Per-guest peers created in onPeerConnected will send candidates with peerId.
+      const relayIceCandidate = (_candidate: RTCIceCandidateInit) => {
+        return;
       };
 
       if (!SIGNAL_SERVER_AVAILABLE) {
@@ -461,7 +456,6 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     async (name: string, code: string) => {
       signalBridge.disconnect(1000, 'session-refresh-guest');
       pendingOfferRef.current = null;
-      pendingMessagesRef.current = [];
 
       const tag = generateUserTag();
       const id = nanoid(8);

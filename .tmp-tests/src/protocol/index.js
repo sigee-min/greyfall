@@ -1,1 +1,1 @@
-export * from '../../signal/src/protocol/schema';
+export * from '../../signal/src/protocol/schema.js';

@@ -1,5 +1,5 @@
 import type { HostObject, CommonDeps } from './types';
-import { ChatHostStore, type ChatEntry, CHAT_OBJECT_ID } from './chat';
+import { ChatHostStore, type ChatEntry, CHAT_OBJECT_ID } from './chat.js';
 
 export class HostChatObject implements HostObject {
   readonly id = CHAT_OBJECT_ID;
@@ -17,4 +17,3 @@ export class HostChatObject implements HostObject {
     return this.store.onRequest(sinceRev, 'object-request chatlog');
   }
 }
-

@@ -1,3 +1,4 @@
+import { patchOpSchema } from './schemas.js';
 export class ClientNetObjectStore {
     constructor() {
         this.state = new Map();
@@ -29,6 +30,10 @@ export class ClientNetObjectStore {
         return true;
     }
     applyPatch(id, rev, ops) {
+        // Validate ops shape early; reject invalid payloads
+        if (!Array.isArray(ops) || ops.some((op) => !patchOpSchema.safeParse(op).success)) {
+            return false;
+        }
         const current = this.state.get(id);
         if (!current)
             return false; // need base snapshot first

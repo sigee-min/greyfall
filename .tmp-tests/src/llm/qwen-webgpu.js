@@ -54,8 +54,17 @@ export function resetQwenEngine() {
 export async function generateQwenChat(prompt, options = {}) {
     const { systemPrompt = 'You are a seasoned guide who offers concise, practical suggestions.', temperature = 0.7, topP = 0.9, maxTokens = 512, signal, onToken } = options;
     // Assume engine has already been initialised by manager selection path
-    const engine = await (enginePromise ?? loadQwenEngineByManager('smart'));
-    const completion = await engine.chat.completion({
+    let engine = await (enginePromise ?? loadQwenEngineByManager('smart'));
+    // Guard against partially-initialised or incompatible engine shape by waiting, not resetting
+    if (!isChatApiAvailable(engine)) {
+        try {
+            await waitForChatApi(engine, 10000);
+        }
+        catch (err) {
+            throw normaliseEngineError(err);
+        }
+    }
+    const request = {
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
@@ -71,8 +80,85 @@ export async function generateQwenChat(prompt, options = {}) {
                 onToken(token, metadata?.token_id ?? 0);
             }
             : undefined
-    });
-    return completion.output_text;
+    };
+    // One-time recovery on transient TypeError (e.g., engine proxy not fully ready)
+    let text;
+    try {
+        text = await chatCompletionCompat(engine, request);
+    }
+    catch (err) {
+        const transient = isTransientEngineError(err);
+        if (!transient)
+            throw err;
+        await sleep(150);
+        text = await chatCompletionCompat(engine, request);
+    }
+    return text;
+}
+function omitOnNewToken(req) {
+    const { onNewToken: _onNewToken, ...rest } = req;
+    return rest;
+}
+async function chatCompletionCompat(engine, req) {
+    // Prefer legacy API if present (supports onNewToken callback)
+    if (typeof engine.chat?.completion === 'function') {
+        const completion = await engine.chat.completion(req);
+        return (completion?.output_text ?? '').toString();
+    }
+    // Fallback to newer API shape
+    const create = engine.chat?.completions?.create;
+    if (typeof create === 'function') {
+        const payload = omitOnNewToken(req); // omit callback; streaming may differ in newer API
+        const res = await create(payload);
+        if (res?.output_text && typeof res.output_text === 'string')
+            return res.output_text;
+        const first = res?.choices && res.choices.length > 0 ? res.choices[0] : undefined;
+        const text = first?.message?.content ?? first?.text ?? '';
+        if (text)
+            return text;
+        throw new Error('Empty completion result');
+    }
+    throw new Error('WebLLM chat completion API not available');
+}
+function isChatApiAvailable(engine) {
+    if (!engine)
+        return false;
+    const legacy = typeof engine.chat?.completion === 'function';
+    const modern = typeof engine.chat?.completions?.create === 'function';
+    return legacy || modern;
+}
+function isTransientEngineError(err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return /Cannot read properties of undefined\s*\(reading 'engine'\)/i.test(msg) || /not a function/i.test(msg);
+}
+export async function waitForChatApi(engine, timeoutMs = 8000) {
+    const start = Date.now();
+    while (!isChatApiAvailable(engine)) {
+        if (Date.now() - start > timeoutMs)
+            throw new Error('WebLLM chat API not ready');
+        await sleep(50);
+    }
+}
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+export async function ensureChatApiReady(timeoutMs = 8000) {
+    const eng = await (enginePromise ?? loadQwenEngineByManager('smart'));
+    await waitForChatApi(eng, timeoutMs);
+}
+// Non-intrusive probe that will NOT trigger engine/model initialisation.
+export async function probeChatApiReady(timeoutMs = 500) {
+    const pending = enginePromise;
+    if (!pending)
+        return { initialised: false, chatApiReady: false };
+    const race = await Promise.race([
+        pending.then((engine) => ({ engine })),
+        sleep(timeoutMs).then(() => ({ timeout: true }))
+    ]);
+    if ('timeout' in race)
+        return { initialised: true, chatApiReady: false };
+    const engine = race.engine;
+    return { initialised: true, chatApiReady: isChatApiAvailable(engine) };
 }
 async function ensureWebLLMRuntime() {
     if (window.webllm)
