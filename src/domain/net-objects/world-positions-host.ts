@@ -42,8 +42,16 @@ export class HostWorldPositionsObject implements HostObject {
     );
   }
 
+  movePartyToMap(mapId: string, memberIds: string[]) {
+    const map = getMap(mapId);
+    if (!map) return false;
+    const entry = getEntryField(map);
+    if (!entry) return false;
+    const ops = memberIds.map((id) => ({ id, mapId: map.id, fieldId: entry.id }));
+    return this.replicator.apply(this.id, [{ op: 'merge', path: 'list', value: ops } as any], 'world:positions:party-travel');
+  }
+
   onRequest(sinceRev?: number) {
     return this.replicator.onRequest(this.id, sinceRev, 'object-request world:positions');
   }
 }
-

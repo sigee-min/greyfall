@@ -241,6 +241,48 @@ const lobbyFieldMoveRequestSchema = lobbyEnvelopeSchema.extend({
   })
 });
 
+// Party travel request (client -> host)
+const lobbyMapTravelRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('map:travel:request'),
+  body: z
+    .object({
+      requesterId: z.string().min(1),
+      direction: z.enum(['next', 'prev']).optional(),
+      toMapId: z.string().min(1).optional()
+    })
+    .refine((v) => Boolean(v.direction) !== Boolean(v.toMapId), {
+      message: 'Provide either direction or toMapId'
+    })
+});
+
+// Interaction handshake (invite/accept/cancel/confirmed)
+const lobbyInteractInviteSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('interact:invite'),
+  body: z.object({
+    inviteId: z.string().min(6),
+    fromId: z.string().min(1),
+    toId: z.string().min(1),
+    mapId: z.string().min(1),
+    fieldId: z.string().min(1),
+    verb: z.string().min(1)
+  })
+});
+
+const lobbyInteractAcceptSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('interact:accept'),
+  body: z.object({ inviteId: z.string().min(6), toId: z.string().min(1) })
+});
+
+const lobbyInteractCancelSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('interact:cancel'),
+  body: z.object({ inviteId: z.string().min(6), byId: z.string().min(1) })
+});
+
+const lobbyInteractConfirmedSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('interact:confirmed'),
+  body: z.object({ inviteId: z.string().min(6), fromId: z.string().min(1), toId: z.string().min(1), verb: z.string().min(1) })
+});
+
 export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyHelloSchema,
   lobbyStateSchema,
@@ -253,7 +295,12 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyObjectRequestSchema,
   lobbyObjectAckSchema,
   lobbyChatAppendRequestSchema,
-  lobbyFieldMoveRequestSchema
+  lobbyFieldMoveRequestSchema,
+  lobbyMapTravelRequestSchema,
+  lobbyInteractInviteSchema,
+  lobbyInteractAcceptSchema,
+  lobbyInteractCancelSchema,
+  lobbyInteractConfirmedSchema
 ]);
 
 export type LobbyMessage = z.infer<typeof lobbyMessageSchema>;
@@ -272,6 +319,11 @@ export type LobbyMessageBodies = {
   'object:ack': { id: string; rev: number };
   'chat:append:request': { body: string; authorId: string };
   'field:move:request': { playerId: string; mapId: string; fromFieldId: string; toFieldId: string };
+  'map:travel:request': { requesterId: string; direction?: 'next' | 'prev'; toMapId?: string };
+  'interact:invite': { inviteId: string; fromId: string; toId: string; mapId: string; fieldId: string; verb: string };
+  'interact:accept': { inviteId: string; toId: string };
+  'interact:cancel': { inviteId: string; byId: string };
+  'interact:confirmed': { inviteId: string; fromId: string; toId: string; verb: string };
 };
 
 export function createLobbyMessage<K extends LobbyMessageKind>(

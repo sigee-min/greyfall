@@ -4,6 +4,9 @@ import type { HostObject } from './types';
 import { HostParticipantsObject } from './participants-host.js';
 import { HostChatObject } from './chat-host.js';
 import { HostWorldPositionsObject } from './world-positions-host.js';
+import { HostPartyObject } from './party-host.js';
+import { WORLD_STATIC } from '../world/data';
+import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
 
@@ -17,6 +20,7 @@ export class HostRouter {
   private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
   private readonly world: HostWorldPositionsObject;
+  private readonly party: HostPartyObject;
   private readonly limiter: SlidingWindowLimiter;
   private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   private readonly map = new PeerParticipantMap();
@@ -42,6 +46,8 @@ export class HostRouter {
     this.register(this.chat);
     this.world = new HostWorldPositionsObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore });
     this.register(this.world);
+    this.party = new HostPartyObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore }, this.world);
+    this.register(this.party);
   }
 
   register(object: HostObject) {
@@ -78,6 +84,7 @@ export class HostRouter {
           if (peerId) this.map.set(peerId, p.id);
           // Ensure world position at map head's entry field
           this.world.ensureParticipant(p.id, 'LUMENFORD');
+          this.party.addMember(p.id);
           break;
         }
         case 'ready': {
@@ -96,6 +103,7 @@ export class HostRouter {
           this.lobbyStore.remove(id);
           this.participants.remove(id, 'leave:remove');
           this.map.removeByParticipant(id);
+          this.party.removeMember(id);
           break;
         }
         case 'object:request': {
@@ -143,6 +151,61 @@ export class HostRouter {
           if (!exists) break;
           const ok = this.world.moveField(String(playerId), String(mapId), String(fromFieldId), String(toFieldId));
           if (!ok) console.warn('[move] rejected', { playerId, mapId, fromFieldId, toFieldId });
+          break;
+        }
+        case 'map:travel:request': {
+          const { requesterId, direction, toMapId } = message.body as any;
+          if (!this.limiter.allow(`travel:${requesterId}`)) {
+            console.warn('[travel] rate limited', { requesterId });
+            break;
+          }
+          // Validate all current party members are on the same map at its entry field
+          const members = this.party.getMembers();
+          if (members.length === 0) break;
+          const posState = (this.world as any).replicator?.get?.('world:positions')?.value as any;
+          const list: { id: string; mapId: string; fieldId: string }[] = Array.isArray(posState?.list) ? posState.list : [];
+          const first = list.find((e) => e.id === members[0]);
+          if (!first) break;
+          const map = getMap(first.mapId);
+          if (!map) break;
+          const entry = getEntryField(map);
+          const allOnSameMap = members.every((m) => {
+            const p = list.find((e) => e.id === m);
+            return p && p.mapId === first.mapId && p.fieldId === (entry?.id ?? '');
+          });
+          if (!allOnSameMap) {
+            console.warn('[travel] denied: not all at entry', { firstMap: first.mapId });
+            break;
+          }
+          const ok = this.party.travel(direction as any, toMapId as any);
+          if (!ok) console.warn('[travel] failed', { direction, toMapId });
+          break;
+        }
+        case 'interact:invite': {
+          const { inviteId, fromId, toId, mapId, fieldId, verb } = message.body as any;
+          // Validate same field
+          const posState = (this.world as any).replicator?.get?.('world:positions')?.value as any;
+          const list: any[] = Array.isArray(posState?.list) ? posState.list : [];
+          const pf = list.find((e) => e.id === fromId);
+          const pt = list.find((e) => e.id === toId);
+          if (!pf || !pt) break;
+          if (!(pf.mapId === mapId && pt.mapId === mapId && pf.fieldId === fieldId && pt.fieldId === fieldId)) {
+            console.warn('[interact] invite rejected: not same field');
+            break;
+          }
+          // Broadcast invite as-is
+          this.send('interact:invite' as any, { inviteId, fromId, toId, mapId, fieldId, verb } as any, 'interact:invite');
+          break;
+        }
+        case 'interact:accept': {
+          const { inviteId, toId } = message.body as any;
+          // No further validation here; in a real system we would check invite store
+          this.send('interact:confirmed' as any, { inviteId, fromId: 'unknown', toId, verb: 'unknown' } as any, 'interact:confirmed');
+          break;
+        }
+        case 'interact:cancel': {
+          const { inviteId, byId } = message.body as any;
+          this.send('interact:cancel' as any, { inviteId, byId } as any, 'interact:cancel');
           break;
         }
         case 'object:ack': {

@@ -30,6 +30,7 @@ import { useGlobalBus } from './bus/global-bus';
 import { useGameBus } from './bus/game-bus';
 import type { SceneKey } from './types/scenes';
 import { FieldGraph } from './ui/world/field-graph';
+import { MapMini } from './ui/world/map-mini';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -363,6 +364,12 @@ function App() {
           {scene === 'game' && (
             <div className="pointer-events-auto absolute bottom-6 right-6 w-[360px]">
               <FieldGraph
+                localParticipantId={localParticipantId}
+                participants={participants}
+                publish={publishLobbyMessage}
+              />
+              <div className="mt-4" />
+              <MapMini
                 localParticipantId={localParticipantId}
                 participants={participants}
                 publish={publishLobbyMessage}
