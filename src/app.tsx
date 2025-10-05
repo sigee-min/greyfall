@@ -408,7 +408,12 @@ function App() {
         )}
 
         {scene === 'game' && showCharBuilder && (
-          <CharacterBuilder onClose={() => setShowCharBuilder(false)} />)
+          <CharacterBuilder
+            onClose={() => setShowCharBuilder(false)}
+            playerName={playerName}
+            localParticipantId={localParticipantId}
+            publish={publishLobbyMessage as any}
+          />)
         }
       </StageViewport>
     );

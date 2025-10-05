@@ -3,13 +3,37 @@ import { CreateWebWorkerMLCEngine } from '@mlc-ai/web-llm';
 export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
 type ModelProfile = { id: string };
 // Qwen3 profiles (use prebuilt registry inside WebLLM)
+// Base Qwen3 options
 const QWEN3_HASTY: ModelProfile = { id: 'Qwen3-0.6B-q4f16_1-MLC' };
 const QWEN3_FAST: ModelProfile = { id: 'Qwen3-1.7B-q4f32_1-MLC' };
-const QWEN3_SMART: ModelProfile = { id: 'Qwen3-4B-q0f16-MLC' };
+const QWEN3_4B_Q4F16_1: ModelProfile = { id: 'Qwen3-4B-q4f16_1-MLC' };
+const QWEN3_8B_Q4F16_1: ModelProfile = { id: 'Qwen3-8B-q4f16_1-MLC' };
+
+// Llama 3.2 3B mid-tier
+const LLAMA32_3B_Q4F16_1: ModelProfile = { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC' };
+
+// SmolLM2 1.7B low-tier
+const SMOLLM2_1_7B_Q4F16_1: ModelProfile = { id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC' };
+function envOverride(kind: LlmManagerKind): string | null {
+  const env = (import.meta as any).env || {};
+  const key = kind === 'hasty' ? 'VITE_LLM_MODEL_ID_HASTY' : kind === 'fast' ? 'VITE_LLM_MODEL_ID_FAST' : 'VITE_LLM_MODEL_ID_SMART';
+  const id = env?.[key];
+  return typeof id === 'string' && id.trim() ? id.trim() : null;
+}
+
 function resolveProfiles(kind: LlmManagerKind): ModelProfile[] {
-  if (kind === 'hasty') return [QWEN3_HASTY];
-  if (kind === 'fast') return [QWEN3_FAST];
-  return [QWEN3_SMART];
+  const override = envOverride(kind);
+  if (override) return [{ id: override }];
+  if (kind === 'hasty') {
+    // Low-tier default: SmolLM2 1.7B; fallback to Qwen3 0.6B for ultra-low VRAM
+    return [SMOLLM2_1_7B_Q4F16_1, QWEN3_HASTY];
+  }
+  if (kind === 'fast') {
+    // Mid-tier default: Llama 3.2 3B; fallbacks decrease VRAM footprint
+    return [LLAMA32_3B_Q4F16_1, QWEN3_4B_Q4F16_1, QWEN3_FAST, SMOLLM2_1_7B_Q4F16_1, QWEN3_HASTY];
+  }
+  // smart (high-tier): Prefer Qwen3 8B; fallbacks reduce VRAM
+  return [QWEN3_8B_Q4F16_1, QWEN3_4B_Q4F16_1, LLAMA32_3B_Q4F16_1, QWEN3_FAST, SMOLLM2_1_7B_Q4F16_1, QWEN3_HASTY];
 }
 
 export type QwenChatOptions = {

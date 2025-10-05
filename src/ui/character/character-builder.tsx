@@ -5,7 +5,14 @@ import { cn } from '../../lib/utils';
 
 function rollD6(): number { return Math.floor(Math.random() * 6) + 1; }
 
-export function CharacterBuilder({ onClose }: { onClose: () => void }) {
+type Props = {
+  onClose: () => void;
+  playerName?: string;
+  localParticipantId: string | null;
+  publish: <K extends any>(kind: K, body: any, context?: string) => boolean;
+};
+
+export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish }: Props) {
   const built = useCharacterStore((s) => s.built);
   const roll = useCharacterStore((s) => s.roll);
   const budget = useCharacterStore((s) => s.budget);
@@ -27,7 +34,21 @@ export function CharacterBuilder({ onClose }: { onClose: () => void }) {
   const add = (trait: TraitSpec) => selectTrait(trait);
   const remove = (id: string) => deselectTrait(id);
 
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'positive' | 'negative'>('all');
   const canFinalize = remaining >= 0;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return TRAITS.filter((t) => {
+      if (typeFilter === 'positive' && t.cost < 0) return false;
+      if (typeFilter === 'negative' && t.cost > 0) return false;
+      if (!q) return true;
+      return (
+        t.name.toLowerCase().includes(q) ||
+        (t.description ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [query, typeFilter]);
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
@@ -66,9 +87,29 @@ export function CharacterBuilder({ onClose }: { onClose: () => void }) {
             </ul>
           </section>
           <section className="col-span-2">
-            <h4 className="mb-3 text-sm font-semibold">특성</h4>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold">특성</h4>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="검색(이름/설명)"
+                  className="w-44 rounded-md border border-border/60 bg-background/60 px-2 py-1 text-xs"
+                />
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  className="rounded-md border border-border/60 bg-background/60 px-2 py-1 text-xs"
+                >
+                  <option value="all">전체</option>
+                  <option value="positive">보너스</option>
+                  <option value="negative">패널티</option>
+                </select>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {TRAITS.map((t) => {
+              {filtered.map((t) => {
                 const picked = selected.some((s) => s.id === t.id);
                 const willExceed = !picked && (remaining - t.cost) < 0;
                 return (
@@ -98,11 +139,27 @@ export function CharacterBuilder({ onClose }: { onClose: () => void }) {
           <div className="text-xs text-muted-foreground">특성은 세션 중 일부 교체 기회가 생길 수 있습니다.</div>
           <div className="flex items-center gap-3">
             <button className="rounded-md border border-border/60 px-3 py-2 text-xs hover:border-destructive hover:text-destructive" onClick={onClose}>나중에</button>
-            <button disabled={!canFinalize} className={cn('rounded-md border px-3 py-2 text-xs', canFinalize ? 'border-primary text-primary hover:bg-primary/10' : 'cursor-not-allowed opacity-50')} onClick={() => { finalize(); onClose(); }}>확정</button>
+            <button
+              disabled={!canFinalize}
+              className={cn('rounded-md border px-3 py-2 text-xs', canFinalize ? 'border-primary text-primary hover:bg-primary/10' : 'cursor-not-allowed opacity-50')}
+              onClick={() => {
+                finalize();
+                // Broadcast summary to lobby chat via host
+                try {
+                  const s = Object.entries(stats).map(([k, v]) => `${k}:${v}`).join(', ');
+                  const traitNames = selected.map((t) => t.name).join(', ') || '—';
+                  const passiveNames = passives.map((p) => p.name).join(', ') || '—';
+                  const body = `캐릭터 확정 — ${playerName}\n스탯: ${s}\n특성: ${traitNames}\n패시브: ${passiveNames}`;
+                  if (localParticipantId) publish('chat:append:request' as any, { body, authorId: localParticipantId } as any, 'character:finalized');
+                } catch {}
+                onClose();
+              }}
+            >
+              확정
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

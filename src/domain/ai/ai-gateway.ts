@@ -159,15 +159,8 @@ export async function requestAICommand({
   }
   const parsed = parseAICommand(raw);
   if (parsed) {
-    // Validate against registry; coerce unknown commands to chat for UX safety
-    const spec = commandRegistry.get(parsed.cmd);
-    if (!spec) {
-      const preview = typeof raw === 'string' ? raw.slice(0, 160) : String(raw);
-      console.warn('[ai-gateway] Unknown command from LLM; falling back to chat', { cmd: parsed.cmd, preview });
-      const bodyText = typeof parsed.body === 'string' && parsed.body.trim() ? parsed.body.trim() : fallbackChatText;
-      release();
-      return { cmd: 'chat', body: bodyText };
-    }
+    // Command registry initialisation happens inside executeAICommand.
+    // Do not attempt to validate here; return as-is and let the executor handle policy/unknowns.
     release();
     return parsed;
   }
