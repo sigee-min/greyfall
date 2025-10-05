@@ -590,9 +590,461 @@ const MAP_SEWERS: MapNode = {
   ],
 };
 
+const MAP_HIGHWAY: MapNode = {
+  id: 'HIGHWAY',
+  name: '붕괴 고속도로',
+  description:
+    '도시권을 벗어난 외곽 고속도로. 교각 일부가 무너져 차선이 끊기고, 바람에 유리먼지가 실려 반짝인다.',
+  entryFieldId: 'onramp',
+  prev: 'SEWERS',
+  next: 'SUBWAY_LINE',
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'exposed-travel' },
+  bg: {
+    path: '/assets/bg/maps/highway/main.webp',
+    position: 'center 60%',
+    overlay: 'fog',
+    grade: 'cool',
+    description:
+      '해질녘, 고속도로 상판에 균열과 잡초가 드문드문 자랐다. 붕괴된 교각 잔해가 아래 골짜기로 떨어져 있고, ' +
+      '차선 페인트는 바래어 끊긴 점선이 된다. 도로 표면에는 미세한 유리먼지가 얇게 깔려 바람이 지날 때 점状 반짝임을 만든다. ' +
+      '프레이밍: 3분할 구성, 좌측 하단에 끊긴 가드레일, 우측 상단에 붕괴 흔적, 원근선은 중앙 소실점.',
+    gifRecommended: true,
+    llmPrompt:
+      'Dusk collapsed expressway; cracked deck with sparse weeds; broken piers in ravine; faded lane paint; thin glass dust glittering in wind; thirds composition with vanishing point center; loopable wind shimmer.',
+  },
+  music: {
+    mood: 'wind shear + distant traffic ghosts',
+    tracks: ['/assets/audio/maps/highway/wind_shear.ogg'],
+    loop: true,
+    volume: 0.6,
+    description:
+      '넓은 바람 소리 위에 희미한 고속 주행 잔상(흐릿한 도플러), 금속 가드레일이 미세하게 떨며 내는 공명. ' +
+      '템포 없음, 낮은 다이내믹, 냉색 잔향.',
+    llmPrompt:
+      'Wide wind ambience with faint ghostly traffic dopplers; subtle metal guardrail resonance; atonal; low dynamics; cool-tail reverb.',
+  },
+  fields: [
+    {
+      id: 'onramp',
+      name: '진입 램프(Entry)',
+      kind: 'entry',
+      description: '폐쇄 배리어를 치우고 진입하는 램프 구간. 표지판과 잡초.',
+      neighbors: ['overpass', 'wreck-lanes'],
+      bg: {
+        path: '/assets/bg/maps/highway/onramp.webp',
+        position: 'center 65%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '진입 차선의 화살표가 반쯤 지워져 있고 잡초가 표면을 뚫고 나온다. 폐쇄 배리어의 반사띠가 바람에 미세하게 흔들린다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Highway on-ramp with half-erased arrows and weeds breaking through; barrier retroreflective tape subtly fluttering; loopable.',
+      },
+    },
+    {
+      id: 'overpass',
+      name: '고가 교차로',
+      kind: 'infrastructure',
+      description: '서로 다른 층의 도로가 겹치는 구간. 교각 그림자와 균열.',
+      neighbors: ['onramp', 'wreck-lanes'],
+      bg: {
+        path: '/assets/bg/maps/highway/overpass.webp',
+        position: 'center 55%',
+        overlay: 'fog',
+        grade: 'cool',
+        description:
+          '교각이 겹쳐 만든 깊은 그림자. 균열 사이로 식생이 자라며, 상판 가장자리 철근이 드러나 녹빛 얼룩이 번진다.',
+        llmPrompt:
+          'Layered overpass shadows; cracks with sprouting plants; exposed rebar with green rust stains; cool fog overlay.',
+      },
+    },
+    {
+      id: 'wreck-lanes',
+      name: '차량 잔해 구간',
+      kind: 'ruin',
+      description: '뒤엉킨 차량 잔해가 길을 막는다. 일부는 반쯤 매몰.',
+      neighbors: ['onramp', 'overpass'],
+      bg: {
+        path: '/assets/bg/maps/highway/wreck_lanes.webp',
+        position: 'center 60%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '폐차 더미와 흩어진 유리 파편, 눌린 차체의 주름과 벗겨진 도색. 바람에 걸린 범퍼 천 조각이 간헐적으로 흔들린다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Tangled car wrecks with scattered glass shards; crushed sheet metal creases and flaked paint; occasional fluttering fabric; loopable subtle motion.',
+      },
+    },
+  ],
+};
+
+const MAP_SUBWAY: MapNode = {
+  id: 'SUBWAY_LINE',
+  name: '폐 지하철 선로',
+  description:
+    '철문이 열린 서비스 입구를 통해 들어가는 폐 선로. 물웅덩이와 깜빡이는 비상등, 오래된 광고판이 남아 있다.',
+  entryFieldId: 'service-entrance',
+  prev: 'HIGHWAY',
+  next: 'REFINERY_BELT',
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'echoing-underground' },
+  bg: {
+    path: '/assets/bg/maps/subway/main.webp',
+    position: 'center 55%',
+    overlay: 'fog',
+    grade: 'cool',
+    description:
+      '플랫폼 기둥과 선로가 평행으로 사라진다. 바닥에는 물웅덩이가 점점이 찍혀 조명 반사를 일그러뜨리고, ' +
+      '비상등은 불규칙한 간격으로 깜빡인다. 오래된 광고판은 벗겨진 종이와 녹 얼룩으로 질감이 거칠다.',
+    gifRecommended: true,
+    llmPrompt:
+      'Abandoned subway with parallel tracks; puddles causing wavy reflections; intermittent emergency light flicker; torn paper ads with rust stains; loopable flicker and ripple.',
+  },
+  music: {
+    mood: 'sub-bass rumbles + fluorescent buzz',
+    tracks: ['/assets/audio/maps/subway/rumble.ogg'],
+    loop: true,
+    volume: 0.55,
+    description:
+      '낮은 럼블과 형광등 버즈가 교차. 멀리서 들리는 금속 굴림 잔향(희귀). 공간감은 터널 중심에 집중.',
+    llmPrompt:
+      'Low rumbles with fluorescent light buzz; rare distant metal roll echoes; centered tunnel reverb; sparse textures.',
+  },
+  fields: [
+    {
+      id: 'service-entrance',
+      name: '서비스 입구(Entry)',
+      kind: 'entry',
+      description: '철문과 좁은 계단, 경고 표지판. 습기와 곰팡이 냄새.',
+      neighbors: ['platform', 'tunnel'],
+      bg: {
+        path: '/assets/bg/maps/subway/service_entrance.webp',
+        position: 'center 60%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '녹슨 철문과 경사 계단. 계단 모서리에 물방울이 맺혀 반짝이며, 경고 표지판의 글자는 반쯤 벗겨져 있다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Rusty steel door and inclined stair; droplets glinting on step edges; peeling warning signage; loopable micro-drips.',
+      },
+    },
+    {
+      id: 'platform',
+      name: '플랫폼',
+      kind: 'infrastructure',
+      description: '열차는 없다. 광고판과 벤치, 행선 LED 잔광.',
+      neighbors: ['service-entrance', 'tunnel'],
+      bg: {
+        path: '/assets/bg/maps/subway/platform.webp',
+        position: 'center 55%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '플랫폼 벽면의 라이트 박스가 간헐적으로 남은 전류로 깜빡이며, 벤치 금속 다리엔 찌든 자국이 번져 있다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Platform lightboxes faintly flicker from residual current; stained metal bench legs; loopable flicker.',
+      },
+    },
+    {
+      id: 'tunnel',
+      name: '터널',
+      kind: 'infrastructure',
+      description: '균일한 선로와 케이블 볼트. 소리의 꼬리만 남는다.',
+      neighbors: ['service-entrance', 'platform'],
+      bg: {
+        path: '/assets/bg/maps/subway/tunnel.webp',
+        position: 'center 55%',
+        overlay: 'fog',
+        grade: 'cool',
+        description:
+          '벽면 케이블 고정 볼트가 반복 패턴을 이루며, 원근감이 강하게 느껴진다. 먼지 입자가 헤드램프 없는 어둠 속에서 천천히 흐른다.',
+        llmPrompt:
+          'Tunnel with repeating cable bolts; strong perspective; slow floating dust in headlamp-less darkness; cool fog overlay.',
+      },
+    },
+  ],
+};
+
+const MAP_REFINERY: MapNode = {
+  id: 'REFINERY_BELT',
+  name: '정유 벨트',
+  description:
+    '파이프라인과 탱크가 늘어선 공업 지대. 플레어 스택은 꺼졌고, 오일 자국만 바닥에 남아 있다.',
+  entryFieldId: 'pipeway',
+  prev: 'SUBWAY_LINE',
+  next: 'CLOSED_AIRFIELD',
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'industrial-desolate' },
+  bg: {
+    path: '/assets/bg/maps/refinery/main.webp',
+    position: 'center 55%',
+    overlay: 'grain',
+    grade: 'cool',
+    description:
+      '지면에 고여 번들거리는 오일 자국과 얽힌 파이프 숲. 밸브 휠의 페인트가 벗겨져 금속 바탕이 드러나며, ' +
+      '플레어 스택은 냉각되어 잔열만 공기 왜곡으로 떠오른다.',
+    gifRecommended: true,
+    llmPrompt:
+      'Pipeline forest with glossy oil puddles; peeling valve wheel paint exposing metal; cooled flare stacks with subtle heat haze; loopable shimmer.',
+  },
+  music: {
+    mood: 'metal groan + oil drip',
+    tracks: ['/assets/audio/maps/refinery/metal_groan.ogg'],
+    loop: true,
+    volume: 0.6,
+    description:
+      '느린 금속 하중음과 드문 오일 방울 소리. 넓은 리버브는 억제, 중저역 질감 강조.',
+    llmPrompt:
+      'Slow metal load groans with sparse oil drip; restrained reverb; mid-low texture emphasis.',
+  },
+  fields: [
+    {
+      id: 'pipeway',
+      name: '파이프 웨이(Entry)',
+      kind: 'entry',
+      description: '파이프 트러스 아래의 통로. 격자 그림자.',
+      neighbors: ['cracking-yard', 'flare-stack'],
+      bg: {
+        path: '/assets/bg/maps/refinery/pipeway.webp',
+        position: 'center 55%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '격자 트러스 그림자가 바닥에 격자로 드리워지고, 바람에 눌리는 비닐 시트가 파이프에 걸려 떨린다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Pipe truss casting grid shadows; plastic sheet caught and fluttering; loopable flutter.',
+      },
+    },
+    {
+      id: 'cracking-yard',
+      name: '분해 공정 야드',
+      kind: 'infrastructure',
+      description: '정지된 장치와 안전 페인트. 표식은 자주색/노랑 대비.',
+      neighbors: ['pipeway', 'flare-stack'],
+      bg: {
+        path: '/assets/bg/maps/refinery/cracking_yard.webp',
+        position: 'center 55%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '자주색 위험 표식과 노란 안전 라인. 장치 표면에는 스케일이 끼어 거칠고, 볼트 주변엔 기름때 무늬.',
+        llmPrompt:
+          'Cracking units with purple hazard signs and yellow safety lines; scaled rough surfaces; oil grime halos around bolts.',
+      },
+    },
+    {
+      id: 'flare-stack',
+      name: '플레어 스택',
+      kind: 'infrastructure',
+      description: '꺼진 스택. 잔열의 공기 떨림만 남아 있다.',
+      neighbors: ['pipeway', 'cracking-yard'],
+      bg: {
+        path: '/assets/bg/maps/refinery/flare_stack.webp',
+        position: 'center 50%',
+        overlay: 'fog',
+        grade: 'cool',
+        description:
+          '수직 스택과 계단. 금속 난간에 응결수, 상단 배출구 주변 공기 굴절이 미세하게 일렁인다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Vertical flare stack and stair; condensation on rails; subtle refractive shimmer near the outlet; loopable.',
+      },
+    },
+  ],
+};
+
+const MAP_AIRFIELD: MapNode = {
+  id: 'CLOSED_AIRFIELD',
+  name: '폐 공항 활주로',
+  description:
+    '폐쇄된 활주로와 비행격납고. 바람에 모래와 유리먼지가 지나가고, 유도등은 일부만 살아 깜빡인다.',
+  entryFieldId: 'runway-entry',
+  prev: 'REFINERY_BELT',
+  next: 'ASHENPORT',
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'open-winds' },
+  bg: {
+    path: '/assets/bg/maps/airfield/main.webp',
+    position: 'center 55%',
+    overlay: 'fog',
+    grade: 'cool',
+    description:
+      '긴 활주로 중앙선이 소실점으로 뻗는다. 표면의 균열 사이로 모래가 쌓이고, 유도등 몇 개는 주기적으로 희미하게 점등된다. ' +
+      '멀리 격납고 실루엣과 관제탑이 낮게 솟아 있다.',
+    gifRecommended: true,
+    llmPrompt:
+      'Closed runway with long centerline to vanishing point; sand collected in cracks; few taxi lights faintly blinking; distant hangars and tower silhouettes; loopable wind/sand motion.',
+  },
+  music: {
+    mood: 'windscape + beacon ticks',
+    tracks: ['/assets/audio/maps/airfield/windscape.ogg'],
+    loop: true,
+    volume: 0.6,
+    description:
+      '넓은 바람 위에 희미한 비콘 틱이 간헐적으로 섞이는 구성. 저역은 억제하고 고역 바람 결을 살린다.',
+    llmPrompt:
+      'Wide wind with occasional beacon ticks; low end restrained; emphasize high-frequency wind textures; sparse.',
+  },
+  fields: [
+    {
+      id: 'runway-entry',
+      name: '활주로 입구(Entry)',
+      kind: 'entry',
+      description: '활주로 표식과 배리어. 바람이 강하다.',
+      neighbors: ['hangars', 'control-tower'],
+      bg: {
+        path: '/assets/bg/maps/airfield/runway_entry.webp',
+        position: 'center 60%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '활주로 번호가 크게 적힌 표식. 일부 페인트가 바래고 갈라졌다. 바람에모래가 얇은 커튼처럼 스친다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Runway threshold numbers faded and cracked; thin curtains of sand blown across; loopable.',
+      },
+    },
+    {
+      id: 'hangars',
+      name: '격납고',
+      kind: 'infrastructure',
+      description: '슬라이딩 도어가 반쯤 열린 격납고. 내부는 어둡다.',
+      neighbors: ['runway-entry', 'control-tower'],
+      bg: {
+        path: '/assets/bg/maps/airfield/hangars.webp',
+        position: 'center 55%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '거대한 슬라이딩 도어 틈에서 바람이 일며 내부 먼지가 비스듬히 움직인다. 금속 골조가 반복 패턴을 만든다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Hangar sliding door half open; oblique dust drift inside; repeating steel frame pattern; loopable.',
+      },
+    },
+    {
+      id: 'control-tower',
+      name: '관제탑',
+      kind: 'infrastructure',
+      description: '사다리와 유리 박스. 내부 패널 일부가 살아 있다.',
+      neighbors: ['runway-entry', 'hangars'],
+      bg: {
+        path: '/assets/bg/maps/airfield/control_tower.webp',
+        position: 'center 50%',
+        overlay: 'fog',
+        grade: 'cool',
+        description:
+          '유리 박스형 탑 상부에 계단과 발판. 내부 패널 LED 일부가 박동하듯 아주 느리게 밝아진다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Glass box tower top with stairs/platform; interior panel LEDs pulsing very slowly; loopable subtle pulse.',
+      },
+    },
+  ],
+};
+
+const MAP_ASHENPORT: MapNode = {
+  id: 'ASHENPORT',
+  name: '재빛 항구도시',
+  description:
+    '재와 유리 슬래그가 쌓인 해안 도시. 방파제와 건조 도크, 낮고 무거운 구름 하늘 아래 잿빛 바다가 펼쳐진다.',
+  entryFieldId: 'gate',
+  prev: 'CLOSED_AIRFIELD',
+  next: null,
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'harbor-gloom' },
+  bg: {
+    path: '/assets/bg/maps/ashenport/main.webp',
+    position: 'center 60%',
+    overlay: 'fog',
+    grade: 'cool',
+    description:
+      '방파제 끝에 녹슨 표식과 신호등, 건조 도크의 크레인이 조용히 서 있다. 바다는 잔물결이 느리게 번지고, 하늘은 낮게 드리운 연회색 층운.',
+    gifRecommended: true,
+    llmPrompt:
+      'Harbor breakwater with rusty markers and signal lights; dry-dock cranes; slow ripples on gray sea; low stratus clouds; loopable water motion.',
+  },
+  music: {
+    mood: 'sea mist + low horns',
+    tracks: ['/assets/audio/maps/ashenport/sea_mist.ogg'],
+    loop: true,
+    volume: 0.6,
+    description:
+      '해무 앰비언스와 낮은 혼 경적이 드물게 섞임. 금속 케이블 삭는 소리가 아주 낮은 레벨로 배경에 깔린다.',
+    llmPrompt:
+      'Sea mist ambience with rare low foghorns; faint metal cable creak; restrained mix.',
+  },
+  fields: [
+    {
+      id: 'gate',
+      name: '항구 문(Entry)',
+      kind: 'entry',
+      description: '항구 도시의 관문. 통행 펜스와 경비 박스.',
+      neighbors: ['dry-docks', 'civic-hall'],
+      bg: {
+        path: '/assets/bg/maps/ashenport/gate.webp',
+        position: 'center 60%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '메쉬 펜스 뒤로 컨테이너 실루엣이 겹겹이 쌓이고, 경비 박스의 작은 창에 실내 조명이 은은히 번진다.',
+        llmPrompt:
+          'Harbor gate with mesh fence, stacked container silhouettes; guard booth window with faint interior light; cool grain.',
+      },
+    },
+    {
+      id: 'dry-docks',
+      name: '건조 도크',
+      kind: 'infrastructure',
+      description: '선체 지지대와 크레인. 바닥은 녹과 기름 얼룩.',
+      neighbors: ['gate', 'civic-hall'],
+      bg: {
+        path: '/assets/bg/maps/ashenport/dry_docks.webp',
+        position: 'center 55%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '선체 지지대가 리듬감 있게 반복되며, 크레인의 케이블이 바람에 느리게 떨린다. 바닥의 오일 웰트가 점状 반짝임.',
+        gifRecommended: true,
+        llmPrompt:
+          'Dry-dock with repeating hull supports; crane cables slowly vibrating; oil speckles glinting; loopable.',
+      },
+    },
+    {
+      id: 'civic-hall',
+      name: '시민 회관',
+      kind: 'district',
+      description: '낮고 넓은 로비 공간. 공지판과 쉼터 벤치.',
+      neighbors: ['gate', 'dry-docks'],
+      bg: {
+        path: '/assets/bg/maps/ashenport/civic_hall.webp',
+        position: 'center 55%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '광택 없는 석재 바닥과 긴 그림자. 공지판에는 낡은 종이가 어긋나게 겹쳐 붙어 있고, 벤치의 금속 팔걸이는 차갑게 빛난다.',
+        llmPrompt:
+          'Matte stone floor with long shadows; layered old paper notices; cold sheen on metal bench armrests; subdued cool palette.',
+      },
+    },
+  ],
+};
+
 export const WORLD_STATIC: WorldIndex = {
   id: 'GREYFALL_CORE',
   name: 'Greyfall — Solas Basin',
   head: 'LUMENFORD',
-  maps: [MAP_LUMENFORD, MAP_BACKSTREETS, MAP_LIBRARY, MAP_CAUSEWAY, MAP_SEWERS],
+  maps: [
+    MAP_LUMENFORD,
+    MAP_BACKSTREETS,
+    MAP_LIBRARY,
+    MAP_CAUSEWAY,
+    MAP_SEWERS,
+    MAP_HIGHWAY,
+    MAP_SUBWAY,
+    MAP_REFINERY,
+    MAP_AIRFIELD,
+    MAP_ASHENPORT,
+  ],
 };

@@ -10,6 +10,9 @@ export type Publish = <K extends LobbyMessageKind>(
 export type HostObject = {
   id: string;
   onRequest: (sinceRev?: number) => boolean;
+  // Optional but recommended: enable targeted resend and incremental recovery
+  getSnapshot?: () => { rev: number; value: unknown } | null | undefined;
+  getLogsSince?: (sinceRev: number) => { rev: number; ops: unknown[] }[] | null | undefined;
 };
 
 export type ClientObject = {
@@ -22,4 +25,3 @@ export type CommonDeps = {
   publish: Publish;
   lobbyStore: LobbyStore;
 };
-
