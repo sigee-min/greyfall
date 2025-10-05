@@ -1,17 +1,7 @@
 class Registry {
     constructor() {
-        Object.defineProperty(this, "specs", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new Map()
-        });
-        Object.defineProperty(this, "lastExecAt", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new Map()
-        });
+        this.specs = new Map();
+        this.lastExecAt = new Map();
     }
     register(spec) {
         this.specs.set(spec.cmd.toLowerCase(), spec);

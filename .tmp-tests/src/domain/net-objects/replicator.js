@@ -45,7 +45,33 @@ export class HostReplicator {
                 result = structuredClone(op.value);
             }
             else if (op.op === 'merge') {
-                if (typeof result === 'object' && result) {
+                const path = op.path;
+                const value = op.value;
+                if (path) {
+                    const target = result[path];
+                    if (Array.isArray(target)) {
+                        const items = Array.isArray(value) ? value : [value];
+                        for (const patch of items) {
+                            const id = patch?.id;
+                            if (id == null)
+                                continue;
+                            const idx = target.findIndex((e) => e?.id === id);
+                            if (idx >= 0) {
+                                target[idx] = { ...target[idx], ...patch };
+                            }
+                            else {
+                                target.push(patch);
+                            }
+                        }
+                    }
+                    else if (target && typeof target === 'object') {
+                        Object.assign(target, value);
+                    }
+                    else {
+                        result[path] = structuredClone(value);
+                    }
+                }
+                else if (typeof result === 'object' && result) {
                     Object.assign(result, op.value);
                 }
                 else {

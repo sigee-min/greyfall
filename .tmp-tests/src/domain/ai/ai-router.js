@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { commandRegistry } from './command-registry';
-import { ChatCommand } from './commands/chat';
+import { commandRegistry } from './command-registry.js';
+import { ChatCommand } from './commands/chat.js';
 const EnvelopeSchema = z.object({ cmd: z.string().min(1), body: z.any().optional() }).passthrough();
 export function parseAICommand(text) {
     try {

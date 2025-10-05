@@ -27,6 +27,7 @@ export class HostNetController {
   private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
   private readonly registry = new Map<string, HostObject>();
+  private readonly peerToParticipant = new Map<string, string>();
   private readonly chatLimiter = new SlidingWindowLimiter(5, 10_000); // 5 msgs / 10s per author
 
   constructor({ publish, lobbyStore, busPublish }: Deps) {
@@ -39,7 +40,7 @@ export class HostNetController {
     this.register(this.chat);
   }
 
-  bindChannel(channel: RTCDataChannel) {
+  bindChannel(channel: RTCDataChannel, peerId?: string) {
     const onMessage = (event: MessageEvent) => {
       let payload: unknown = event.data;
       try {
@@ -47,7 +48,7 @@ export class HostNetController {
       } catch (_err) {
         // Ignore non-JSON payloads
       }
-      this.handlePayload(payload);
+      this.handlePayload(payload, peerId);
     };
     channel.addEventListener('message', onMessage);
   }
@@ -62,7 +63,7 @@ export class HostNetController {
     obj?.onRequest(sinceRev);
   }
 
-  private handlePayload(payload: unknown) {
+  private handlePayload(payload: unknown, peerId?: string) {
     const message = parseLobbyMessage(payload);
     if (!message) return;
 
@@ -71,6 +72,7 @@ export class HostNetController {
         const p = message.body.participant;
         this.lobbyStore.upsertFromWire(p);
         this.participants.upsert(p, 'hello:merge');
+        if (peerId) this.peerToParticipant.set(peerId, p.id);
         break;
       }
       case 'ready': {
@@ -86,6 +88,10 @@ export class HostNetController {
         const id = message.body.participantId;
         this.lobbyStore.remove(id);
         this.participants.remove(id, 'leave:remove');
+        // drop any peer mapping for this participant
+        for (const [k, v] of Array.from(this.peerToParticipant.entries())) {
+          if (v === id) this.peerToParticipant.delete(k);
+        }
         break;
       }
       case 'object:request': {
@@ -129,5 +135,20 @@ export class HostNetController {
 
   register(object: HostObject) {
     this.registry.set(object.id, object);
+  }
+
+  onPeerDisconnected(peerId: string) {
+    const participantId = this.peerToParticipant.get(peerId);
+    if (!participantId) return;
+    this.peerToParticipant.delete(peerId);
+    // remove participant and broadcast patch removal
+    this.lobbyStore.remove(participantId);
+    this.participants.remove(participantId, 'peer-disconnected');
+  }
+
+  updateParticipantReady(participantId: string, ready: boolean, context = 'ready:host-toggle') {
+    const raw = this.lobbyStore.snapshotWire().map((p) => (p.id === participantId ? { ...p, ready } : p));
+    this.lobbyStore.replaceFromWire(raw);
+    this.participants.update(participantId, { ready }, context);
   }
 }

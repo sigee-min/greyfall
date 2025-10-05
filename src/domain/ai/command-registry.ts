@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { PublishLobbyMessage } from '../chat/use-lobby-chat';
+import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
+export type PublishLobbyMessage = <K extends LobbyMessageKind>(
+  kind: K,
+  body: LobbyMessageBodies[K],
+  context?: string
+) => boolean;
 import type { SessionParticipant } from '../session/types';
 import type { LlmManagerKind } from '../../llm/qwen-webgpu';
 

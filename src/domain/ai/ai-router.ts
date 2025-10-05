@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { commandRegistry, type CommandContext, type AICommandEnvelope } from './command-registry';
-import { ChatCommand } from './commands/chat';
+import { commandRegistry, type CommandContext, type AICommandEnvelope } from './command-registry.js';
+import { ChatCommand } from './commands/chat.js';
 
 export type AICommand = { cmd: string; body?: unknown };
 

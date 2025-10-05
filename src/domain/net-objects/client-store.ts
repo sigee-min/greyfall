@@ -2,6 +2,7 @@ type ObjectState = { rev: number; value: unknown };
 
 export class ClientNetObjectStore {
   private state = new Map<string, ObjectState>();
+  private pending = new Map<string, Map<number, unknown[]>>();
 
   get(id: string) {
     return this.state.get(id) ?? null;
@@ -11,16 +12,52 @@ export class ClientNetObjectStore {
     const current = this.state.get(id);
     if (current && rev <= current.rev) return false; // stale
     this.state.set(id, { rev, value });
+    // After replace, try to apply any queued patches sequentially
+    const queued = this.pending.get(id);
+    if (queued) {
+      let next = rev + 1;
+      while (queued.has(next)) {
+        const ops = queued.get(next)! as any[];
+        const ok = this.applyPatch(id, next, ops);
+        queued.delete(next);
+        if (!ok) break;
+        next++;
+      }
+      if (queued.size === 0) this.pending.delete(id);
+    }
     return true;
   }
 
   applyPatch(id: string, rev: number, ops: any[]): boolean {
     const current = this.state.get(id);
-    if (!current) return false; // need base
-    if (rev !== current.rev + 1) return false; // out-of-order; request replace
+    if (!current) return false; // need base snapshot first
+    if (rev > current.rev + 1) {
+      // future patch: queue and wait for missing revs
+      const bucket = this.pending.get(id) ?? new Map<number, unknown[]>();
+      bucket.set(rev, ops);
+      this.pending.set(id, bucket);
+      return true;
+    }
+    if (rev <= current.rev) {
+      // duplicate or old patch — ignore
+      return true;
+    }
 
     const next = this.applyOps(structuredClone(current.value), ops);
     this.state.set(id, { rev, value: next });
+    // drain any contiguous queued patches
+    const queued = this.pending.get(id);
+    if (queued) {
+      let nextRev = rev + 1;
+      while (queued.has(nextRev)) {
+        const qops = queued.get(nextRev)! as any[];
+        const applied = this.applyPatch(id, nextRev, qops);
+        queued.delete(nextRev);
+        if (!applied) break;
+        nextRev++;
+      }
+      if (queued.size === 0) this.pending.delete(id);
+    }
     return true;
   }
 

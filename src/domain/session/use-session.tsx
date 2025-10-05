@@ -359,8 +359,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         const hostPeerManager = new HostPeerManager({
           onMessage: () => {},
           onOpen: (channel) => {
-            // Bind host controller per peer channel
-            hostControllerRef.current?.bindChannel(channel);
+            // Host controller binding by peer will be added with peerId below
             handleChannelOpen(channel);
           },
           onClose: handleChannelClose,
@@ -379,6 +378,9 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
             try {
               hostControllerRef.current?.onPeerConnected(peerId);
               const entry = await hostPeerManager.create(peerId);
+              entry.channel.addEventListener('open', () => {
+                hostControllerRef.current?.bindChannel(entry.channel, peerId);
+              });
               entry.peer.addEventListener('icecandidate', (event) => {
                 if (!event.candidate) return;
                 try {
@@ -417,10 +419,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
           onPeerDisconnected: ({ peerId }) => {
             console.info('[signal] peer disconnected (host)', { sessionId: signalSessionId, peerId });
             void hostPeerManager.close(peerId);
-            if (modeRef.current === 'host') {
-              const hostOnly = lobbyStore.hostSnapshot();
-              lobbyStore.replaceFromWire(hostOnly);
-            }
+            hostControllerRef.current?.onPeerDisconnected(peerId);
           }
         });
       } catch (error) {
@@ -669,10 +668,10 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         if (modeRef.current === 'guest') {
           publishLobbyMessage('ready', { participantId, ready: nextReady }, 'ready-toggle guest');
         } else if (modeRef.current === 'host') {
-          hostControllerRef.current?.broadcastParticipants('ready-toggle host');
+          hostControllerRef.current?.updateParticipantReady(participantId, nextReady, 'ready:host-toggle');
         }
       } else if (modeRef.current === 'host') {
-        hostControllerRef.current?.broadcastParticipants('ready-toggle host remote');
+        hostControllerRef.current?.updateParticipantReady(participantId, nextReady, 'ready:host-remote-toggle');
       }
     },
     [lobbyStore, publishLobbyMessage]

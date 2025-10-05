@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { guideDisplayName } from '../../llm/guide-profile';
+import { guideDisplayName } from '../../llm/guide-profile.js';
 import { nanoid } from 'nanoid';
 // 단일 고정 타입: string (프로토콜의 body와 동일)
 const ChatBodySchema = z.string().min(1);

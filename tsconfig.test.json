@@ -16,6 +16,10 @@
   "include": [
     "src/domain/net-objects/replicator.ts",
     "src/domain/net-objects/chat.ts",
+    "src/domain/ai/command-registry.ts",
+    "src/domain/ai/ai-router.ts",
+    "src/domain/ai/commands/chat.ts",
+    "src/domain/ai/personas.ts",
     "src/protocol/index.ts",
     "signal/src/protocol/schema.ts",
     "tests/**/*.ts"
