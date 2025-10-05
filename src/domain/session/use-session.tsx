@@ -12,6 +12,10 @@ import {
 } from '../../protocol';
 import { useLobbyStore, type SessionWireParticipant } from './session-store';
 import { useLobbyBus } from '../../bus/lobby-bus';
+import { HostPeerManager } from './host-peer-manager';
+import { PARTICIPANTS_OBJECT_ID } from '../net-objects/participants';
+import { HostNetController } from '../net-objects/host-controller';
+import { ClientNetController } from '../net-objects/client-controller';
 import { useGlobalBus } from '../../bus/global-bus';
 import { useGameBus } from '../../bus/game-bus';
 import {
@@ -69,6 +73,9 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
   const lobbyStore = useLobbyStore();
   const lobbyBus = useLobbyBus();
   const signalBridge = useSignalBridge();
+  const hostPeersRef = useRef<HostPeerManager | null>(null);
+  const hostControllerRef = useRef<HostNetController | null>(null);
+  const clientControllerRef = useRef<ClientNetController | null>(null);
   const globalBus = useGlobalBus();
   const gameBus = useGameBus();
 
@@ -208,26 +215,30 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
   const publishLobbyMessage = useCallback(
     <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context = 'external') => {
+      const envelope = createLobbyMessage(kind, body);
+      // 항상 로컬에 에코해 UI 즉시 반영
+      lobbyBus.publish(envelope);
+
+      // 호스트: 멀티 피어 매니저가 있으면 브로드캐스트
+      if (modeRef.current === 'host' && hostPeersRef.current) {
+        hostPeersRef.current.sendAll(envelope);
+        console.info('[lobby] broadcast', { context, kind });
+        return true;
+      }
+
+      // 게스트/레거시 단일 채널 경로
       const session = sessionRef.current;
       if (!session) {
-        console.warn('[lobby] send skipped – no session', { context, kind, body });
+        console.warn('[lobby] send skipped – no session', { context, kind });
         return false;
       }
       const { channel } = session;
-      const envelope = createLobbyMessage(kind, body);
-      // Echo to local subscribers immediately so UI reflects own messages even if channel is closed.
-      lobbyBus.publish(envelope);
       if (channel.readyState !== 'open') {
-        // Keep queue bounded to MAX_PENDING_QUEUE by dropping oldest first
         while (pendingMessagesRef.current.length >= MAX_PENDING_QUEUE) {
           pendingMessagesRef.current.shift();
           console.warn('[lobby] pending queue overflow – dropping oldest message');
         }
-        pendingMessagesRef.current.push({
-          context,
-          kind,
-          payload: JSON.stringify(envelope)
-        });
+        pendingMessagesRef.current.push({ context, kind, payload: JSON.stringify(envelope) });
         console.info('[lobby] queued message – channel not open', {
           context,
           state: channel.readyState,
@@ -237,7 +248,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         return false;
       }
       channel.send(JSON.stringify(envelope));
-      console.info('[lobby] send', { context, kind, body });
+      console.info('[lobby] send', { context, kind });
       return true;
     },
     [lobbyBus]
@@ -251,73 +262,15 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     [lobbyBus]
   );
 
-  const broadcastState = useCallback(
-    (context: string) => {
-      if (modeRef.current !== 'host') return;
-      const payload = lobbyStore.snapshotWire();
-      publishLobbyMessage('state', { participants: payload }, context);
-    },
-    [lobbyStore, publishLobbyMessage]
-  );
-
   // leaveSession defined above
 
-  const handleMessage = useCallback(
-    (payload: unknown) => {
-      const message = parseLobbyMessage(payload);
-      if (!message) {
-        console.warn('[lobby] unknown payload', payload);
-        return;
-      }
-
-      switch (message.kind) {
-        case 'hello':
-          if (modeRef.current === 'host') {
-            console.info('[lobby] hello', message.body.participant);
-            lobbyStore.upsertFromWire(message.body.participant);
-            broadcastState('hello');
-          }
-          break;
-        case 'state':
-          if (modeRef.current === 'guest') {
-            console.info('[lobby] state', message.body.participants);
-            lobbyStore.replaceFromWire(message.body.participants);
-          }
-          break;
-        case 'ready':
-          if (modeRef.current === 'host') {
-            console.info('[lobby] ready update', message.body);
-            const raw = lobbyStore.snapshotWire().map((participant) =>
-              participant.id === message.body.participantId
-                ? { ...participant, ready: message.body.ready }
-                : participant
-            );
-            lobbyStore.replaceFromWire(raw);
-            broadcastState('ready-update');
-          }
-          break;
-        case 'leave':
-          console.info('[lobby] leave notice', message.body);
-          lobbyStore.remove(message.body.participantId);
-          if (modeRef.current === 'host') {
-            broadcastState('leave-relay');
-          } else if (message.body.participantId !== lobbyStore.localParticipantIdRef.current) {
-            leaveSession();
-          }
-          break;
-        default:
-          break;
-      }
-
-      lobbyBus.publish(message);
-    },
-    [broadcastState, leaveSession, lobbyBus, lobbyStore]
-  );
 
   const handleChannelOpen = useCallback(
     (channel: RTCDataChannel) => {
       console.info('[lobby] channel open', { mode: modeRef.current, state: channel.readyState });
-      if (pendingMessagesRef.current.length > 0) {
+
+      // Flush pending messages only for single-channel guest path
+      if (modeRef.current === 'guest' && pendingMessagesRef.current.length > 0) {
         const pending = pendingMessagesRef.current.splice(0, pendingMessagesRef.current.length);
         for (const message of pending) {
           channel.send(message.payload);
@@ -328,9 +281,12 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
           });
         }
       }
+
       if (modeRef.current === 'host') {
-        broadcastState('channel-open host');
+        // Delegate message handling to host controller
+        hostControllerRef.current?.bindChannel(channel);
       } else {
+        // Guest: say hello and request authoritative snapshots, then bind client controller
         const localId = lobbyStore.localParticipantIdRef.current;
         if (localId) {
           const self = lobbyStore.participantsRef.current.find((participant) => participant.id === localId);
@@ -338,9 +294,11 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
             publishLobbyMessage('hello', { participant: lobbyStore.toWire(self) }, 'channel-open hello');
           }
         }
+        clientControllerRef.current?.bindChannel(channel);
+        clientControllerRef.current?.requestSnapshots();
       }
     },
-    [broadcastState, lobbyStore, publishLobbyMessage]
+    [lobbyStore, publishLobbyMessage]
   );
 
   const handleChannelClose = useCallback(
@@ -362,13 +320,17 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
   const events: RTCBridgeEvents = useMemo(
     () => ({
-      onMessage: (payload) => handleMessage(payload),
+      // Controllers bind their own channel message handlers; keep this a no-op
+      onMessage: () => {},
       onOpen: handleChannelOpen,
       onClose: handleChannelClose,
       onError: handleChannelError
     }),
-    [handleChannelClose, handleChannelError, handleChannelOpen, handleMessage]
+    [handleChannelClose, handleChannelError, handleChannelOpen]
   );
+
+  // Guest peerId received via signal ack
+  const guestPeerIdRef = useRef<string | null>(null);
 
   const createGame = useCallback(
     async (name: string) => {
@@ -395,45 +357,67 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
       try {
         signalSessionId = await requestSignalSessionId();
-        await signalBridge.connect(signalSessionId, 'host', {
-          onOffer: async (offer) => {
-            // 호스트는 외부에서 온 offer를 처리하지 않습니다(권위 유지)
-            console.debug('[signal] unexpected offer received at host (ignored)', { len: offer.length });
+        const hostPeerManager = new HostPeerManager({
+          onMessage: () => {},
+          onOpen: (channel) => {
+            // Bind host controller per peer channel
+            hostControllerRef.current?.bindChannel(channel);
+            handleChannelOpen(channel);
           },
-          onAnswer: async (answerCode) => {
-            console.info('[signal] answer received', {
-              sessionId: signalSessionId,
-              answerCodeLength: answerCode.length
-            });
+          onClose: handleChannelClose,
+          onError: handleChannelError
+        });
+        hostPeersRef.current = hostPeerManager;
+        hostControllerRef.current = new HostNetController({
+          publish: (kind, body, context) => publishLobbyMessage(kind as any, body as any, context),
+          lobbyStore,
+          busPublish: (message) => lobbyBus.publish(message)
+        });
+
+        await signalBridge.connect(signalSessionId, 'host', {
+          onPeerConnected: async ({ peerId }) => {
+            console.info('[signal] peer connected (host)', { sessionId: signalSessionId, peerId });
+            try {
+              hostControllerRef.current?.onPeerConnected(peerId);
+              const entry = await hostPeerManager.create(peerId);
+              entry.peer.addEventListener('icecandidate', (event) => {
+                if (!event.candidate) return;
+                try {
+                  signalBridge.sendCandidate(event.candidate.toJSON(), peerId);
+                } catch (error) {
+                  console.warn('[signal] candidate send failed (host)', error);
+                }
+              });
+              const offerCode = await hostPeerManager.createOffer(peerId, { iceRestart: true });
+              if (!signalBridge.sendOffer(offerCode, peerId)) {
+                console.warn('[signal] failed to send offer payload', { peerId });
+              }
+            } catch (error) {
+              console.error('[host] failed to create peer for', peerId, error);
+            }
+          },
+          onAnswer: async ({ code, peerId }) => {
+            if (!peerId) return;
             if (modeRef.current !== 'host') return;
             try {
-              const currentSession = sessionRef.current as HostLobbySession | null;
-              if (!currentSession) return;
-              if (pendingOfferRef.current) {
-                await pendingOfferRef.current.catch((error: unknown) => {
-                  console.warn('[signal] pending offer refresh failed before answer', error);
-                });
-              }
-              await currentSession.acceptAnswer(answerCode);
+              await hostPeerManager.applyAnswer(peerId, code);
             } catch (error) {
               console.error('[signal] failed to apply answer', error);
             }
           },
-          onCandidate: async (candidateJson) => {
+          onCandidate: async ({ candidate, peerId }) => {
+            if (!peerId) return;
             if (modeRef.current !== 'host') return;
             try {
-              const candidate = JSON.parse(candidateJson) as RTCIceCandidateInit;
-              await (sessionRef.current as HostLobbySession | null)?.peer.addIceCandidate(candidate);
+              const json = JSON.parse(candidate) as RTCIceCandidateInit;
+              await hostPeerManager.get(peerId)?.peer.addIceCandidate(json);
             } catch (error) {
               console.warn('[signal] failed to apply candidate (host)', error);
             }
           },
-          onPeerConnected: () => {
-            console.info('[signal] peer connected (host)', { sessionId: signalSessionId });
-            // Avoid sending a re-offer on connect; initial offer is already in flight via `forwardOffer()`.
-          },
-          onPeerDisconnected: () => {
-            console.info('[signal] peer disconnected (host)', { sessionId: signalSessionId });
+          onPeerDisconnected: ({ peerId }) => {
+            console.info('[signal] peer disconnected (host)', { sessionId: signalSessionId, peerId });
+            void hostPeerManager.close(peerId);
             if (modeRef.current === 'host') {
               const hostOnly = lobbyStore.hostSnapshot();
               lobbyStore.replaceFromWire(hostOnly);
@@ -470,40 +454,9 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       lobbyStore.replaceFromWire([hostParticipant]);
       globalBus.publish('session:state', { mode: 'host', code: sessionCode, participants: 1 });
 
-      forwardOffer = async () => {
-        const currentSession = sessionRef.current as HostLobbySession | null;
-        if (!currentSession) {
-          console.warn('[signal] cannot send offer – no active host session');
-          return;
-        }
-
-        const refreshPromise = currentSession
-          .refreshOffer({ iceRestart: true })
-          .then((code) => {
-            console.info('[signal] sending offer to peer', {
-              sessionId: signalSessionId,
-              hasSession: Boolean(sessionRef.current),
-              offerLength: code.length
-            });
-            if (!signalBridge.sendOffer(code)) {
-              console.warn('[signal] failed to send offer payload');
-            }
-          })
-          .catch((error: unknown) => {
-            console.error('[signal] failed to refresh offer', error);
-            throw error;
-          })
-          .finally(() => {
-            pendingOfferRef.current = null;
-          });
-
-        pendingOfferRef.current = refreshPromise;
-        await refreshPromise;
-      };
-
-      await forwardOffer();
+      forwardOffer = async () => undefined;
     },
-    [events, globalBus, lobbyStore, signalBridge, startHost, attachPeerWatchers]
+    [events, globalBus, lobbyStore, signalBridge, startHost, attachPeerWatchers, lobbyBus]
   );
 
   const joinGame = useCallback(
@@ -538,14 +491,17 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
       try {
         await signalBridge.connect(upperInput, 'guest', {
-          onOffer: async (offer: string) => {
+          onAck: ({ peerId }) => {
+            guestPeerIdRef.current = peerId ?? null;
+          },
+          onOffer: async ({ code: offerCode }) => {
             console.info('[signal] offer received via socket', {
               sessionId: upperInput,
-              offerLength: offer.length
+              offerLength: offerCode.length
             });
             if (!offerResolved) {
               offerResolved = true;
-              offerPromise.resolve(offer);
+              offerPromise.resolve(offerCode);
               return;
             }
 
@@ -554,7 +510,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
             const active = sessionRef.current as GuestLobbySession | null;
             if (!active) return;
             try {
-              const decoded = atob(offer);
+              const decoded = atob(offerCode);
               const restored = decodeURIComponent(decoded);
               const signal = JSON.parse(restored) as { type: 'offer' | 'answer'; sdp: string };
               if (signal.type !== 'offer') return;
@@ -584,7 +540,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
               console.error('[webrtc] failed to apply restart offer (guest)', error);
             }
           },
-          onCandidate: async (candidateJson: string) => {
+          onCandidate: async ({ candidate: candidateJson }) => {
             if (modeRef.current !== 'guest') return;
             try {
               const candidate = JSON.parse(candidateJson) as RTCIceCandidateInit;
@@ -640,7 +596,11 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
               console.error('[signal] failed to send answer payload');
             }
           },
-          relayIceCandidate
+          (candidate) => {
+            if (!signalBridge.sendCandidate(candidate)) {
+              console.debug('[signal] candidate skipped – socket not open (guest)');
+            }
+          }
         );
       } catch (error) {
         console.error('[signal] joinHost failed', {
@@ -661,6 +621,13 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       modeRef.current = 'guest';
       sessionRef.current = session;
       lobbyStore.setLocalParticipantId(id);
+
+      // Instantiate client-side controller for net objects
+      clientControllerRef.current = new ClientNetController({
+        publish: (kind, body, context) => publishLobbyMessage(kind as any, body as any, context),
+        lobbyStore,
+        busPublish: (message) => lobbyBus.publish(message)
+      });
 
       setSessionMeta({
         mode: 'guest',
@@ -703,13 +670,13 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         if (modeRef.current === 'guest') {
           publishLobbyMessage('ready', { participantId, ready: nextReady }, 'ready-toggle guest');
         } else if (modeRef.current === 'host') {
-          broadcastState('ready-toggle host');
+          hostControllerRef.current?.broadcastParticipants('ready-toggle host');
         }
       } else if (modeRef.current === 'host') {
-        broadcastState('ready-toggle host remote');
+        hostControllerRef.current?.broadcastParticipants('ready-toggle host remote');
       }
     },
-    [broadcastState, lobbyStore, publishLobbyMessage]
+    [lobbyStore, publishLobbyMessage]
   );
 
   const startMissionReady = useMemo(

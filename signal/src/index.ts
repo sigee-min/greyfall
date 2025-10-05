@@ -14,19 +14,21 @@ type Role = 'host' | 'guest';
 type Peer = {
   role: Role;
   socket: WebSocket;
+  peerId?: string;
 };
 
 type Session = {
   id: string;
   createdAt: number;
   host?: Peer;
-  guest?: Peer;
-  lastOffer?: string;
-  pendingForGuest: string[];
-  pendingForHost: string[];
+  guests: Map<string, Peer>;
+  lastOffers: Map<string, string>;
+  pendingForGuest: Map<string, string[]>; // key: peerId
+  pendingForHost: Map<string, string[]>; // key: peerId
 };
 
 const sessions = new Map<string, Session>();
+const MAX_GUESTS = 3; // host + 3 guests = 4 players
 
 const SESSION_TTL_MS = 1000 * 60 * 30; // 30 minutes
 const PORT = Number(process.env.PORT ?? 8787);
@@ -47,7 +49,14 @@ app.get('/health', (_req, res) => {
 
 app.post('/sessions', (_req, res) => {
   const id = generateSessionId();
-  sessions.set(id, { id, createdAt: Date.now(), pendingForGuest: [], pendingForHost: [] });
+  sessions.set(id, {
+    id,
+    createdAt: Date.now(),
+    guests: new Map(),
+    lastOffers: new Map(),
+    pendingForGuest: new Map(),
+    pendingForHost: new Map()
+  });
   console.log(`[session] created ${id}`);
   res.json({ sessionId: id });
 });
@@ -74,8 +83,10 @@ wss.on('connection', (socket, request) => {
       session = {
         id: sessionId,
         createdAt: Date.now(),
-        pendingForGuest: [],
-        pendingForHost: []
+        guests: new Map(),
+        lastOffers: new Map(),
+        pendingForGuest: new Map(),
+        pendingForHost: new Map()
       };
       sessions.set(sessionId, session);
       console.log(`[ws] new session registered via host ${sessionId}`);
@@ -95,26 +106,28 @@ wss.on('connection', (socket, request) => {
     session.host = { role, socket };
     console.log(`[ws] host connected ${sessionId}`);
     send(socket, createSignalServerMessage('ack', { role: 'host', sessionId }));
-    if (session.guest) {
-      send(socket, createSignalServerMessage('peer-connected', {}));
-      flushPending(session, 'host');
+    for (const peerId of session.guests.keys()) {
+      send(socket, createSignalServerMessage('peer-connected', { peerId }));
+      flushPendingToHost(session, peerId);
     }
   } else {
-    if (session.guest) {
-      console.warn(`[ws] guest already connected for ${sessionId}`);
-      socket.close(1011, 'Guest already connected');
+    if (session.guests.size >= MAX_GUESTS) {
+      console.warn(`[ws] session full ${sessionId}`);
+      socket.close(1013, 'Session full');
       return;
     }
-    session.guest = { role, socket };
-    console.log(`[ws] guest connected ${sessionId}`);
-    send(socket, createSignalServerMessage('ack', { role: 'guest', sessionId }));
+    const peerId = generatePeerId(session);
+    session.guests.set(peerId, { role, socket, peerId });
+    console.log(`[ws] guest connected ${sessionId} peerId=${peerId}`);
+    send(socket, createSignalServerMessage('ack', { role: 'guest', sessionId, peerId }));
     if (session.host?.socket.readyState === WebSocket.OPEN) {
-      send(session.host.socket, createSignalServerMessage('peer-connected', {}));
+      send(session.host.socket, createSignalServerMessage('peer-connected', { peerId }));
     }
-    if (session.lastOffer) {
-      send(socket, createSignalServerMessage('offer', { code: session.lastOffer }));
+    const last = session.lastOffers.get(peerId);
+    if (last) {
+      send(socket, createSignalServerMessage('offer', { code: last, peerId }));
     }
-    flushPending(session, 'guest');
+    flushPendingToGuest(session, peerId);
   }
 
   socket.on('message', (raw) => {
@@ -131,48 +144,64 @@ wss.on('connection', (socket, request) => {
       case 'ping':
         send(socket, createSignalServerMessage('pong', {}));
         break;
-      case 'offer':
+      case 'offer': {
         if (role !== 'host') {
           console.warn('[ws] unexpected offer from guest', { sessionId });
           return;
         }
-        console.log(`[ws] host sent offer ${sessionId}`);
-        currentSession.lastOffer = parsed.body.code;
-        if (currentSession.guest?.socket.readyState === WebSocket.OPEN) {
-          send(currentSession.guest.socket, createSignalServerMessage('offer', { code: parsed.body.code }));
+        const targetPeerId = parsed.body.peerId ?? (currentSession.guests.size === 1 ? [...currentSession.guests.keys()][0] : undefined);
+        if (!targetPeerId) {
+          console.warn('[ws] offer missing peerId with multiple guests', { sessionId });
+          return;
         }
-        break;
-      case 'answer':
+        console.log(`[ws] host sent offer ${sessionId} -> ${targetPeerId}`);
+        currentSession.lastOffers.set(targetPeerId, parsed.body.code);
+        const target = currentSession.guests.get(targetPeerId);
+        if (target?.socket.readyState === WebSocket.OPEN) {
+          send(target.socket, createSignalServerMessage('offer', { code: parsed.body.code, peerId: targetPeerId }));
+        }
+        break; }
+      case 'answer': {
         if (role !== 'guest') {
           console.warn('[ws] unexpected answer from host', { sessionId });
           return;
         }
-        console.log(`[ws] guest sent answer ${sessionId}`);
-        if (currentSession.host?.socket.readyState === WebSocket.OPEN) {
-          send(currentSession.host.socket, createSignalServerMessage('answer', { code: parsed.body.code }));
+        const fromPeerId = findPeerIdBySocket(currentSession, socket);
+        if (!fromPeerId) {
+          console.warn('[ws] could not resolve guest peerId for answer');
+          return;
         }
-        break;
-      case 'candidate':
+        console.log(`[ws] guest sent answer ${sessionId} from ${fromPeerId}`);
+        if (currentSession.host?.socket.readyState === WebSocket.OPEN) {
+          send(currentSession.host.socket, createSignalServerMessage('answer', { code: parsed.body.code, peerId: fromPeerId }));
+        }
+        break; }
+      case 'candidate': {
         if (role === 'host') {
-          if (currentSession.guest?.socket.readyState === WebSocket.OPEN) {
-            send(
-              currentSession.guest.socket,
-              createSignalServerMessage('candidate', { candidate: parsed.body.candidate })
-            );
+          const targetPeerId = parsed.body.peerId ?? (currentSession.guests.size === 1 ? [...currentSession.guests.keys()][0] : undefined);
+          if (!targetPeerId) {
+            console.warn('[ws] candidate missing peerId with multiple guests', { sessionId });
+            return;
+          }
+          const target = currentSession.guests.get(targetPeerId);
+          if (target?.socket.readyState === WebSocket.OPEN) {
+            send(target.socket, createSignalServerMessage('candidate', { candidate: parsed.body.candidate, peerId: targetPeerId }));
           } else {
-            currentSession.pendingForGuest.push(parsed.body.candidate);
+            enqueue(currentSession.pendingForGuest, targetPeerId, parsed.body.candidate);
           }
         } else if (role === 'guest') {
+          const fromPeerId = findPeerIdBySocket(currentSession, socket);
+          if (!fromPeerId) {
+            console.warn('[ws] could not resolve guest peerId for candidate');
+            return;
+          }
           if (currentSession.host?.socket.readyState === WebSocket.OPEN) {
-            send(
-              currentSession.host.socket,
-              createSignalServerMessage('candidate', { candidate: parsed.body.candidate })
-            );
+            send(currentSession.host.socket, createSignalServerMessage('candidate', { candidate: parsed.body.candidate, peerId: fromPeerId }));
           } else {
-            currentSession.pendingForHost.push(parsed.body.candidate);
+            enqueue(currentSession.pendingForHost, fromPeerId, parsed.body.candidate);
           }
         }
-        break;
+        break; }
       default:
         break;
     }
@@ -185,18 +214,26 @@ wss.on('connection', (socket, request) => {
     if (role === 'host') {
       delete currentSession.host;
       console.log(`[ws] host disconnected ${sessionId}`);
-      if (currentSession.guest?.socket.readyState === WebSocket.OPEN) {
-        send(currentSession.guest.socket, createSignalServerMessage('peer-disconnected', {}));
+      for (const [pid, guest] of currentSession.guests.entries()) {
+        if (guest.socket.readyState === WebSocket.OPEN) {
+          send(guest.socket, createSignalServerMessage('peer-disconnected', { peerId: 'host' }));
+        }
       }
     } else {
-      delete currentSession.guest;
-      console.log(`[ws] guest disconnected ${sessionId}`);
-      if (currentSession.host?.socket.readyState === WebSocket.OPEN) {
-        send(currentSession.host.socket, createSignalServerMessage('peer-disconnected', {}));
+      const pid = findPeerIdBySocket(currentSession, socket);
+      if (pid) {
+        currentSession.guests.delete(pid);
+        currentSession.lastOffers.delete(pid);
+        currentSession.pendingForGuest.delete(pid);
+        currentSession.pendingForHost.delete(pid);
+        console.log(`[ws] guest disconnected ${sessionId} peerId=${pid}`);
+        if (currentSession.host?.socket.readyState === WebSocket.OPEN) {
+          send(currentSession.host.socket, createSignalServerMessage('peer-disconnected', { peerId: pid }));
+        }
       }
     }
 
-    if (!currentSession.host && !currentSession.guest) {
+    if (!currentSession.host && currentSession.guests.size === 0) {
       sessions.delete(sessionId);
       console.log(`[session] removed ${sessionId}`);
     }
@@ -206,7 +243,7 @@ wss.on('connection', (socket, request) => {
 setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessions.entries()) {
-    if (!session.host && !session.guest && now - session.createdAt > SESSION_TTL_MS) {
+    if (!session.host && session.guests.size === 0 && now - session.createdAt > SESSION_TTL_MS) {
       sessions.delete(id);
     }
   }
@@ -222,17 +259,29 @@ function send(socket: WebSocket, payload: SignalServerMessage) {
     socket.send(JSON.stringify(payload));
   }
 }
+function enqueue(map: Map<string, string[]>, peerId: string, candidate: string) {
+  const list = map.get(peerId) ?? [];
+  list.push(candidate);
+  map.set(peerId, list);
+}
 
-function flushPending(session: Session, target: Role) {
-  const list = target === 'guest' ? session.pendingForGuest : session.pendingForHost;
-  if (list.length === 0) return;
-  const peerSocket = target === 'guest' ? session.guest?.socket : session.host?.socket;
-  if (!peerSocket || peerSocket.readyState !== WebSocket.OPEN) {
-    return;
-  }
-
+function flushPendingToGuest(session: Session, peerId: string) {
+  const guest = session.guests.get(peerId);
+  if (!guest || guest.socket.readyState !== WebSocket.OPEN) return;
+  const list = session.pendingForGuest.get(peerId);
+  if (!list || list.length === 0) return;
   for (const candidate of list.splice(0, list.length)) {
-    send(peerSocket, createSignalServerMessage('candidate', { candidate }));
+    send(guest.socket, createSignalServerMessage('candidate', { candidate, peerId }));
+  }
+}
+
+function flushPendingToHost(session: Session, peerId: string) {
+  const host = session.host;
+  if (!host || host.socket.readyState !== WebSocket.OPEN) return;
+  const list = session.pendingForHost.get(peerId);
+  if (!list || list.length === 0) return;
+  for (const candidate of list.splice(0, list.length)) {
+    send(host.socket, createSignalServerMessage('candidate', { candidate, peerId }));
   }
 }
 
@@ -261,5 +310,20 @@ function generateSessionId() {
   do {
     id = `${randomBlock()}-${randomBlock()}-${randomBlock()}`;
   } while (sessions.has(id));
+  return id;
+}
+
+function findPeerIdBySocket(session: Session, socket: WebSocket): string | null {
+  for (const [peerId, peer] of session.guests.entries()) {
+    if (peer.socket === socket) return peerId;
+  }
+  return null;
+}
+
+function generatePeerId(session: Session): string {
+  let id = '';
+  do {
+    id = `${randomBlock()}${randomBlock()}`;
+  } while (session.guests.has(id));
   return id;
 }

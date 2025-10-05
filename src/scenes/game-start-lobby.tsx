@@ -5,8 +5,8 @@ import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/qwen-webgpu';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
-import { guideDisplayName } from '../domain/llm/guide-profile';
-import { nanoid } from 'nanoid';
+import { executeAICommand } from '../domain/ai/ai-router';
+import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 
 type GameStartLobbyProps = {
@@ -128,7 +128,7 @@ export function GameStartLobby({
     return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
   }, [llmError, llmStatus, isActiveLoading, tick]);
 
-  // 안내인 로드 완료 시, 안내인 이름으로 1회 채팅 합류 알림
+  // 안내인 로드 완료 시, AI 명령(chat)으로 1회 합류 알림 전송
   useEffect(() => {
     if (mode !== 'host') return;
     if (!llmReady) return;
@@ -137,17 +137,21 @@ export function GameStartLobby({
 
     guideAnnouncedRef.current = true;
 
-    const self = participants.find((p) => p.id === localParticipantId);
-    const entry = {
-      id: nanoid(12),
-      authorId: localParticipantId,
-      authorName: guideDisplayName(llmManager),
-      authorTag: self?.tag ?? '#HOST',
-      authorRole: self?.role ?? 'host' as SessionRole,
-      body: '채널에 합류했습니다.',
-      at: Date.now()
-    };
-    publishLobbyMessage('chat', { entry }, 'guide-join');
+    void (async () => {
+      const parsed = await requestAICommand({
+        manager: llmManager,
+        userInstruction: '팀에 시작 인사를 전하세요. 반드시 JSON 한 줄로 {"cmd","body"}만 출력하세요.',
+        temperature: 0.5,
+        maxTokens: 96,
+        fallbackChatText: '채널에 합류했습니다.'
+      });
+      await executeAICommand(parsed, {
+        manager: llmManager,
+        publishLobbyMessage,
+        participants,
+        localParticipantId
+      });
+    })();
   }, [llmReady, llmManager, localParticipantId, mode, participants, publishLobbyMessage]);
 
   // 모든 인원 준비 + (호스트인 경우) 안내인까지 준비되어야 시작 가능

@@ -34,13 +34,13 @@ function decodeBase64(payload: string) {
   throw new Error('Base64 decoding unavailable in this runtime');
 }
 
-function serialiseSignal(signal: RTCSignal): string {
+export function serialiseSignal(signal: RTCSignal): string {
   const payload = JSON.stringify(signal);
   const safe = encodeURIComponent(payload);
   return encodeBase64(safe);
 }
 
-function deserialiseSignal(code: string): RTCSignal {
+export function deserialiseSignal(code: string): RTCSignal {
   const decoded = decodeBase64(code);
   const restored = decodeURIComponent(decoded);
   return JSON.parse(restored) as RTCSignal;
@@ -230,4 +230,34 @@ export async function joinHostSession(
     close: () => peer.close(),
     answerCode
   };
+}
+
+export function createHostPeer(events: RTCBridgeEvents, iceServers: RTCIceServer[] = ICE_SERVERS) {
+  const peer = new RTCPeerConnection({ iceServers });
+  const channel = peer.createDataChannel('greyfall');
+  channel.addEventListener('open', () => events.onOpen?.(channel));
+  channel.addEventListener('close', (ev) => events.onClose?.(ev));
+  channel.addEventListener('error', (ev) => events.onError?.(ev));
+  channel.addEventListener('message', (messageEvent) => {
+    try {
+      const payload = JSON.parse(messageEvent.data);
+      events.onMessage(payload, channel);
+    } catch (error) {
+      console.error('Failed to parse message', error);
+    }
+  });
+  return { peer, channel };
+}
+
+export async function createOfferCodeForPeer(peer: RTCPeerConnection, options?: RTCOfferOptions): Promise<string> {
+  const offer = await peer.createOffer(options);
+  await peer.setLocalDescription(offer);
+  const offerSignal: RTCSignal = { type: 'offer', sdp: offer.sdp ?? '' };
+  return serialiseSignal(offerSignal);
+}
+
+export async function applyAnswerCodeToPeer(peer: RTCPeerConnection, answerCode: string): Promise<void> {
+  const signal = deserialiseSignal(answerCode);
+  if (signal.type !== 'answer') throw new Error('Provided answer code is not an RTC answer');
+  await peer.setRemoteDescription({ type: 'answer', sdp: signal.sdp });
 }

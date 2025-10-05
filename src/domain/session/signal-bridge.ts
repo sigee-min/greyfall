@@ -4,19 +4,20 @@ import { createSignalClientMessage, parseSignalServerMessage, type SignalClientB
 import type { SessionMode } from './types';
 
 export type SignalBridgeHandlers = {
-  onOffer?: (code: string) => void;
-  onAnswer?: (code: string) => void;
-  onCandidate?: (candidate: string) => void;
-  onPeerConnected?: () => void;
-  onPeerDisconnected?: () => void;
+  onAck?: (payload: { role: 'host' | 'guest'; sessionId: string; peerId?: string | null }) => void;
+  onOffer?: (payload: { code: string; peerId?: string | null }) => void;
+  onAnswer?: (payload: { code: string; peerId?: string | null }) => void;
+  onCandidate?: (payload: { candidate: string; peerId?: string | null }) => void;
+  onPeerConnected?: (payload: { peerId: string }) => void;
+  onPeerDisconnected?: (payload: { peerId: string }) => void;
 };
 
 export type SignalBridge = {
   connect: (sessionId: string, role: SessionMode, handlers: SignalBridgeHandlers) => Promise<void>;
   disconnect: (code?: number, reason?: string) => void;
-  sendOffer: (code: string) => boolean;
-  sendAnswer: (code: string) => boolean;
-  sendCandidate: (candidate: RTCIceCandidateInit) => boolean;
+  sendOffer: (code: string, peerId?: string) => boolean;
+  sendAnswer: (code: string, peerId?: string) => boolean;
+  sendCandidate: (candidate: RTCIceCandidateInit, peerId?: string) => boolean;
   getSessionId: () => string | null;
   getSocket: () => WebSocket | null;
   isOpen: () => boolean;
@@ -111,20 +112,23 @@ export function useSignalBridge(): SignalBridge {
 
           const currentHandlers = handlersRef.current;
           switch (message.kind) {
+            case 'ack':
+              currentHandlers.onAck?.({ role: message.body.role, sessionId: message.body.sessionId, peerId: message.body.peerId });
+              break;
             case 'offer':
-              currentHandlers.onOffer?.(message.body.code);
+              currentHandlers.onOffer?.({ code: message.body.code, peerId: message.body.peerId });
               break;
             case 'answer':
-              currentHandlers.onAnswer?.(message.body.code);
+              currentHandlers.onAnswer?.({ code: message.body.code, peerId: message.body.peerId });
               break;
             case 'candidate':
-              currentHandlers.onCandidate?.(message.body.candidate);
+              currentHandlers.onCandidate?.({ candidate: message.body.candidate, peerId: message.body.peerId });
               break;
             case 'peer-connected':
-              currentHandlers.onPeerConnected?.();
+              currentHandlers.onPeerConnected?.({ peerId: message.body.peerId });
               break;
             case 'peer-disconnected':
-              currentHandlers.onPeerDisconnected?.();
+              currentHandlers.onPeerDisconnected?.({ peerId: message.body.peerId });
               break;
             default:
               break;
@@ -155,14 +159,14 @@ export function useSignalBridge(): SignalBridge {
     []
   );
 
-  const sendOffer = useCallback((code: string) => sendEnvelope('offer', { code }), [sendEnvelope]);
-  const sendAnswer = useCallback((code: string) => sendEnvelope('answer', { code }), [sendEnvelope]);
+  const sendOffer = useCallback((code: string, peerId?: string) => sendEnvelope('offer', { code, peerId }), [sendEnvelope]);
+  const sendAnswer = useCallback((code: string, peerId?: string) => sendEnvelope('answer', { code, peerId }), [sendEnvelope]);
   const sendCandidate = useCallback(
-    (candidate: RTCIceCandidateInit) => {
+    (candidate: RTCIceCandidateInit, peerId?: string) => {
       if (!candidate || !candidate.candidate) return false;
       try {
         const payload = JSON.stringify(candidate);
-        return sendEnvelope('candidate', { candidate: payload });
+        return sendEnvelope('candidate', { candidate: payload, peerId });
       } catch (error) {
         console.warn('[signal] serialise candidate failed', error);
         return false;

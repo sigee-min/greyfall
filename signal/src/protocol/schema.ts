@@ -12,19 +12,21 @@ const signalEnvelopeSchema = z.object({
   version: z.literal(RTC_PROTOCOL_VERSION)
 });
 
+const peerIdSchema = z.string().min(1);
+
 const signalOfferSchema = signalEnvelopeSchema.extend({
   kind: z.literal('offer'),
-  body: z.object({ code: z.string().min(10) })
+  body: z.object({ code: z.string().min(10), peerId: peerIdSchema.optional() })
 });
 
 const signalAnswerSchema = signalEnvelopeSchema.extend({
   kind: z.literal('answer'),
-  body: z.object({ code: z.string().min(10) })
+  body: z.object({ code: z.string().min(10), peerId: peerIdSchema.optional() })
 });
 
 const signalCandidateSchema = signalEnvelopeSchema.extend({
   kind: z.literal('candidate'),
-  body: z.object({ candidate: z.string().min(1) })
+  body: z.object({ candidate: z.string().min(1), peerId: peerIdSchema.optional() })
 });
 
 const signalPingSchema = signalEnvelopeSchema.extend({
@@ -36,18 +38,19 @@ const signalAckSchema = signalEnvelopeSchema.extend({
   kind: z.literal('ack'),
   body: z.object({
     role: sessionRoleSchema,
-    sessionId: z.string().min(3)
+    sessionId: z.string().min(3),
+    peerId: peerIdSchema.optional()
   })
 });
 
 const signalPeerConnectedSchema = signalEnvelopeSchema.extend({
   kind: z.literal('peer-connected'),
-  body: z.object({}).strict()
+  body: z.object({ peerId: peerIdSchema })
 });
 
 const signalPeerDisconnectedSchema = signalEnvelopeSchema.extend({
   kind: z.literal('peer-disconnected'),
-  body: z.object({}).strict()
+  body: z.object({ peerId: peerIdSchema })
 });
 
 const signalPongSchema = signalEnvelopeSchema.extend({
@@ -79,19 +82,19 @@ export type SignalClientKind = SignalClientMessage['kind'];
 export type SignalServerKind = SignalServerMessage['kind'];
 
 export type SignalClientBodies = {
-  offer: { code: string };
-  answer: { code: string };
-  candidate: { candidate: string };
+  offer: { code: string; peerId?: string };
+  answer: { code: string; peerId?: string };
+  candidate: { candidate: string; peerId?: string };
   ping: Record<string, never>;
 };
 
 export type SignalServerBodies = {
-  ack: { role: SessionRole; sessionId: string };
-  offer: { code: string };
-  answer: { code: string };
-  candidate: { candidate: string };
-  'peer-connected': Record<string, never>;
-  'peer-disconnected': Record<string, never>;
+  ack: { role: SessionRole; sessionId: string; peerId?: string };
+  offer: { code: string; peerId?: string };
+  answer: { code: string; peerId?: string };
+  candidate: { candidate: string; peerId?: string };
+  'peer-connected': { peerId: string };
+  'peer-disconnected': { peerId: string };
   pong: Record<string, never>;
 };
 
@@ -181,12 +184,44 @@ const lobbyChatSchema = lobbyEnvelopeSchema.extend({
   body: z.object({ entry: lobbyChatMessageSchema })
 });
 
+// Network object sync (host-authoritative)
+const patchOpSchema = z.object({
+  op: z.enum(['set', 'merge', 'insert', 'remove']),
+  path: z.string().optional(),
+  value: z.unknown().optional()
+});
+
+const lobbyObjectPatchSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('object:patch'),
+  body: z.object({ id: z.string().min(1), rev: z.number().int().nonnegative(), ops: patchOpSchema.array().max(64) })
+});
+
+const lobbyObjectReplaceSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('object:replace'),
+  body: z.object({ id: z.string().min(1), rev: z.number().int().nonnegative(), value: z.unknown() })
+});
+
+const lobbyObjectRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('object:request'),
+  body: z.object({ id: z.string().min(1), sinceRev: z.number().int().nonnegative().optional() })
+});
+
+// Client suggestion (host validates & converts to object patch)
+const lobbyChatAppendRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('chat:append:request'),
+  body: z.object({ body: z.string().min(1).max(2000), authorId: z.string().min(1) })
+});
+
 export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyHelloSchema,
   lobbyStateSchema,
   lobbyReadySchema,
   lobbyLeaveSchema,
-  lobbyChatSchema
+  lobbyChatSchema,
+  lobbyObjectPatchSchema,
+  lobbyObjectReplaceSchema,
+  lobbyObjectRequestSchema,
+  lobbyChatAppendRequestSchema
 ]);
 
 export type LobbyMessage = z.infer<typeof lobbyMessageSchema>;
@@ -198,6 +233,10 @@ export type LobbyMessageBodies = {
   ready: { participantId: string; ready: boolean };
   leave: { participantId: string };
   chat: { entry: LobbyChatMessage };
+  'object:patch': { id: string; rev: number; ops: { op: 'set' | 'merge' | 'insert' | 'remove'; path?: string; value?: unknown }[] };
+  'object:replace': { id: string; rev: number; value: unknown };
+  'object:request': { id: string; sinceRev?: number };
+  'chat:append:request': { body: string; authorId: string };
 };
 
 export function createLobbyMessage<K extends LobbyMessageKind>(

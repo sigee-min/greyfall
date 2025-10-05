@@ -98,6 +98,29 @@ export function useLobbyChat({
     return unsubscribe;
   }, [gameBus, registerLobbyHandler]);
 
+  // Host-authoritative chat object: replace handler
+  useEffect(() => {
+    const unsubscribe = registerLobbyHandler('object:replace', (message) => {
+      if (message.body.id !== 'chatlog') return;
+      const value: any = message.body.value;
+      const entries = Array.isArray(value?.entries) ? (value.entries as SessionChatLogEntry[] | any[]) : Array.isArray(value?.list) ? (value.list as SessionChatLogEntry[] | any[]) : null;
+      if (!entries) return;
+      // Map to local shape and mark self messages
+      const mapped = entries.map((e: any) => ({
+        id: String(e.id),
+        authorId: String(e.authorId),
+        authorName: String(e.authorName),
+        authorTag: String(e.authorTag),
+        authorRole: e.authorRole,
+        body: String(e.body),
+        at: Number(e.at),
+        isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
+      })) as SessionChatLogEntry[];
+      setChatMessages(mapped);
+    });
+    return unsubscribe;
+  }, [registerLobbyHandler]);
+
   const sendChatMessage = useCallback(
     (body: string) => {
       const trimmed = body.trim();
@@ -124,7 +147,8 @@ export function useLobbyChat({
         at: Date.now()
       };
 
-      const delivered = publishLobbyMessage('chat', { entry }, 'chat-send');
+      // Host-authoritative path: request Host to append; Host rebroadcasts chatlog snapshot/patch
+      const delivered = publishLobbyMessage('chat:append:request', { body: trimmed, authorId }, 'chat-send');
       if (!delivered) {
         console.info('[chat] queued until channel open');
       }

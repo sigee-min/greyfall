@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { LlmManagerKind } from '../../llm/qwen-webgpu';
-import { generateQwenChat } from '../../llm/qwen-webgpu';
+// LLM 호출은 ai-gateway 단일 창구를 사용합니다.
 import { guideDisplayName } from './guide-profile';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../chat/use-lobby-chat';
 import type { SessionParticipant } from '../session/types';
-import { nanoid } from 'nanoid';
-import { executeAICommand, parseAICommand } from '../ai/ai-router';
+// import { nanoid } from 'nanoid';
+import { executeAICommand } from '../ai/ai-router';
+import { requestAICommand } from '../ai/ai-gateway';
 
 export type GuideAgentPolicy = {
   respondOnMention: boolean;
@@ -81,30 +82,21 @@ export function useGuideAgent({
 
       pendingRef.current = (async () => {
         try {
-          const sys = buildSystemPrompt(guideName);
           const context = historyRef.current
             .slice(-fullPolicy.maxContext)
             .map((m) => `- ${m.role === 'assistant' ? '(안내인) ' : ''}${m.content}`)
             .join('\n');
-          const userPrompt = [
-            '당신의 출력은 JSON이어야 합니다.',
-            '형식: {"cmd": "chat", "body": string | object }',
-            '예: {"cmd":"chat","body":"안녕하세요."}',
-            '예: {"cmd":"chat","body":{"text":"안녕하세요.","tone":"formal"}}',
-            '대화 맥락:',
-            context,
-            '마지막 사용자 요청을 반영해 가장 적절한 chat 명령을 1개만 출력하세요.',
-          ].join('\n');
-
-          const raw = (await generateQwenChat(userPrompt, {
-            systemPrompt: sys,
+          const parsed = await requestAICommand({
+            manager,
+            userInstruction:
+              '사용자에게 응답하세요. 반드시 JSON 한 줄로 {"cmd":...,"body":{}} 형식만 출력하세요. chat은 {"text": string} 고정.',
+            contextText: context,
             temperature: 0.4,
-            topP: 0.9,
-            maxTokens: fullPolicy.maxTokens
-          })).trim();
+            maxTokens: fullPolicy.maxTokens,
+            fallbackChatText: '요청하신 내용을 이해하지 못했습니다.'
+          });
 
-          const parsed = parseAICommand(raw) ?? { cmd: 'chat', body: raw };
-          const executed = executeAICommand(parsed, {
+          const executed = await executeAICommand(parsed, {
             manager,
             publishLobbyMessage,
             participants: _participants,
@@ -126,7 +118,7 @@ export function useGuideAgent({
       })();
     });
     return unsubscribe;
-  }, [authorId, enabled, fullPolicy, guideName, publishLobbyMessage, registerLobbyHandler]);
+  }, [authorId, enabled, fullPolicy, guideName, publishLobbyMessage, registerLobbyHandler, _participants, localParticipantId, manager]);
 }
 
 function pushHistory(ref: { current: { role: 'user' | 'assistant'; content: string }[] }, item: { role: 'user' | 'assistant'; content: string }, max: number) {
@@ -146,13 +138,4 @@ function shouldReply(text: string, name: string, policy: GuideAgentPolicy): bool
   return false;
 }
 
-function buildSystemPrompt(name: string): string {
-  return [
-    `당신은 작전 안내인 “${name}”입니다.`,
-    '규칙:',
-    '- 한국어 존댓말 사용',
-    '- 1~2문장, 간결/실용적으로 답변',
-    '- 불확실하면 추가 정보 요청',
-    '- 코드/명령은 짧고 명확하게',
-  ].join('\n');
-}
+// System 프롬프트는 ai-gateway에서 페르소나 + 명령 레지스트리를 기반으로 구성합니다.
