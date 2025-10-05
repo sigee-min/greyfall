@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 224 35% 6%;
+  --foreground: 210 40% 98%;
+  --muted: 215 27% 16%;
+  --muted-foreground: 213 27% 78%;
+  --popover: 220 32% 12%;
+  --popover-foreground: 210 40% 98%;
+  --card: 220 32% 12%;
+  --card-foreground: 210 40% 98%;
+  --border: 220 32% 18%;
+  --input: 220 32% 18%;
+  --primary: 222 86% 55%;
+  --primary-foreground: 208 39% 95%;
+  --secondary: 215 16% 24%;
+  --secondary-foreground: 210 40% 96%;
+  --accent: 182 71% 45%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 217 91% 60%;
+  --radius: 0.75rem;
+}
+
+* {
+  @apply border-border;
+}
+
+*, *::before, *::after {
+  cursor: inherit !important;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  cursor: url('/assets/cursors/lantern-default.png') 16 16, auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+input,
+textarea,
+select,
+[contenteditable='true'],
+.selectable-text {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.scrollbar-lobby {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.55) hsl(var(--card) / 0.2);
+}
+
+.scrollbar-lobby::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollbar-lobby::-webkit-scrollbar-track {
+  background: hsl(var(--card) / 0.18);
+  border-radius: 9999px;
+}
+
+.scrollbar-lobby::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.6), hsl(var(--primary) / 0.4));
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--card) / 0.2);
+}
+
+.scrollbar-lobby::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.75), hsl(var(--primary) / 0.55));
+}
