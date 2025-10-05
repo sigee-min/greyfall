@@ -81,7 +81,8 @@ function App() {
     LOBBY_TRACKS,
     musicPlayEnabled,
     musicVolume,
-    scene
+    scene,
+    LOBBY_TRACKS
   );
 
   const changeScene = useCallback(

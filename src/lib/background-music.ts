@@ -74,9 +74,15 @@ export function useBackgroundMusic(
   tracks: string | string[],
   enabled: boolean,
   volume: number,
-  scene: SceneKey
+  scene: SceneKey,
+  fallbackTracks?: string | string[]
 ): BackgroundMusicHandle {
-  const sources = useMemo(() => (Array.isArray(tracks) ? [...tracks] : [tracks]), [tracks]);
+  const primary = useMemo(() => (Array.isArray(tracks) ? [...tracks] : [tracks]), [tracks]);
+  const fallback = useMemo(
+    () => (fallbackTracks ? (Array.isArray(fallbackTracks) ? [...fallbackTracks] : [fallbackTracks]) : []),
+    [fallbackTracks]
+  );
+  const sources = useMemo(() => [...primary, ...fallback], [primary, fallback]);
   const sourcesKey = useMemo(() => sources.join('|'), [sources]);
   const shouldPlay = enabled && scene !== 'game';
 

@@ -13,10 +13,14 @@ type Props = {
   src: string;
   className?: string;
   alt?: string;
+  fallbackSrc?: string; // default to main lobby background
 };
 
-export function FallbackBackground({ src, className, alt = '' }: Props) {
+const LOBBY_BG = '/assets/bg/lobby.gif';
+
+export function FallbackBackground({ src, className, alt = '', fallbackSrc = LOBBY_BG }: Props) {
   const { gif, png } = useMemo(() => computeCandidates(src), [src]);
+  const { gif: fbGif, png: fbPng } = useMemo(() => computeCandidates(fallbackSrc), [fallbackSrc]);
   const [current, setCurrent] = useState<string>(gif);
 
   useEffect(() => {
@@ -24,10 +28,20 @@ export function FallbackBackground({ src, className, alt = '' }: Props) {
   }, [gif]);
 
   const handleError = useCallback(() => {
-    if (current.toLowerCase().endsWith('.gif')) {
+    const lower = current.toLowerCase();
+    if (lower === gif.toLowerCase()) {
       setCurrent(png);
+      return;
     }
-  }, [current, png]);
+    if (lower === png.toLowerCase()) {
+      setCurrent(fbGif);
+      return;
+    }
+    if (lower === fbGif.toLowerCase()) {
+      setCurrent(fbPng);
+      return;
+    }
+  }, [current, fbGif, fbPng, gif, png]);
 
   return (
     <img
@@ -39,4 +53,3 @@ export function FallbackBackground({ src, className, alt = '' }: Props) {
     />
   );
 }
-

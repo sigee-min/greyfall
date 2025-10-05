@@ -33,7 +33,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         setReady(false);
         setError(null);
         setProgress(0);
-        setStatus('엔진 초기화 중…');
+        setStatus(null);
         lastUpdateAtRef.current = Date.now();
 
         const { loadQwenEngineByManager, ensureChatApiReady, probeChatApiActive, resetQwenEngine } = await import('../../llm/qwen-webgpu');
@@ -58,13 +58,13 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         if (cancelled) return;
         setReady(true);
         setProgress(null); // 완료 시 바 숨김
-        setStatus('엔진 준비 완료');
+        setStatus(null);
         attemptsRef.current = 0;
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
-        setStatus('심판자 영입 실패');
+        setStatus(msg);
         setReady(false);
         startedRef.current = false; // 재시도 허용
       }

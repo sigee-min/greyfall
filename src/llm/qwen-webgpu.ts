@@ -155,7 +155,6 @@ export async function generateQwenChat(prompt: string, options: QwenChatOptions 
     top_p: topP,
     max_tokens: maxTokens,
     stream: Boolean(onToken),
-    signal,
     onNewToken: onToken
       ? (token: string, progress?: WebLLMProgress, metadata?: { token_id: number }) => {
           void progress;
@@ -164,17 +163,41 @@ export async function generateQwenChat(prompt: string, options: QwenChatOptions 
       : undefined
   };
 
-  // One-time recovery on transient TypeError (e.g., engine proxy not fully ready)
-  let text: string;
-  try {
-    text = await chatCompletionCompat(engine, request);
-  } catch (err) {
-    const transient = isTransientEngineError(err);
-    if (!transient) throw err;
-    await sleep(150);
-    text = await chatCompletionCompat(engine, request);
+  // Local abort handling (do not pass AbortSignal across worker boundary)
+  let aborted = false;
+  if (signal) {
+    if (signal.aborted) aborted = true;
+    else signal.addEventListener('abort', () => (aborted = true), { once: true });
   }
-  return text;
+
+  const task = (async () => {
+    // One-time recovery on transient TypeError (e.g., engine proxy not fully ready)
+    try {
+      const out = await chatCompletionCompat(engine, request);
+      if (aborted) throw new DOMException('Aborted', 'AbortError');
+      return out;
+    } catch (err) {
+      const transient = isTransientEngineError(err);
+      if (!transient || aborted) throw err;
+      await sleep(150);
+      const out = await chatCompletionCompat(engine, request);
+      if (aborted) throw new DOMException('Aborted', 'AbortError');
+      return out;
+    }
+  })();
+
+  if (signal) {
+    const abortPromise = new Promise<string>((_, reject) => {
+      if (signal.aborted) {
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+      const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    return Promise.race([task, abortPromise]) as Promise<string>;
+  }
+  return task;
 }
 
 function omitOnNewToken<T extends WebLLMCompletionRequest>(req: T): Omit<T, 'onNewToken'> {
@@ -184,12 +207,15 @@ function omitOnNewToken<T extends WebLLMCompletionRequest>(req: T): Omit<T, 'onN
 
 async function chatCompletionCompat(engine: WebLLMEngine, req: WebLLMCompletionRequest): Promise<string> {
   // Modern API only: engine.chat.completions.create(...)
-  const create = engine.chat?.completions?.create;
-  if (typeof create === 'function') {
-    const payload = omitOnNewToken(req) as WebLLMCompletionRequest;
+  const completions = engine.chat?.completions;
+  if (completions && typeof completions.create === 'function') {
+    // Exclude fields not supported/cloneable across worker boundary (e.g., signal)
+    const { onNewToken: _ot, signal: _sg, ...rest } = (req as unknown as Record<string, unknown>);
+    const payload = rest as WebLLMCompletionRequest;
     // Enable streaming when a token callback is provided
     if (req.onNewToken) (payload as any).stream = true;
-    const res = await create(payload);
+    // IMPORTANT: keep `this` binding on completions to avoid undefined engine inside method
+    const res = await completions.create.call(completions, payload as any);
     // If streaming, res may be an async iterable
     if (res && typeof (res as any)[Symbol.asyncIterator] === 'function') {
       let output = '';

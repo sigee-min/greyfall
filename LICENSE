@@ -1,7 +1,7 @@
 Greyfall Console Non-Commercial License
 =======================================
 
-Copyright (c) 2024 Greyfall Operations. All rights reserved.
+Copyright (c) 2025 sigee-min. All rights reserved.
 
 1. Permission is granted to download, view, build, and run the Greyfall
    Console source code ("Software") for internal evaluation and
@@ -28,3 +28,34 @@ Copyright (c) 2024 Greyfall Operations. All rights reserved.
 
 6. Greyfall reserves the right to revoke this license at any time if the
    Software is used in a manner inconsistent with these terms.
+
+7. Asset License — Non‑Commercial, No Redistribution.
+   7.1 Definition. “Assets” means all media files included with or
+       referenced by the Software, including without limitation images,
+       illustrations, textures, sprites, videos, audio/music/sfx/voice,
+       fonts, icons, logos, shaders, data files and any derivatives thereof,
+       regardless of location in the repository (e.g., under `public/`,
+       `public/assets/`, or any other path) and regardless of format.
+   7.2 Ownership. All Assets are the exclusive property of Greyfall or
+       their respective rightsholders. No ownership, title, or additional
+       rights are transferred by this license.
+   7.3 Permitted Use. You may use the Assets as bundled within the
+       Software solely for internal evaluation and non‑commercial tabletop
+       sessions conducted by or on behalf of Greyfall. You may make local
+       modifications strictly for that purpose.
+   7.4 Prohibited Uses (without a separate written agreement from Greyfall):
+       (a) Any commercial use of the Assets (including sale, licensing,
+           advertising, sponsorship, paywall, or other monetization);
+       (b) Redistribution of the Assets, whether standalone or as part of
+           any other product, project, repository, dataset, or service,
+           including public re‑hosting or package/CDN uploads.
+   7.5 Attribution/Notices. Do not remove or alter copyright notices or
+       attribution accompanying the Assets.
+   7.6 No Sublicense. You may not sublicense, transfer, or assign any right
+       to the Assets.
+   7.7 Takedown. Upon Greyfall’s request, you must promptly remove and
+       delete all copies of the Assets under your control.
+
+8. Conflicts. If any term of this Asset License conflicts with a general
+   term above, the Asset License (Section 7) controls with respect to the
+   Assets.

@@ -8,7 +8,6 @@ import type { LlmManagerKind } from '../llm/qwen-webgpu';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
 import { useBroadcastLlmProgress, useReceiveLlmProgress } from '../domain/llm/use-llm-progress-bridge';
 import { executeAICommand } from '../domain/ai/ai-router';
-import { LlmStreamConsole } from '../ui/cards/llm-stream-console';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 import type { RegisterLobbyHandler } from '../domain/chat/use-lobby-chat';
@@ -67,7 +66,6 @@ export function GameStartLobby({
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
-  const [llmTesterOpen, setLlmTesterOpen] = useState(false);
   const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError } = useGuideLoader({
     manager: llmManager,
     enabled: mode === 'host'
@@ -240,13 +238,6 @@ export function GameStartLobby({
                 className="rounded-md border border-primary/60 px-3 py-2 text-primary transition hover:bg-primary/10"
               >
                 Lobby Chat
-              </button>
-              <button
-                type="button"
-                onClick={() => setLlmTesterOpen(true)}
-                className="rounded-md border border-border/60 px-3 py-2 transition hover:border-primary hover:text-primary"
-              >
-                LLM Test
               </button>
                 {onOptions && (
                   <button type="button" onClick={onOptions} className="rounded-md border border-border/60 px-3 py-2 transition hover:border-primary hover:text-primary">
@@ -590,18 +581,6 @@ export function GameStartLobby({
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {llmTesterOpen && (
-        <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/40 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 z-0" data-cursor="pointer" aria-hidden="true" onClick={() => setLlmTesterOpen(false)} />
-          <div
-            className="relative z-10 h-full w-full max-w-full border-l border-border/60 bg-card/95 shadow-2xl transition-transform sm:w-[36rem] sm:rounded-l-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <LlmStreamConsole defaultManager={llmManager} onClose={() => setLlmTesterOpen(false)} />
           </div>
         </div>
       )}
