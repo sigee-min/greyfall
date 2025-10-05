@@ -68,7 +68,7 @@ function App() {
     registerLobbyHandler
   } = useSession({ startHostSession, joinHostSession });
 
-  const { chatMessages, sendChatMessage, canSendChat } = useLobbyChat({
+  const { chatMessages, sendChatMessage, canSendChat, channelOpen } = useLobbyChat({
     registerLobbyHandler,
     publishLobbyMessage,
     participants,
@@ -310,6 +310,7 @@ function App() {
           participants={participants}
           localParticipantId={localParticipantId}
           canSendChat={canSendChat}
+          channelReady={channelOpen}
           chatMessages={chatMessages}
           onToggleReady={toggleReady}
           onStartGame={startMission}

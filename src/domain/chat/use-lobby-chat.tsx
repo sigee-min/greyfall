@@ -109,10 +109,7 @@ export function useLobbyChat({
         return false;
       }
 
-      if (!channelReady) {
-        console.info('[chat] send skipped – channel not open');
-        return false;
-      }
+      // 채널이 열리지 않았어도 로컬 로그에는 추가하고, 전송은 큐에 쌓입니다.
 
       const author = participantsRef.current.find((participant) => participant.id === authorId);
       const authorRole: SessionParticipant['role'] = author?.role ?? modeRef.current ?? 'guest';
@@ -136,14 +133,14 @@ export function useLobbyChat({
 
       const delivered = publishLobbyMessage('chat', { entry }, 'chat-send');
       if (!delivered) {
-        console.warn('[chat] message may not reach peer', { reason: 'channel not open' });
+        console.info('[chat] queued until channel open');
       }
 
       gameBus.publish('lobby:chat', { entry, self: true });
 
       return true;
     },
-    [channelReady, gameBus, publishLobbyMessage]
+    [gameBus, publishLobbyMessage]
   );
 
   const chatLog = useMemo(() => chatMessages, [chatMessages]);
@@ -151,6 +148,9 @@ export function useLobbyChat({
   return {
     chatMessages: chatLog,
     sendChatMessage,
-    canSendChat: channelReady && Boolean(localIdRef.current)
-  };
+    // 입력은 로컬 참가자 존재 여부만 확인해 허용하고,
+    // 전송은 내부적으로 큐잉되어 채널 오픈 시 플러시됩니다.
+    canSendChat: Boolean(localIdRef.current),
+    channelOpen: channelReady
+  } as const;
 }

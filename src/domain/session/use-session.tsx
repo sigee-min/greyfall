@@ -199,6 +199,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     },
     [clearDisconnectTimer, scheduleDisconnectTimeout, requestIceRestartHost]
   );
+  const MAX_PENDING_QUEUE = 100;
   const pendingMessagesRef = useRef<{
     context: string;
     kind: LobbyMessageKind;
@@ -215,6 +216,11 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       const { channel } = session;
       if (channel.readyState !== 'open') {
         const envelope = createLobbyMessage(kind, body);
+        // Keep queue bounded to MAX_PENDING_QUEUE by dropping oldest first
+        while (pendingMessagesRef.current.length >= MAX_PENDING_QUEUE) {
+          pendingMessagesRef.current.shift();
+          console.warn('[lobby] pending queue overflow – dropping oldest message');
+        }
         pendingMessagesRef.current.push({
           context,
           kind,
@@ -223,7 +229,8 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         console.info('[lobby] queued message – channel not open', {
           context,
           state: channel.readyState,
-          kind
+          kind,
+          queued: pendingMessagesRef.current.length
         });
         return false;
       }

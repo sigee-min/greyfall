@@ -7,6 +7,6 @@ export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
     host: true,
-    https: true
+    // basicSsl() plugin enables HTTPS; explicit boolean can conflict with types
   }
 });

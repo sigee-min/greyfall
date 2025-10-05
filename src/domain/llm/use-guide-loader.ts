@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LlmManagerKind } from '../../llm/qwen-webgpu';
-import { loadQwenEngineByManager } from '../../llm/qwen-webgpu';
+import { loadQwenEngineByManager, resetQwenEngine } from '../../llm/qwen-webgpu';
 
 export type GuideLoaderState = {
   ready: boolean;
@@ -17,6 +17,9 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const [seq, setSeq] = useState(0);
+  const lastUpdateAtRef = useRef<number | null>(null);
+  const attemptsRef = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -31,6 +34,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         setError(null);
         setProgress(0);
         setStatus('엔진 초기화 중…');
+        lastUpdateAtRef.current = Date.now();
 
         await loadQwenEngineByManager(manager, (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
@@ -40,13 +44,15 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
             const clamped = Math.min(1, Math.max(0, p));
             return Math.max(prev ?? 0, clamped);
           });
-          if (report.text) setStatus(mapProgressText(report.text));
+          if (report.text) setStatus(report.text);
+          lastUpdateAtRef.current = Date.now();
         });
 
         if (cancelled) return;
         setReady(true);
         setProgress(null); // 완료 시 바 숨김
         setStatus('엔진 준비 완료');
+        attemptsRef.current = 0;
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -61,18 +67,29 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
     return () => {
       cancelled = true;
     };
-  }, [enabled, manager]);
+  }, [enabled, manager, seq]);
+
+  // Watchdog: 진행 업데이트가 오래 없으면 자동 재시도(최대 2회)
+  useEffect(() => {
+    if (!enabled) return;
+    if (ready || error) return;
+    const id = window.setInterval(() => {
+      const last = lastUpdateAtRef.current;
+      if (!startedRef.current) return;
+      if (last == null) return;
+      const elapsed = Date.now() - last;
+      if (elapsed > 30000 && attemptsRef.current < 2) {
+        // 30초 이상 진전이 없으면 재시도
+        attemptsRef.current += 1;
+        setStatus('진행이 지연되어 재시도합니다…');
+        resetQwenEngine();
+        startedRef.current = false;
+        setProgress(0);
+        setSeq((n) => n + 1);
+      }
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [enabled, ready, error]);
 
   return { ready, progress, status, error };
-}
-
-function mapProgressText(text: string): string {
-  const t = text.toLowerCase();
-  if (t.includes('download') || t.includes('fetch')) return '모델 내려받는 중…';
-  if (t.includes('load tokenizer') || t.includes('token')) return '토크나이저 준비 중…';
-  if (t.includes('compile') || t.includes('kernel') || t.includes('shader')) return 'WebGPU 컴파일 중…';
-  if (t.includes('initialize') || t.includes('init') || t.includes('start')) return '엔진 초기화 중…';
-  if (t.includes('warmup') || t.includes('prefill')) return '엔진 예열 중…';
-  if (t.includes('finish') || t.includes('ready')) return '엔진 준비 완료';
-  return '자료를 불러오는 중…';
 }

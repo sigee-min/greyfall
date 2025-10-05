@@ -92,6 +92,11 @@ export async function loadQwenEngineByManager(
   return enginePromise;
 }
 
+// Allow UI to force a fresh initialisation attempt if previous one got stuck
+export function resetQwenEngine() {
+  enginePromise = null;
+}
+
 export async function generateQwenChat(prompt: string, options: QwenChatOptions = {}) {
   const {
     systemPrompt = 'You are a seasoned guide who offers concise, practical suggestions.',

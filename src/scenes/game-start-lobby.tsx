@@ -17,6 +17,7 @@ type GameStartLobbyProps = {
   participants: SessionParticipant[];
   localParticipantId: string | null;
   chatMessages: SessionChatLogEntry[];
+  channelReady?: boolean;
   canSendChat: boolean;
   onToggleReady: (participantId: string) => void;
   onStartGame: () => void;
@@ -42,6 +43,7 @@ export function GameStartLobby({
   localParticipantId,
   chatMessages,
   canSendChat,
+  channelReady = false,
   onToggleReady,
   onStartGame,
   onLeave,
@@ -64,6 +66,10 @@ export function GameStartLobby({
   const chatListRef = useRef<HTMLDivElement | null>(null);
   const progressPercent = llmProgress === null ? null : Math.round(Math.min(1, Math.max(0, llmProgress)) * 100);
   const guideAnnouncedRef = useRef(false);
+  const chatAutoOpenedRef = useRef(false);
+  // 진행 상태 시각화를 위한 하트비트와 최신 업데이트 시각
+  const [tick, setTick] = useState(0);
+  const [lastLlmUpdateAt, setLastLlmUpdateAt] = useState<number | null>(null);
 
   const submitChat = useCallback(() => {
     if (!canSendChat) return false;
@@ -80,6 +86,55 @@ export function GameStartLobby({
     if (!chatListRef.current) return;
     chatListRef.current.scrollTo({ top: chatListRef.current.scrollHeight, behavior: 'smooth' });
   }, [chatMessages, chatOpen]);
+
+  // 채널이 열리면 1회 자동으로 채팅 패널을 열어 안내
+  useEffect(() => {
+    if (chatOpen) return;
+    if (chatAutoOpenedRef.current) return;
+    if (!canSendChat) return;
+    chatAutoOpenedRef.current = true;
+    setChatOpen(true);
+  }, [canSendChat, chatOpen]);
+
+  // LLM 진행 상태 갱신 시각 기록
+  useEffect(() => {
+    if (llmProgress !== null || llmStatus) {
+      setLastLlmUpdateAt(Date.now());
+    }
+  }, [llmProgress, llmStatus]);
+
+  // 로딩 중 도트 애니메이션을 위한 하트비트
+  useEffect(() => {
+    if (llmProgress === null || llmReady || llmError) return;
+    const id = window.setInterval(() => setTick((t) => (t + 1) % 3), 600);
+    return () => window.clearInterval(id);
+  }, [llmProgress, llmReady, llmError]);
+
+  const secondsSinceUpdate = useMemo(() => {
+    if (lastLlmUpdateAt == null) return null;
+    return Math.floor((Date.now() - lastLlmUpdateAt) / 1000);
+  }, [lastLlmUpdateAt, tick]);
+
+  const isActiveLoading = llmProgress !== null && !llmError && !llmReady;
+  const isStalled = isActiveLoading && (secondsSinceUpdate ?? 0) > 20;
+
+  const mapLlmUiText = (text: string | null | undefined) => {
+    if (!text) return '엔진 초기화 중…';
+    const t = text.toLowerCase();
+    if (t.includes('download') || t.includes('fetch')) return '모델 내려받는 중…';
+    if (t.includes('load tokenizer') || t.includes('token')) return '토크나이저 준비 중…';
+    if (t.includes('compile') || t.includes('kernel') || t.includes('shader')) return 'WebGPU 컴파일 중…';
+    if (t.includes('initialize') || t.includes('init') || t.includes('start')) return '엔진 초기화 중…';
+    if (t.includes('warmup') || t.includes('prefill')) return '엔진 예열 중…';
+    if (t.includes('finish') || t.includes('ready')) return '엔진 준비 완료';
+    return '자료를 불러오는 중…';
+  };
+
+  const displayStatus = useMemo(() => {
+    if (llmError) return '안내인 영입 실패';
+    const base = mapLlmUiText(llmStatus);
+    return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
+  }, [llmError, llmStatus, isActiveLoading, tick]);
 
   // 안내인 로드 완료 시, 안내인 이름으로 1회 채팅 합류 알림
   useEffect(() => {
@@ -126,11 +181,11 @@ export function GameStartLobby({
   };
 
   const chatPlaceholder = useMemo(() => {
-    if (!canSendChat) {
-      return '연결 정보를 가져오는 중입니다…';
+    if (!channelReady) {
+      return '세션 연결 대기 중… (보내면 연결 후 전송됩니다)';
     }
     return '메시지를 입력하세요 (Shift+Enter로 줄바꿈)';
-  }, [canSendChat]);
+  }, [channelReady]);
 
   return (
     <div
@@ -364,7 +419,7 @@ export function GameStartLobby({
       {mode === 'host' && (llmProgress !== null || llmError) && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 w-[min(320px,90vw)] -translate-x-1/2 rounded-lg border border-border/60 bg-card/80 px-4 py-3 text-xs text-muted-foreground shadow-lg backdrop-blur">
           <p className="font-semibold text-foreground">
-            {llmError ? 'LLM 초기화 실패' : llmStatus ?? 'WebGPU 초기화 중…'}
+            {displayStatus}
           </p>
           {llmError ? (
             <p className="mt-1 text-[11px] text-destructive">{llmError}</p>
@@ -376,6 +431,13 @@ export function GameStartLobby({
               />
             </div>
           )}
+          
+          {isStalled && (
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-[11px]">진행이 지연되고 있습니다…</p>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -481,7 +543,7 @@ export function GameStartLobby({
               <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <span>Enter 키로 전송 · Shift+Enter로 줄바꿈</span>
                 <div className="flex items-center gap-2">
-                  <span>{canSendChat ? '채널 연결됨' : '세션 연결 대기 중'}</span>
+                  <span>{channelReady ? '채널 연결됨' : '세션 연결 대기 중'}</span>
                   <button
                     type="submit"
                     className={cn(
@@ -490,7 +552,7 @@ export function GameStartLobby({
                         ? 'border-primary bg-primary/90 text-primary-foreground hover:bg-primary'
                         : 'border-border bg-background/70 text-muted-foreground'
                     )}
-                    disabled={!canSendChat || !chatInput.trim()}
+                    disabled={!chatInput.trim()}
                   >
                     Send
                   </button>
