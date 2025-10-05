@@ -4,36 +4,6 @@ import { ChatHostStore } from './chat';
 import { HostParticipantsObject } from './participants-host';
 export class HostNetController {
     constructor({ publish, lobbyStore, busPublish }) {
-        Object.defineProperty(this, "publish", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "lobbyStore", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "busPublish", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "participants", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "chat", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
         this.publish = publish;
         this.lobbyStore = lobbyStore;
         this.busPublish = busPublish;

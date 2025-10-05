@@ -283,8 +283,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       }
 
       if (modeRef.current === 'host') {
-        // Delegate message handling to host controller
-        hostControllerRef.current?.bindChannel(channel);
+        // Host binding occurs where peers are created (HostPeerManager onOpen)
       } else {
         // Guest: say hello and request authoritative snapshots, then bind client controller
         const localId = lobbyStore.localParticipantIdRef.current;

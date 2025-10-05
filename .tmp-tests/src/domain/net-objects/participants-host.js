@@ -2,24 +2,8 @@ import { PARTICIPANTS_OBJECT_ID, makeParticipantsSnapshot } from './participants
 import { HostReplicator } from './replicator';
 export class HostParticipantsObject {
     constructor(deps) {
-        Object.defineProperty(this, "deps", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: deps
-        });
-        Object.defineProperty(this, "id", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: PARTICIPANTS_OBJECT_ID
-        });
-        Object.defineProperty(this, "replicator", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
+        this.deps = deps;
+        this.id = PARTICIPANTS_OBJECT_ID;
         this.replicator = new HostReplicator((kind, body, ctx) => deps.publish(kind, body, ctx));
     }
     broadcast(context = 'participants-sync') {

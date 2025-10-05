@@ -1,30 +1,9 @@
 export class HostReplicator {
     constructor(publish, maxLog = 128) {
-        Object.defineProperty(this, "publish", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: publish
-        });
-        Object.defineProperty(this, "state", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new Map()
-        });
+        this.publish = publish;
+        this.state = new Map();
         // Simple logs per id for future incremental patch (not used yet)
-        Object.defineProperty(this, "logs", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new Map()
-        });
-        Object.defineProperty(this, "maxLog", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
+        this.logs = new Map();
         this.maxLog = maxLog;
     }
     get(id) {

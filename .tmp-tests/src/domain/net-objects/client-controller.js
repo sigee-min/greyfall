@@ -1,38 +1,10 @@
 import { parseLobbyMessage } from '../../protocol';
 import { ClientNetObjectStore } from './client-store';
 import { ClientParticipantsObject } from './participants-client';
+import { PARTICIPANTS_OBJECT_ID } from './participants';
 export class ClientNetController {
     constructor({ publish, lobbyStore, busPublish }) {
-        Object.defineProperty(this, "publish", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "lobbyStore", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "busPublish", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
-        Object.defineProperty(this, "store", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new ClientNetObjectStore()
-        });
-        Object.defineProperty(this, "registry", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: void 0
-        });
+        this.store = new ClientNetObjectStore();
         this.publish = publish;
         this.lobbyStore = lobbyStore;
         this.busPublish = busPublish;

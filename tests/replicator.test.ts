@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from './test-harness';
+import { test } from './test-harness.js';
 import { HostReplicator } from '../src/domain/net-objects/replicator';
 
 test('HostReplicator: set publishes object:replace with rev++', () => {
@@ -49,4 +49,3 @@ test('HostReplicator: onRequest publishes latest replace', () => {
   assert.equal(sent[0].body.rev, 1);
   assert.deepEqual(sent[0].body.value, { a: 1 });
 });
-

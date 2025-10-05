@@ -1,22 +1,23 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
     "noEmit": false,
     "outDir": ".tmp-tests",
     "types": ["node"],
-    "module": "ESNext",
-    "target": "ES2020",
-    "moduleResolution": "Bundler",
-    "sourceMap": false,
-    "declaration": false,
-    "emitDeclarationOnly": false,
-    "skipLibCheck": true
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": [
-    "src/domain/ai/**/*.ts",
-    "src/domain/net-objects/**/*.ts",
-    "src/protocol/**/*.ts",
+    "src/domain/net-objects/replicator.ts",
+    "src/domain/net-objects/chat.ts",
+    "src/protocol/index.ts",
+    "signal/src/protocol/schema.ts",
     "tests/**/*.ts"
   ]
 }
-

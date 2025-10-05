@@ -92,4 +92,8 @@ export class ClientNetController {
     // Forward to lobby bus for other features (chat, agents, etc.)
     this.busPublish(message);
   }
+
+  register(object: { id: string; onReplace: (rev: number, value: unknown) => void; onPatch?: (rev: number, ops: unknown[]) => void }) {
+    this.registry.set(object.id, { onReplace: object.onReplace, onPatch: object.onPatch });
+  }
 }

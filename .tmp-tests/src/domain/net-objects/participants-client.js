@@ -1,18 +1,8 @@
 import { PARTICIPANTS_OBJECT_ID, isParticipantsSnapshot } from './participants';
 export class ClientParticipantsObject {
     constructor(lobbyStore) {
-        Object.defineProperty(this, "lobbyStore", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: lobbyStore
-        });
-        Object.defineProperty(this, "id", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: PARTICIPANTS_OBJECT_ID
-        });
+        this.lobbyStore = lobbyStore;
+        this.id = PARTICIPANTS_OBJECT_ID;
     }
     onReplace(_rev, value) {
         if (isParticipantsSnapshot(value)) {

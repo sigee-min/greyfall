@@ -1,11 +1,6 @@
 export class ClientNetObjectStore {
     constructor() {
-        Object.defineProperty(this, "state", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new Map()
-        });
+        this.state = new Map();
     }
     get(id) {
         return this.state.get(id) ?? null;
