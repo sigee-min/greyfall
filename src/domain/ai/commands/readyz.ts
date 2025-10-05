@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { CommandSpec } from '../command-registry';
-import { probeChatApiReady, probeChatApiActive } from '../../../llm/qwen-webgpu';
+import { probeChatApiReady, probeChatApiActive } from '../../../llm/webllm-engine';
 
 export const ReadyzCommand: CommandSpec<string> = {
   cmd: 'llm.readyz',

@@ -8,22 +8,27 @@ type BackgroundMusicHandle = {
 
 type UnlockHandler = () => void;
 
-let audioElement: HTMLAudioElement | null = null;
+let audioA: HTMLAudioElement | null = null;
+let audioB: HTMLAudioElement | null = null;
+let active: 'A' | 'B' = 'A';
 let unlockHandler: UnlockHandler | null = null;
 let attachedSourcesKey: string | null = null;
 
-function ensureAudioElement(): HTMLAudioElement | null {
+function ensureAudioElements(): { a: HTMLAudioElement; b: HTMLAudioElement } | null {
   if (typeof document === 'undefined') return null;
-  if (audioElement) return audioElement;
-
-  const audio = document.createElement('audio');
-  audio.preload = 'auto';
-  audio.loop = true;
-  audio.style.display = 'none';
-  audio.dataset.greyfallAudio = 'lobby';
-  document.body.appendChild(audio);
-  audioElement = audio;
-  return audio;
+  if (audioA && audioB) return { a: audioA, b: audioB };
+  const make = (tag: string) => {
+    const el = document.createElement('audio');
+    el.preload = 'auto';
+    el.loop = true;
+    el.style.display = 'none';
+    el.dataset.greyfallAudio = tag;
+    document.body.appendChild(el);
+    return el;
+  };
+  audioA = audioA ?? make('A');
+  audioB = audioB ?? make('B');
+  return { a: audioA!, b: audioB! };
 }
 
 function disposeUnlockHandler() {
@@ -87,40 +92,60 @@ export function useBackgroundMusic(
   const shouldPlay = enabled; // play across scenes; caller controls tracks
 
   useEffect(() => {
-    const audio = ensureAudioElement();
-    if (!audio) return;
+    const pair = ensureAudioElements();
+    if (!pair) return;
+    const current = active === 'A' ? pair.a : pair.b;
+    const next = active === 'A' ? pair.b : pair.a;
 
-    attachSources(audio, sources, sourcesKey);
-    audio.volume = clampVolume(volume);
+    // If sources changed, crossfade to next
+    attachSources(next, sources, sourcesKey);
+    next.volume = 0;
 
     if (shouldPlay) {
-      void attemptPlay(audio, 'state-change');
+      void attemptPlay(next, 'state-change');
+      const target = clampVolume(volume);
+      const start = performance.now();
+      const duration = 400; // ms
+      const fade = () => {
+        const t = Math.min(1, (performance.now() - start) / duration);
+        next.volume = target * t;
+        current.volume = target * (1 - t);
+        if (t < 1) requestAnimationFrame(fade);
+        else {
+          current.pause();
+          active = active === 'A' ? 'B' : 'A';
+        }
+      };
+      requestAnimationFrame(fade);
     } else {
-      audio.pause();
+      current.pause();
+      next.pause();
       disposeUnlockHandler();
     }
-  }, [sources, sourcesKey, shouldPlay, volume]);
+  }, [sources, sourcesKey, shouldPlay]);
 
   useEffect(() => {
     return () => {
-      if (!audioElement) return;
-      audioElement.pause();
+      if (audioA) audioA.pause();
+      if (audioB) audioB.pause();
       disposeUnlockHandler();
     };
   }, []);
 
   const resume = useCallback((reason: string = 'manual') => {
-    const audio = ensureAudioElement();
-    if (!audio) return;
-    attachSources(audio, sources, sourcesKey);
-    audio.volume = clampVolume(volume);
-    void attemptPlay(audio, reason);
+    const pair = ensureAudioElements();
+    if (!pair) return;
+    const next = active === 'A' ? pair.a : pair.b;
+    attachSources(next, sources, sourcesKey);
+    next.volume = clampVolume(volume);
+    void attemptPlay(next, reason);
   }, [sources, sourcesKey, volume]);
 
   const previewVolume = useCallback((nextVolume: number) => {
-    const audio = audioElement;
-    if (!audio) return;
-    audio.volume = clampVolume(nextVolume);
+    const pair = ensureAudioElements();
+    if (!pair) return;
+    const cur = active === 'A' ? pair.a : pair.b;
+    cur.volume = clampVolume(nextVolume);
   }, []);
 
   return useMemo(() => ({ resume, previewVolume }), [resume, previewVolume]);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { WORLD_STATIC } from '../../domain/world/data';
 import { worldPositionsClient } from '../../domain/net-objects/world-positions-client';
 import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/chat/use-lobby-chat';
+import { useGlobalBus } from '../../bus/global-bus';
 import type { SessionParticipant } from '../../domain/session/types';
 import type { LobbyMessage } from '../../protocol';
 
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function MapMini({ localParticipantId, participants, publish, register }: Props) {
+  const bus = useGlobalBus();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
   const [vote, setVote] = useState<{ inviteId: string; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all'; status: 'proposed' | 'approved' | 'rejected' | 'cancelled' } | null>(null);
@@ -37,6 +39,10 @@ export function MapMini({ localParticipantId, participants, publish, register }:
         setDeadlineAt(Date.now() + 60_000);
       }
       if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
+        const mapName = WORLD_STATIC.maps.find((m) => m.id === b.targetMapId)?.name ?? b.targetMapId;
+        const statusTitle = b.status === 'approved' ? 'Travel Approved' : b.status === 'rejected' ? 'Travel Rejected' : 'Travel Cancelled';
+        const statusKind = b.status === 'approved' ? 'success' : b.status === 'rejected' ? 'warning' : 'info';
+        bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind as any, durationMs: 2500 });
         setTimeout(() => {
           setVote(null);
           setDeadlineAt(null);

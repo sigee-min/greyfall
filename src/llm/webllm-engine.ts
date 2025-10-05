@@ -2,17 +2,12 @@ import { CreateWebWorkerMLCEngine } from '@mlc-ai/web-llm';
 
 export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
 type ModelProfile = { id: string };
-// Qwen3 profiles (use prebuilt registry inside WebLLM)
-// Base Qwen3 options
-const QWEN3_HASTY: ModelProfile = { id: 'Qwen3-0.6B-q4f16_1-MLC' };
-const QWEN3_FAST: ModelProfile = { id: 'Qwen3-1.7B-q4f32_1-MLC' };
-const QWEN3_4B_Q4F16_1: ModelProfile = { id: 'Qwen3-4B-q4f16_1-MLC' };
-const QWEN3_8B_Q4F16_1: ModelProfile = { id: 'Qwen3-8B-q4f16_1-MLC' };
-
-// Llama 3.2 3B mid-tier
+// Curated models (Qwen removed):
+// - High tier: Llama 3.1 8B Instruct (q4f16_1)
+// - Mid tier: Llama 3.2 3B Instruct (q4f16_1)
+// - Low tier: SmolLM2 1.7B Instruct (q4f16_1)
+const LLAMA31_8B_Q4F16_1: ModelProfile = { id: 'Llama-3.1-8B-Instruct-q4f16_1-MLC' };
 const LLAMA32_3B_Q4F16_1: ModelProfile = { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC' };
-
-// SmolLM2 1.7B low-tier
 const SMOLLM2_1_7B_Q4F16_1: ModelProfile = { id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC' };
 function envOverride(kind: LlmManagerKind): string | null {
   const env = (import.meta as any).env || {};
@@ -25,18 +20,18 @@ function resolveProfiles(kind: LlmManagerKind): ModelProfile[] {
   const override = envOverride(kind);
   if (override) return [{ id: override }];
   if (kind === 'hasty') {
-    // Low-tier default: SmolLM2 1.7B; fallback to Qwen3 0.6B for ultra-low VRAM
-    return [SMOLLM2_1_7B_Q4F16_1, QWEN3_HASTY];
+    // Low → Mid → High
+    return [SMOLLM2_1_7B_Q4F16_1, LLAMA32_3B_Q4F16_1, LLAMA31_8B_Q4F16_1];
   }
   if (kind === 'fast') {
-    // Mid-tier default: Llama 3.2 3B; fallbacks decrease VRAM footprint
-    return [LLAMA32_3B_Q4F16_1, QWEN3_4B_Q4F16_1, QWEN3_FAST, SMOLLM2_1_7B_Q4F16_1, QWEN3_HASTY];
+    // Mid → Low → High
+    return [LLAMA32_3B_Q4F16_1, SMOLLM2_1_7B_Q4F16_1, LLAMA31_8B_Q4F16_1];
   }
-  // smart (high-tier): Prefer Qwen3 8B; fallbacks reduce VRAM
-  return [QWEN3_8B_Q4F16_1, QWEN3_4B_Q4F16_1, LLAMA32_3B_Q4F16_1, QWEN3_FAST, SMOLLM2_1_7B_Q4F16_1, QWEN3_HASTY];
+  // High → Mid → Low
+  return [LLAMA31_8B_Q4F16_1, LLAMA32_3B_Q4F16_1, SMOLLM2_1_7B_Q4F16_1];
 }
 
-export type QwenChatOptions = {
+export type ChatOptions = {
   systemPrompt?: string;
   temperature?: number;
   topP?: number;
@@ -93,12 +88,12 @@ function setEnginePromise(p: Promise<WebLLMEngine> | null) { getState().enginePr
 function getInitialising() { return getState().initialising; }
 function setInitialising(v: boolean) { getState().initialising = v; }
 
-export async function loadQwenEngineByManager(
+export async function loadEngineByManager(
   manager: LlmManagerKind,
   onProgress?: (report: WebLLMProgress) => void
 ): Promise<WebLLMEngine> {
   if (typeof window === 'undefined') {
-    throw new Error('Qwen WebGPU runtime is only available in the browser environment.');
+    throw new Error('WebLLM WebGPU runtime is only available in the browser environment.');
   }
 
   if (!window.isSecureContext) {
@@ -170,9 +165,9 @@ export async function loadQwenEngineByManager(
 }
 
 // Allow UI to force a fresh initialisation attempt if previous one got stuck
-export function resetQwenEngine() { setEnginePromise(null); }
+export function resetEngine() { setEnginePromise(null); }
 
-export async function generateQwenChat(prompt: string, options: QwenChatOptions = {}) {
+export async function generateChat(prompt: string, options: ChatOptions = {}) {
   const {
     systemPrompt = 'You are a seasoned guide who offers concise, practical suggestions.',
     temperature = 0.7,
@@ -183,7 +178,7 @@ export async function generateQwenChat(prompt: string, options: QwenChatOptions 
   } = options;
 
   // Assume engine has already been initialised by manager selection path
-  let engine = await (getEnginePromise() ?? loadQwenEngineByManager('smart'));
+  let engine = await (getEnginePromise() ?? loadEngineByManager('smart'));
 
   // Guard against partially-initialised or incompatible engine shape by waiting, not resetting
   if (!isChatApiAvailable(engine)) {
@@ -334,7 +329,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function ensureChatApiReady(timeoutMs = 8000): Promise<void> {
-  const eng = await (getEnginePromise() ?? loadQwenEngineByManager('smart'));
+  const eng = await (getEnginePromise() ?? loadEngineByManager('smart'));
   await waitForChatApi(eng, timeoutMs);
 }
 

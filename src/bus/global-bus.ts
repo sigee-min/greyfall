@@ -10,6 +10,8 @@ export type GlobalBusEvents = {
   'error:show': { message: string; context?: string; cause?: unknown };
   'error:clear': undefined;
   'session:state': GlobalSessionState;
+  'toast:show': { title?: string; message: string; status?: 'info' | 'success' | 'warning' | 'error'; durationMs?: number };
+  'toast:clear': undefined;
 };
 
 const globalBus = createEventBus<GlobalBusEvents>();

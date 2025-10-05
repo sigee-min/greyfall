@@ -1,4 +1,4 @@
-import type { LlmManagerKind } from '../../llm/qwen-webgpu';
+import type { LlmManagerKind } from '../../llm/webllm-engine';
 
 export type Persona = {
   id: LlmManagerKind;
@@ -39,4 +39,3 @@ const PERSONAS: Record<LlmManagerKind, Persona> = {
 export function getPersona(manager: LlmManagerKind): Persona {
   return PERSONAS[manager] ?? PERSONAS.smart;
 }
-

@@ -1,4 +1,4 @@
-import type { LlmManagerKind } from '../../llm/qwen-webgpu';
+import type { LlmManagerKind } from '../../llm/webllm-engine';
 
 export function guideDisplayName(kind: LlmManagerKind): string {
   switch (kind) {

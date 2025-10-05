@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useCharacterStore, type TraitSpec } from '../../store/character';
+import { useGlobalBus } from '../../bus/global-bus';
 import { TRAITS } from '../../domain/character/traits';
 import { cn } from '../../lib/utils';
 
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish }: Props) {
+  const bus = useGlobalBus();
   const built = useCharacterStore((s) => s.built);
   const roll = useCharacterStore((s) => s.roll);
   const budget = useCharacterStore((s) => s.budget);
@@ -151,6 +153,7 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                   const passiveNames = passives.map((p) => p.name).join(', ') || '—';
                   const body = `캐릭터 확정 — ${playerName}\n스탯: ${s}\n특성: ${traitNames}\n패시브: ${passiveNames}`;
                   if (localParticipantId) publish('chat:append:request' as any, { body, authorId: localParticipantId } as any, 'character:finalized');
+                  bus.publish('toast:show', { title: 'Character Ready', message: playerName, status: 'success', durationMs: 2500 });
                 } catch {}
                 onClose();
               }}

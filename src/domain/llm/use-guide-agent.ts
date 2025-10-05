@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { LlmManagerKind } from '../../llm/qwen-webgpu';
+import type { LlmManagerKind } from '../../llm/webllm-engine';
 // LLM 호출은 ai-gateway 단일 창구를 사용합니다.
 import { guideDisplayName } from './guide-profile';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../chat/use-lobby-chat';

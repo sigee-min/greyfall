@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { LlmManagerKind } from '../../llm/qwen-webgpu';
+import type { LlmManagerKind } from '../../llm/webllm-engine';
 // LLM 모듈은 동적 import로 지연 로딩합니다.
 
 export type GuideLoaderState = {
@@ -36,8 +36,8 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         setStatus(null);
         lastUpdateAtRef.current = Date.now();
 
-        const { loadQwenEngineByManager, ensureChatApiReady, probeChatApiActive, resetQwenEngine } = await import('../../llm/qwen-webgpu');
-        await loadQwenEngineByManager(manager, (report: { text?: string; progress?: number }) => {
+        const { loadEngineByManager, ensureChatApiReady, probeChatApiActive, resetEngine } = await import('../../llm/webllm-engine');
+        await loadEngineByManager(manager, (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
           setProgress((prev) => {
             const p = typeof report.progress === 'number' ? report.progress : undefined;
@@ -92,8 +92,8 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         // 동적 임포트 스코프 바깥이므로 비동기로 호출
         void (async () => {
           try {
-            const mod = await import('../../llm/qwen-webgpu');
-            mod.resetQwenEngine();
+            const mod = await import('../../llm/webllm-engine');
+            mod.resetEngine();
           } catch {
             // ignore
           }

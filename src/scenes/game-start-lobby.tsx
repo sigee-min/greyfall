@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 import { FallbackBackground } from '../ui/common/fallback-bg';
 import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
-import type { LlmManagerKind } from '../llm/qwen-webgpu';
+import type { LlmManagerKind } from '../llm/webllm-engine';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
 import { useBroadcastLlmProgress, useReceiveLlmProgress } from '../domain/llm/use-llm-progress-bridge';
 import { executeAICommand } from '../domain/ai/ai-router';

@@ -35,6 +35,7 @@ import { MapMini } from './ui/world/map-mini';
 import { InteractionPanel } from './ui/world/interaction-panel';
 import { CharacterBuilder } from './ui/character/character-builder';
 import { useCharacterStore } from './store/character';
+import { Toaster } from './ui/common/toaster';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -349,6 +350,11 @@ function App() {
     return (
       <StageViewport background={stageBg} className="cursor-crosshair">
         <div className="pointer-events-none absolute inset-0">
+          <Toaster />
+          {/* Global toasts */}
+          <div className="pointer-events-none">
+            {/* Toaster overlays inside stage for z-index consistency */}
+          </div>
           <div className="pointer-events-auto mx-6 mt-6 flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/50">
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Greyfall Stage</p>
@@ -372,7 +378,7 @@ function App() {
 
           <div className="pointer-events-auto absolute bottom-6 left-6 flex w-[360px] flex-col gap-4">
             <ChatDock />
-            <CommandConsole />
+            <CommandConsole publish={publishLobbyMessage as any} localParticipantId={localParticipantId} />
           </div>
 
           {scene === 'game' && (

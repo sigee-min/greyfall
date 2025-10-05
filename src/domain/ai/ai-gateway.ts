@@ -39,11 +39,11 @@ export async function requestAICommand({
   const effectiveTimeout = Math.max(1_000, Math.min(120_000, timeoutMs ?? defaultTimeout));
   // 동적 import로 LLM 런타임 지연 로딩
   const {
-    generateQwenChat,
+    generateChat,
     ensureChatApiReady,
-    loadQwenEngineByManager,
+    loadEngineByManager,
     probeChatApiActive
-  } = await import('../../llm/qwen-webgpu');
+  } = await import('../../llm/webllm-engine');
   // 0) 동일 매니저 키로 줄 세워 실행 (중복·동시 호출 방지)
   if (!inflightByManager.has(manager)) {
     inflightByManager.set(manager, Promise.resolve());
@@ -88,7 +88,7 @@ export async function requestAICommand({
   let raw = '';
   try {
     // 1) 엔진 예열 및 Chat API 준비 보장
-    await loadQwenEngineByManager(manager);
+    await loadEngineByManager(manager);
     await ensureChatApiReady(10_000);
     // 활성 프로브: 실제 최소 호출이 통과하는지 확인 (타이밍 레이스 방지)
     if (!(await probeChatApiActive(1_000))) {
@@ -99,13 +99,13 @@ export async function requestAICommand({
       }
     }
 
-    // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateQwenChat 내부 + 아래 보강)
+    // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateChat 내부 + 아래 보강)
     // 타임아웃은 실제 생성 단계에만 적용 (사전 준비는 별도 내부 타임아웃으로 보호됨)
     const ctl = new AbortController();
     const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), effectiveTimeout);
     try {
       raw = (
-        await generateQwenChat(user, {
+        await generateChat(user, {
           systemPrompt: sys,
           temperature,
           maxTokens: maxTokens ?? maxTok,
@@ -142,7 +142,7 @@ export async function requestAICommand({
         );
         try {
           raw = (
-            await generateQwenChat(user, {
+            await generateChat(user, {
               systemPrompt: sys,
               temperature,
               maxTokens: maxTokens ?? maxTok,
