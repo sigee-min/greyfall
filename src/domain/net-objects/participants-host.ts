@@ -50,4 +50,8 @@ export class HostParticipantsObject implements HostObject {
     if (!base) return this.broadcast(context);
     return this.replicator.apply(this.id, [{ op: 'remove', path: 'list', value: { id: participantId } } as any], context);
   }
+
+  getSnapshot() {
+    return this.replicator.get(this.id);
+  }
 }

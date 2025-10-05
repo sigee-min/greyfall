@@ -16,7 +16,7 @@ export class HostRouter {
   private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
   private readonly limiter: SlidingWindowLimiter;
-  private readonly onAck?: (id: string, rev: number) => void;
+  private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   private readonly map = new PeerParticipantMap();
   private readonly registry = new Map<string, HostObject>();
 
@@ -27,7 +27,7 @@ export class HostRouter {
     participants: HostParticipantsObject;
     chat: HostChatObject;
     limiter?: SlidingWindowLimiter;
-    onAck?: (id: string, rev: number) => void;
+    onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   }) {
     this.send = args.send;
     this.lobbyStore = args.lobbyStore;
@@ -127,7 +127,8 @@ export class HostRouter {
         }
         case 'object:ack': {
           const { id, rev } = message.body as any;
-          this.onAck?.(String(id), Number(rev));
+          console.debug('[object:ack] recv', { id, rev, peerId });
+          this.onAck?.(peerId, String(id), Number(rev));
           break;
         }
         default:

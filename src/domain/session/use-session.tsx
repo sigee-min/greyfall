@@ -364,7 +364,9 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         hostControllerRef.current = new HostNetController({
           publish: (kind, body, context) => publishLobbyMessage(kind as any, body as any, context),
           lobbyStore,
-          busPublish: (message) => lobbyBus.publish(message)
+          busPublish: (message) => lobbyBus.publish(message),
+          getPeerIds: () => hostPeerManager.listPeerIds(),
+          sendToPeer: (peerId, message) => hostPeerManager.sendToPeer(peerId, message)
         });
 
         await signalBridge.connect(signalSessionId, 'host', {

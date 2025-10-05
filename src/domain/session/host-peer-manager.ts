@@ -78,6 +78,20 @@ export class HostPeerManager {
     });
   }
 
+  listPeerIds(): string[] {
+    return [...this.peers.keys()];
+  }
+
+  sendToPeer(peerId: string, payload: unknown): boolean {
+    try {
+      const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
+      this.sendTo(peerId, data);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private sendTo(peerId: string, data: string) {
     const entry = this.peers.get(peerId);
     if (!entry) return;

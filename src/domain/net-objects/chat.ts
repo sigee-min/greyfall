@@ -43,4 +43,8 @@ export class ChatHostStore {
   onRequest(_sinceRev?: number, context = 'chat-request') {
     return this.broadcastSnapshot(context);
   }
+
+  snapshot() {
+    return { rev: this.rev, value: { entries: this.log } } as const;
+  }
 }

@@ -16,4 +16,8 @@ export class HostChatObject implements HostObject {
   onRequest(sinceRev?: number) {
     return this.store.onRequest(sinceRev, 'object-request chatlog');
   }
+
+  getSnapshot() {
+    return this.store.snapshot();
+  }
 }
