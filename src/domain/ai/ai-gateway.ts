@@ -23,10 +23,20 @@ export async function requestAICommand({
   userInstruction,
   contextText,
   temperature = 0.5,
-  maxTokens = 128,
+  maxTokens,
   fallbackChatText = '채널에 합류했습니다.',
-  timeoutMs = 20000
+  timeoutMs
 }: AIGatewayParams): Promise<AICommand> {
+  const envMax = Number((import.meta as any).env?.VITE_LLM_MAX_TOKENS);
+  const maxTok = Number.isFinite(envMax) && envMax > 0 ? Math.min(2048, Math.max(32, envMax)) : 128;
+  const envTimeout = Number((import.meta as any).env?.VITE_LLM_TIMEOUT_MS);
+  const defaultTimeout = (() => {
+    if (Number.isFinite(envTimeout) && envTimeout! > 0) return Math.min(120_000, Math.max(5_000, envTimeout!));
+    if (manager === 'hasty') return 35_000;
+    if (manager === 'fast') return 45_000;
+    return 60_000;
+  })();
+  const effectiveTimeout = Math.max(1_000, Math.min(120_000, timeoutMs ?? defaultTimeout));
   // 동적 import로 LLM 런타임 지연 로딩
   const {
     generateQwenChat,
@@ -62,6 +72,8 @@ export async function requestAICommand({
     '출력은 반드시 JSON 한 줄로만 작성:',
     '{"cmd": "<명령>", "body": <고정타입>}',
     '각 명령의 body는 고정 타입을 따릅니다(예: chat → string).',
+    '반드시 위 목록의 명령(cmd) 중 하나만 선택하세요. 목록에 정확히 매칭되지 않으면 chat을 사용하세요.',
+    '불확실하거나 다른 형식의 응답은 금지됩니다. 설명/사고 과정은 포함하지 말고 JSON 한 줄만 출력하세요.',
   ].join('\n');
 
   const user = [
@@ -90,14 +102,13 @@ export async function requestAICommand({
     // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateQwenChat 내부 + 아래 보강)
     // 타임아웃은 실제 생성 단계에만 적용 (사전 준비는 별도 내부 타임아웃으로 보호됨)
     const ctl = new AbortController();
-    const timeout = Math.max(1000, Math.min(120000, timeoutMs));
-    const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), timeout);
+    const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), effectiveTimeout);
     try {
       raw = (
         await generateQwenChat(user, {
           systemPrompt: sys,
           temperature,
-          maxTokens,
+          maxTokens: maxTokens ?? maxTok,
           signal: ctl.signal
         })
       ).trim();
@@ -125,13 +136,16 @@ export async function requestAICommand({
         }
         // 재시도 시에도 생성 단계에만 단기 타임아웃 적용
         const ctl2 = new AbortController();
-        const timer2 = setTimeout(() => ctl2.abort('ai-gateway-timeout'), Math.min(8000, Math.max(1000, timeoutMs / 2)));
+        const timer2 = setTimeout(
+          () => ctl2.abort('ai-gateway-timeout'),
+          Math.min(12_000, Math.max(1_000, (timeoutMs ?? defaultTimeout) / 2))
+        );
         try {
           raw = (
             await generateQwenChat(user, {
               systemPrompt: sys,
               temperature,
-              maxTokens,
+              maxTokens: maxTokens ?? maxTok,
               signal: ctl2.signal
             })
           ).trim();
@@ -145,16 +159,37 @@ export async function requestAICommand({
   }
   const parsed = parseAICommand(raw);
   if (parsed) {
+    // Validate against registry; coerce unknown commands to chat for UX safety
+    const spec = commandRegistry.get(parsed.cmd);
+    if (!spec) {
+      const preview = typeof raw === 'string' ? raw.slice(0, 160) : String(raw);
+      console.warn('[ai-gateway] Unknown command from LLM; falling back to chat', { cmd: parsed.cmd, preview });
+      const bodyText = typeof parsed.body === 'string' && parsed.body.trim() ? parsed.body.trim() : fallbackChatText;
+      release();
+      return { cmd: 'chat', body: bodyText };
+    }
     release();
     return parsed;
   }
+  let bodyText = fallbackChatText;
   if (raw) {
-    // Received output but could not parse the expected JSON envelope
+    // Received output but could not parse the expected JSON envelope — salvage as chat text
     const preview = typeof raw === 'string' ? raw.slice(0, 160) : String(raw);
     console.warn('[ai-gateway] Unparseable LLM output; falling back to chat', { preview });
+    try {
+      const cleaned = String(raw)
+        // remove think blocks
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        // strip code fences while keeping inner text
+        .replace(/```[a-zA-Z]*\n([\s\S]*?)```/g, '$1')
+        .trim();
+      if (cleaned) bodyText = cleaned.slice(0, 400);
+    } catch {
+      // keep fallbackChatText
+    }
   } else {
     console.warn('[ai-gateway] Empty LLM output; falling back to chat');
   }
   release();
-  return { cmd: 'chat', body: { text: fallbackChatText } };
+  return { cmd: 'chat', body: bodyText };
 }

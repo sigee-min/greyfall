@@ -56,8 +56,18 @@ type WebLLMEngine = {
 
 // Runtime is provided by the web worker engine; no explicit runtime type/import needed.
 
-let enginePromise: Promise<WebLLMEngine> | null = null;
-let initialising = false;
+// Use global singleton to survive HMR/StrictMode double mounts
+type GlobalWebLLMState = { enginePromise: Promise<WebLLMEngine> | null; initialising: boolean };
+const GLOBAL_KEY = '__greyfall_webllm_singleton__';
+const g = globalThis as Record<string, unknown>;
+if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = { enginePromise: null, initialising: false } satisfies GlobalWebLLMState;
+function getState(): GlobalWebLLMState {
+  return g[GLOBAL_KEY] as GlobalWebLLMState;
+}
+function getEnginePromise() { return getState().enginePromise; }
+function setEnginePromise(p: Promise<WebLLMEngine> | null) { getState().enginePromise = p; }
+function getInitialising() { return getState().initialising; }
+function setInitialising(v: boolean) { getState().initialising = v; }
 
 export async function loadQwenEngineByManager(
   manager: LlmManagerKind,
@@ -78,17 +88,17 @@ export async function loadQwenEngineByManager(
 
   // Prevent racy double-initialisation under StrictMode/HMR by
   // setting a single shared promise that all callers await.
-  if (enginePromise) return enginePromise;
-  if (initialising) {
+  if (getEnginePromise()) return getEnginePromise()!;
+  if (getInitialising()) {
     // Busy-wait with micro-sleeps until the shared promise is set
     // (should only be a few ms window)
-    while (!enginePromise) {
+    while (!getEnginePromise()) {
       // eslint-disable-next-line no-await-in-loop
       await sleep(5);
     }
-    return enginePromise!;
+    return getEnginePromise()!;
   }
-  initialising = true;
+  setInitialising(true);
   const attempts = resolveProfiles(manager);
   const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
   const wrappedProgress = (report: WebLLMProgress) => {
@@ -100,7 +110,7 @@ export async function loadQwenEngineByManager(
     } catch {}
   };
 
-  enginePromise = (async () => {
+  setEnginePromise((async () => {
     let lastError: unknown;
     for (const profile of attempts) {
       try {
@@ -126,17 +136,17 @@ export async function loadQwenEngineByManager(
       }
     }
     throw normaliseEngineError(lastError);
-  })();
+  })());
 
   try {
-    return await enginePromise;
+    return await getEnginePromise()!;
   } finally {
-    initialising = false;
+    setInitialising(false);
   }
 }
 
 // Allow UI to force a fresh initialisation attempt if previous one got stuck
-export function resetQwenEngine() { enginePromise = null; }
+export function resetQwenEngine() { setEnginePromise(null); }
 
 export async function generateQwenChat(prompt: string, options: QwenChatOptions = {}) {
   const {
@@ -149,7 +159,7 @@ export async function generateQwenChat(prompt: string, options: QwenChatOptions 
   } = options;
 
   // Assume engine has already been initialised by manager selection path
-  let engine = await (enginePromise ?? loadQwenEngineByManager('smart'));
+  let engine = await (getEnginePromise() ?? loadQwenEngineByManager('smart'));
 
   // Guard against partially-initialised or incompatible engine shape by waiting, not resetting
   if (!isChatApiAvailable(engine)) {
@@ -300,14 +310,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function ensureChatApiReady(timeoutMs = 8000): Promise<void> {
-  const eng = await (enginePromise ?? loadQwenEngineByManager('smart'));
+  const eng = await (getEnginePromise() ?? loadQwenEngineByManager('smart'));
   await waitForChatApi(eng, timeoutMs);
 }
 
 // Actively exercise chat API with a minimal request. Does not trigger initialisation
 // if engine/model haven't been started (returns false instead).
 export async function probeChatApiActive(timeoutMs = 800): Promise<boolean> {
-  const pending = enginePromise;
+  const pending = getEnginePromise();
   if (!pending) return false;
   try {
     const engine = await pending;
@@ -357,7 +367,7 @@ async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T
 }
 // Non-intrusive probe that will NOT trigger engine/model initialisation.
 export async function probeChatApiReady(timeoutMs = 500): Promise<{ initialised: boolean; chatApiReady: boolean }> {
-  const pending = enginePromise;
+  const pending = getEnginePromise();
   if (!pending) return { initialised: false, chatApiReady: false };
   const race = await Promise.race<
     | { engine: WebLLMEngine }

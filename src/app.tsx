@@ -33,6 +33,8 @@ import { useWorldMedia } from './domain/world/use-world-media';
 import { FieldGraph } from './ui/world/field-graph';
 import { MapMini } from './ui/world/map-mini';
 import { InteractionPanel } from './ui/world/interaction-panel';
+import { CharacterBuilder } from './ui/character/character-builder';
+import { useCharacterStore } from './store/character';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -91,6 +93,12 @@ function App() {
     scene,
     LOBBY_TRACKS
   );
+
+  const characterBuilt = useCharacterStore((s) => s.built);
+  const [showCharBuilder, setShowCharBuilder] = useState(false);
+  useEffect(() => {
+    if (scene === 'game' && !characterBuilt) setShowCharBuilder(true);
+  }, [characterBuilt, scene]);
 
   const changeScene = useCallback(
     (next: SceneKey) => {
@@ -398,6 +406,10 @@ function App() {
         {scene === 'game' && (
           <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         )}
+
+        {scene === 'game' && showCharBuilder && (
+          <CharacterBuilder onClose={() => setShowCharBuilder(false)} />)
+        }
       </StageViewport>
     );
   }, [

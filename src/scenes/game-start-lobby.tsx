@@ -169,8 +169,9 @@ export function GameStartLobby({
         userInstruction:
           '팀에 시작 인사를 전하세요. 반드시 JSON 한 줄로 {"cmd","body"}만 출력하세요. chat은 string 고정.',
         temperature: 0.5,
-        maxTokens: 96,
-        fallbackChatText: '채널에 합류했습니다.'
+        maxTokens: 192,
+        fallbackChatText: '채널에 합류했습니다.',
+        timeoutMs: 45000
       });
       await executeAICommand(parsed, {
         manager: llmManager,
