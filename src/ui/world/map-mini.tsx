@@ -18,6 +18,7 @@ export function MapMini({ localParticipantId, participants, publish, register }:
   const [vote, setVote] = useState<{ inviteId: string; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all'; status: 'proposed' | 'approved' | 'rejected' | 'cancelled' } | null>(null);
   const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
+  const [policy, setPolicy] = useState<'majority' | 'all'>('majority');
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
@@ -47,7 +48,7 @@ export function MapMini({ localParticipantId, participants, publish, register }:
 
   const handleTravel = (dir: 'next' | 'prev') => {
     if (!localParticipantId) return;
-    publish('map:travel:propose' as any, { requesterId: localParticipantId, direction: dir, quorum: 'majority' } as any, 'ui:travel:propose');
+    publish('map:travel:propose' as any, { requesterId: localParticipantId, direction: dir, quorum: policy } as any, 'ui:travel:propose');
   };
 
   const voteYes = () => {
@@ -85,6 +86,17 @@ export function MapMini({ localParticipantId, participants, publish, register }:
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Journey</p>
         <div className="flex gap-2">
+          {localRole === 'host' && (
+            <select
+              value={policy}
+              onChange={(e) => setPolicy(e.target.value as any)}
+              className="rounded-md border border-border/60 bg-background/80 px-2 py-1 text-[11px]"
+              title="Vote policy"
+            >
+              <option value="majority">Majority</option>
+              <option value="all">All</option>
+            </select>
+          )}
           <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('prev')}>Prev</button>
           <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('next')}>Next</button>
         </div>

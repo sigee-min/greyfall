@@ -84,7 +84,7 @@ export function useBackgroundMusic(
   );
   const sources = useMemo(() => [...primary, ...fallback], [primary, fallback]);
   const sourcesKey = useMemo(() => sources.join('|'), [sources]);
-  const shouldPlay = enabled && scene !== 'game';
+  const shouldPlay = enabled; // play across scenes; caller controls tracks
 
   useEffect(() => {
     const audio = ensureAudioElement();

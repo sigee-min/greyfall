@@ -225,8 +225,8 @@ export class HostRouter {
           const votes = new Map<string, boolean | undefined>();
           for (const m of members) votes.set(m, undefined);
           votes.set(String(requesterId), true);
-          // Force majority quorum per design
-          const q: 'majority' | 'all' = 'majority';
+          // Use requested quorum if provided; default to majority
+          const q: 'majority' | 'all' = (quorum === 'all' ? 'all' : 'majority');
           this.travelPoll = { inviteId, targetMapId: targetId, quorum: q, votes };
           const { yes, no, total } = this.computeVoteCounts();
           this.send('map:travel:update' as any, { inviteId, status: 'proposed', targetMapId: targetId, yes, no, total, quorum: q } as any, 'travel:update');

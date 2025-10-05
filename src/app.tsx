@@ -29,6 +29,7 @@ import { useDisableAutofill } from './lib/use-disable-autofill';
 import { useGlobalBus } from './bus/global-bus';
 import { useGameBus } from './bus/game-bus';
 import type { SceneKey } from './types/scenes';
+import { useWorldMedia } from './domain/world/use-world-media';
 import { FieldGraph } from './ui/world/field-graph';
 import { MapMini } from './ui/world/map-mini';
 import { InteractionPanel } from './ui/world/interaction-panel';
@@ -80,8 +81,11 @@ function App() {
   });
 
   const musicPlayEnabled = preferencesLoaded && musicEnabled;
+  // Dynamic world media (bg/music) in game scene
+  const worldMedia = useWorldMedia(localParticipantId);
+  const activeTracks = scene === 'game' ? worldMedia.tracks : LOBBY_TRACKS;
   const { resume: resumeMusic, previewVolume: previewMusicVolume } = useBackgroundMusic(
-    LOBBY_TRACKS,
+    activeTracks,
     musicPlayEnabled,
     musicVolume,
     scene,
@@ -333,8 +337,9 @@ function App() {
       );
     }
 
+    const stageBg = scene === 'game' ? worldMedia.bgSrc : '/assets/bg/stage-ops.png';
     return (
-      <StageViewport background="/assets/bg/stage-ops.png" className="cursor-crosshair">
+      <StageViewport background={stageBg} className="cursor-crosshair">
         <div className="pointer-events-none absolute inset-0">
           <div className="pointer-events-auto mx-6 mt-6 flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/50">
             <div>

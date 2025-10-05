@@ -74,9 +74,6 @@ export async function requestAICommand({
     .join('\n');
 
   let raw = '';
-  const ctl = new AbortController();
-  const timeout = Math.max(1000, Math.min(120000, timeoutMs));
-  const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), timeout);
   try {
     // 1) 엔진 예열 및 Chat API 준비 보장
     await loadQwenEngineByManager(manager);
@@ -91,14 +88,22 @@ export async function requestAICommand({
     }
 
     // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateQwenChat 내부 + 아래 보강)
-    raw = (
-      await generateQwenChat(user, {
-        systemPrompt: sys,
-        temperature,
-        maxTokens,
-        signal: ctl.signal
-      })
-    ).trim();
+    // 타임아웃은 실제 생성 단계에만 적용 (사전 준비는 별도 내부 타임아웃으로 보호됨)
+    const ctl = new AbortController();
+    const timeout = Math.max(1000, Math.min(120000, timeoutMs));
+    const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), timeout);
+    try {
+      raw = (
+        await generateQwenChat(user, {
+          systemPrompt: sys,
+          temperature,
+          maxTokens,
+          signal: ctl.signal
+        })
+      ).trim();
+    } finally {
+      clearTimeout(timerId);
+    }
   } catch (e) {
     // Log error for visibility, then fall back to a safe command to keep UX responsive.
     const message = e instanceof Error ? e.message : String(e);
@@ -118,20 +123,26 @@ export async function requestAICommand({
         if (!(await probeChatApiActive(1_000))) {
           await new Promise((r) => setTimeout(r, 300));
         }
-        raw = (
-          await generateQwenChat(user, {
-            systemPrompt: sys,
-            temperature,
-            maxTokens,
-            signal: ctl.signal
-          })
-        ).trim();
+        // 재시도 시에도 생성 단계에만 단기 타임아웃 적용
+        const ctl2 = new AbortController();
+        const timer2 = setTimeout(() => ctl2.abort('ai-gateway-timeout'), Math.min(8000, Math.max(1000, timeoutMs / 2)));
+        try {
+          raw = (
+            await generateQwenChat(user, {
+              systemPrompt: sys,
+              temperature,
+              maxTokens,
+              signal: ctl2.signal
+            })
+          ).trim();
+        } finally {
+          clearTimeout(timer2);
+        }
       } catch {
         // 두 번째도 실패하면 폴백으로 진행
       }
     }
   }
-  clearTimeout(timerId);
   const parsed = parseAICommand(raw);
   if (parsed) {
     release();

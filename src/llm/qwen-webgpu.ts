@@ -57,6 +57,7 @@ type WebLLMEngine = {
 // Runtime is provided by the web worker engine; no explicit runtime type/import needed.
 
 let enginePromise: Promise<WebLLMEngine> | null = null;
+let initialising = false;
 
 export async function loadQwenEngineByManager(
   manager: LlmManagerKind,
@@ -75,8 +76,31 @@ export async function loadQwenEngineByManager(
     throw new Error('이 브라우저는 WebGPU를 지원하지 않습니다. Chrome 113+ (chrome://flags/#enable-unsafe-webgpu) 또는 최신 Edge에서 시도해 주세요.');
   }
 
-  if (!enginePromise) {
-    const attempts = resolveProfiles(manager);
+  // Prevent racy double-initialisation under StrictMode/HMR by
+  // setting a single shared promise that all callers await.
+  if (enginePromise) return enginePromise;
+  if (initialising) {
+    // Busy-wait with micro-sleeps until the shared promise is set
+    // (should only be a few ms window)
+    while (!enginePromise) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(5);
+    }
+    return enginePromise!;
+  }
+  initialising = true;
+  const attempts = resolveProfiles(manager);
+  const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+  const wrappedProgress = (report: WebLLMProgress) => {
+    try {
+      onProgress?.(report);
+      if (debug && (report.text || typeof report.progress === 'number')) {
+        console.debug('[webllm] progress', report);
+      }
+    } catch {}
+  };
+
+  enginePromise = (async () => {
     let lastError: unknown;
     for (const profile of attempts) {
       try {
@@ -89,36 +113,26 @@ export async function loadQwenEngineByManager(
         worker.addEventListener('messageerror', (ev) => {
           console.error('[webllm] worker messageerror', ev);
         });
-        const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
-        const wrappedProgress = (report: WebLLMProgress) => {
-          try {
-            onProgress?.(report);
-            if (debug && (report.text || typeof report.progress === 'number')) {
-              console.debug('[webllm] progress', report);
-            }
-          } catch {}
-        };
-        // Ensure "initialised" 로그는 실제 resolve 시점에만 출력
-        enginePromise = (async () => {
-          const eng = (await (CreateWebWorkerMLCEngine(
-            worker as unknown as Worker,
-            profile.id,
-            { initProgressCallback: wrappedProgress }
-          ) as any)) as WebLLMEngine;
-          console.info('[webllm] model initialised', { id: profile.id });
-          return eng;
-        })();
-        break;
+        const eng = (await (CreateWebWorkerMLCEngine(
+          worker as unknown as Worker,
+          profile.id,
+          { initProgressCallback: wrappedProgress }
+        ) as any)) as WebLLMEngine;
+        console.info('[webllm] model initialised', { id: profile.id });
+        return eng;
       } catch (error) {
         console.warn('[webllm] model init failed', { id: profile.id, error });
-        enginePromise = null;
         lastError = error;
       }
     }
-    if (!enginePromise) throw normaliseEngineError(lastError);
-  }
+    throw normaliseEngineError(lastError);
+  })();
 
-  return enginePromise;
+  try {
+    return await enginePromise;
+  } finally {
+    initialising = false;
+  }
 }
 
 // Allow UI to force a fresh initialisation attempt if previous one got stuck
