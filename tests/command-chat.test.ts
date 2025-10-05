@@ -3,7 +3,13 @@ import { test } from './test-harness.js';
 import { commandRegistry } from '../src/domain/ai/command-registry.js';
 import { ChatCommand } from '../src/domain/ai/commands/chat.js';
 
+function registerNoCooldown() {
+  const spec = { ...ChatCommand, policy: { ...(ChatCommand.policy ?? {}), cooldownMs: 0 } } as typeof ChatCommand;
+  commandRegistry.register(spec);
+}
+
 test('ChatCommand executes with string body', async () => {
+  registerNoCooldown();
   let lastBody = '';
   const ok = await commandRegistry.execute(
     { id: 't1', cmd: 'chat', body: 'hello world' },
@@ -25,8 +31,7 @@ test('ChatCommand executes with string body', async () => {
 });
 
 test('ChatCommand coerce: object with {message} becomes string', async () => {
-  // Ensure registry has chat command (idempotent)
-  commandRegistry.register(ChatCommand);
+  registerNoCooldown();
   let lastBody = '';
   const ok = await commandRegistry.execute(
     { id: 't2', cmd: 'chat', body: { message: '안녕하세요' } },

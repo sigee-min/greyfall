@@ -51,9 +51,24 @@ export async function requestAICommand({
   try {
     raw = (await generateQwenChat(user, { systemPrompt: sys, temperature, maxTokens })).trim();
   } catch (e) {
-    // Fall through and return fallback command
+    // Log error for visibility, then fall back to a safe command to keep UX responsive.
+    const message = e instanceof Error ? e.message : String(e);
+    // Avoid logging full prompt to reduce noise/PII; include minimal context.
+    console.error('[ai-gateway] LLM request failed; using fallback', {
+      manager,
+      temperature,
+      maxTokens,
+      error: message
+    });
   }
   const parsed = parseAICommand(raw);
   if (parsed) return parsed;
+  if (raw) {
+    // Received output but could not parse the expected JSON envelope
+    const preview = typeof raw === 'string' ? raw.slice(0, 160) : String(raw);
+    console.warn('[ai-gateway] Unparseable LLM output; falling back to chat', { preview });
+  } else {
+    console.warn('[ai-gateway] Empty LLM output; falling back to chat');
+  }
   return { cmd: 'chat', body: { text: fallbackChatText } };
 }

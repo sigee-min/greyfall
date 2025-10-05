@@ -1,12 +1,9 @@
 import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
-import { parseLobbyMessage } from '../../protocol';
 import type { LobbyStore } from '../session/session-store';
-import { PARTICIPANTS_OBJECT_ID } from './participants';
-import type { ChatEntry } from './chat';
 import { HostParticipantsObject } from './participants-host';
-import { SlidingWindowLimiter } from './rate-limit';
 import type { HostObject } from './types';
 import { HostChatObject } from './chat-host';
+import { HostRouter } from './host-router';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -26,9 +23,7 @@ export class HostNetController {
   private readonly busPublish: (message: LobbyMessage) => void;
   private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
-  private readonly registry = new Map<string, HostObject>();
-  private readonly peerToParticipant = new Map<string, string>();
-  private readonly chatLimiter = new SlidingWindowLimiter(5, 10_000); // 5 msgs / 10s per author
+  private readonly router: HostRouter;
 
   constructor({ publish, lobbyStore, busPublish }: Deps) {
     this.publish = publish;
@@ -36,8 +31,13 @@ export class HostNetController {
     this.busPublish = busPublish;
     this.participants = new HostParticipantsObject({ publish: this.publish, lobbyStore: this.lobbyStore });
     this.chat = new HostChatObject({ publish: this.publish, lobbyStore: this.lobbyStore });
-    this.register(this.participants);
-    this.register(this.chat);
+    this.router = new HostRouter({
+      send: (kind, body, ctx) => this.publish(kind as any, body as any, ctx),
+      lobbyStore: this.lobbyStore,
+      publishToBus: (message) => this.busPublish(message),
+      participants: this.participants,
+      chat: this.chat
+    });
   }
 
   bindChannel(channel: RTCDataChannel, peerId?: string) {
@@ -46,109 +46,32 @@ export class HostNetController {
       try {
         payload = JSON.parse(event.data);
       } catch (_err) {
-        // Ignore non-JSON payloads
+        // ignore non-JSON payloads
       }
-      this.handlePayload(payload, peerId);
+      this.router.handle(payload, peerId);
     };
     channel.addEventListener('message', onMessage);
   }
 
-  onPeerConnected(_peerId: string) {
-    // Optionally push current participants snapshot when a peer connects
-    this.participants.broadcast('peer-connected');
+  onPeerConnected(peerId: string) {
+    this.router.onPeerConnected(peerId);
   }
 
-  requestObjectSnapshot(id: string, sinceRev?: number) {
-    const obj = this.registry.get(id);
-    obj?.onRequest(sinceRev);
-  }
-
-  private handlePayload(payload: unknown, peerId?: string) {
-    const message = parseLobbyMessage(payload);
-    if (!message) return;
-
-    switch (message.kind) {
-      case 'hello': {
-        const p = message.body.participant;
-        this.lobbyStore.upsertFromWire(p);
-        this.participants.upsert(p, 'hello:merge');
-        if (peerId) this.peerToParticipant.set(peerId, p.id);
-        break;
-      }
-      case 'ready': {
-        const { participantId, ready } = message.body;
-        const raw = this.lobbyStore.snapshotWire().map((p) =>
-          p.id === participantId ? { ...p, ready } : p
-        );
-        this.lobbyStore.replaceFromWire(raw);
-        this.participants.update(participantId, { ready }, 'ready:merge');
-        break;
-      }
-      case 'leave': {
-        const id = message.body.participantId;
-        this.lobbyStore.remove(id);
-        this.participants.remove(id, 'leave:remove');
-        // drop any peer mapping for this participant
-        for (const [k, v] of Array.from(this.peerToParticipant.entries())) {
-          if (v === id) this.peerToParticipant.delete(k);
-        }
-        break;
-      }
-      case 'object:request': {
-        const { id, sinceRev } = message.body;
-        this.requestObjectSnapshot(id, sinceRev);
-        break;
-      }
-      case 'chat:append:request': {
-        const authorId = String((message.body as any).authorId ?? this.lobbyStore.localParticipantIdRef.current ?? 'host');
-        const rawBody = String((message.body as any).body ?? '');
-        const trimmed = rawBody.trim();
-        if (!trimmed) break; // ignore empty
-        if (!this.chatLimiter.allow(authorId)) {
-          console.warn('[chat] rate limited', { authorId });
-          break;
-        }
-        const self = this.lobbyStore.participantsRef.current.find((p) => p.id === authorId);
-        const entry: ChatEntry = {
-          id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          authorId,
-          authorName: self?.name ?? 'Host',
-          authorTag: self?.tag ?? '#HOST',
-          authorRole: 'host',
-          body: trimmed,
-          at: Date.now()
-        };
-        this.chat.append(entry, 'chat-append');
-        break;
-      }
-      default:
-        break;
-    }
-
-    // Always forward to lobby bus so feature hooks remain reactive
-    this.busPublish(message);
-  }
+  // Message handling moved into HostRouter
 
   broadcastParticipants(context: string = 'participants-sync') {
     this.participants.broadcast(context);
   }
 
   register(object: HostObject) {
-    this.registry.set(object.id, object);
+    this.router.register(object);
   }
 
   onPeerDisconnected(peerId: string) {
-    const participantId = this.peerToParticipant.get(peerId);
-    if (!participantId) return;
-    this.peerToParticipant.delete(peerId);
-    // remove participant and broadcast patch removal
-    this.lobbyStore.remove(participantId);
-    this.participants.remove(participantId, 'peer-disconnected');
+    this.router.onPeerDisconnected(peerId);
   }
 
   updateParticipantReady(participantId: string, ready: boolean, context = 'ready:host-toggle') {
-    const raw = this.lobbyStore.snapshotWire().map((p) => (p.id === participantId ? { ...p, ready } : p));
-    this.lobbyStore.replaceFromWire(raw);
-    this.participants.update(participantId, { ready }, context);
+    this.router.updateParticipantReady(participantId, ready, context);
   }
 }
