@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".tmp-tests",
+    "types": ["node"],
+    "module": "ESNext",
+    "target": "ES2020",
+    "moduleResolution": "Bundler",
+    "sourceMap": false,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/domain/ai/**/*.ts",
+    "src/domain/net-objects/**/*.ts",
+    "src/protocol/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}
+

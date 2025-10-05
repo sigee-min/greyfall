@@ -1,9 +1,9 @@
 import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 import { parseLobbyMessage } from '../../protocol';
 import type { LobbyStore } from '../session/session-store';
-import { PARTICIPANTS_OBJECT_ID, makeParticipantsSnapshot } from './participants';
-import { HostReplicator } from './replicator';
+import { PARTICIPANTS_OBJECT_ID } from './participants';
 import { ChatHostStore, type ChatEntry } from './chat';
+import { HostParticipantsObject } from './participants-host';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -21,14 +21,14 @@ export class HostNetController {
   private readonly publish: Publish;
   private readonly lobbyStore: LobbyStore;
   private readonly busPublish: (message: LobbyMessage) => void;
-  private readonly replicator: HostReplicator;
+  private readonly participants: HostParticipantsObject;
   private readonly chat: ChatHostStore;
 
   constructor({ publish, lobbyStore, busPublish }: Deps) {
     this.publish = publish;
     this.lobbyStore = lobbyStore;
     this.busPublish = busPublish;
-    this.replicator = new HostReplicator((kind, body, context) => this.publish(kind as any, body as any, context));
+    this.participants = new HostParticipantsObject({ publish: this.publish, lobbyStore: this.lobbyStore });
     this.chat = new ChatHostStore((kind, body, context) => this.publish(kind as any, body as any, context));
   }
 
@@ -47,12 +47,12 @@ export class HostNetController {
 
   onPeerConnected(_peerId: string) {
     // Optionally push current participants snapshot when a peer connects
-    this.broadcastParticipants('peer-connected');
+    this.participants.broadcast('peer-connected');
   }
 
   requestObjectSnapshot(id: string, sinceRev?: number) {
     if (id === PARTICIPANTS_OBJECT_ID) {
-      this.replicator.onRequest(PARTICIPANTS_OBJECT_ID, sinceRev, 'object-request participants');
+      this.participants.onRequest(sinceRev);
     } else if (id === 'chatlog') {
       this.chat.onRequest(sinceRev, 'object-request chatlog');
     }
@@ -64,9 +64,8 @@ export class HostNetController {
 
     switch (message.kind) {
       case 'hello': {
-        // Register or update participant, then broadcast authoritative snapshot
         this.lobbyStore.upsertFromWire(message.body.participant);
-        this.broadcastParticipants('hello');
+        this.participants.onHello();
         break;
       }
       case 'ready': {
@@ -75,12 +74,12 @@ export class HostNetController {
           p.id === participantId ? { ...p, ready } : p
         );
         this.lobbyStore.replaceFromWire(raw);
-        this.broadcastParticipants('ready-update');
+        this.participants.onReady();
         break;
       }
       case 'leave': {
         this.lobbyStore.remove(message.body.participantId);
-        this.broadcastParticipants('leave-relay');
+        this.participants.onLeave();
         break;
       }
       case 'object:request': {
@@ -112,7 +111,6 @@ export class HostNetController {
   }
 
   broadcastParticipants(context: string = 'participants-sync') {
-    const value = makeParticipantsSnapshot(this.lobbyStore.snapshotWire(), 4);
-    this.replicator.set(PARTICIPANTS_OBJECT_ID, value, context);
+    this.participants.broadcast(context);
   }
 }

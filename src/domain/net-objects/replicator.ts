@@ -65,9 +65,38 @@ export class HostReplicator {
         } else {
           result = structuredClone(op.value) as any;
         }
+      } else if ((op as any).op === 'insert') {
+        const path = (op as any).path as string | undefined;
+        const value = (op as any).value as unknown;
+        if (path) {
+          const container = (result as any)[path];
+          if (Array.isArray(container)) {
+            if (Array.isArray(value)) container.push(...value);
+            else container.push(value);
+          } else if (container == null) {
+            (result as any)[path] = Array.isArray(value) ? [...value] : [value];
+          }
+        } else if (Array.isArray(result)) {
+          if (Array.isArray(value)) (result as any).push(...value);
+          else (result as any).push(value);
+        }
+      } else if ((op as any).op === 'remove') {
+        const path = (op as any).path as string | undefined;
+        const value = (op as any).value as unknown;
+        if (path) {
+          const container = (result as any)[path];
+          if (Array.isArray(container)) {
+            if (typeof value === 'number') container.splice(value, 1);
+            else if (value && typeof value === 'object' && 'id' in (value as any)) {
+              const idx = container.findIndex((e: any) => e?.id === (value as any).id);
+              if (idx >= 0) container.splice(idx, 1);
+            }
+          } else if (container && typeof container === 'object' && typeof value === 'string') {
+            delete (container as any)[value];
+          }
+        }
       }
     }
     return result;
   }
 }
-

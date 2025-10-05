@@ -2,7 +2,8 @@ import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../p
 import { parseLobbyMessage } from '../../protocol';
 import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
-import { isParticipantsSnapshot, PARTICIPANTS_OBJECT_ID } from './participants';
+import { ClientParticipantsObject } from './participants-client';
+import { PARTICIPANTS_OBJECT_ID } from './participants';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -21,11 +22,19 @@ export class ClientNetController {
   private readonly lobbyStore: LobbyStore;
   private readonly busPublish: (message: LobbyMessage) => void;
   private readonly store = new ClientNetObjectStore();
+  private readonly registry: Map<string, { onReplace: (rev: number, value: unknown) => void; onPatch?: (rev: number, ops: unknown[]) => void }>; 
 
   constructor({ publish, lobbyStore, busPublish }: Deps) {
     this.publish = publish;
     this.lobbyStore = lobbyStore;
     this.busPublish = busPublish;
+    this.registry = new Map();
+    // register built-in participants client object
+    const participants = new ClientParticipantsObject(this.lobbyStore);
+    this.registry.set(participants.id, {
+      onReplace: (rev, value) => participants.onReplace(rev, value),
+      onPatch: (rev, ops) => participants.onPatch?.(rev, ops)
+    });
   }
 
   bindChannel(channel: RTCDataChannel) {
@@ -55,15 +64,8 @@ export class ClientNetController {
         const { id, rev, value } = message.body as { id: string; rev: number; value: unknown };
         const applied = this.store.applyReplace(id, rev, value);
         if (!applied) break;
-        if (id === PARTICIPANTS_OBJECT_ID) {
-          if (isParticipantsSnapshot(value)) {
-            this.lobbyStore.replaceFromWire(value.list);
-          } else if (Array.isArray((value as any)?.participants)) {
-            this.lobbyStore.replaceFromWire((value as any).participants as any);
-          } else if (Array.isArray((value as any)?.list)) {
-            this.lobbyStore.replaceFromWire((value as any).list as any);
-          }
-        }
+        const obj = this.registry.get(id);
+        obj?.onReplace(rev, value);
         break;
       }
       case 'object:patch': {
@@ -72,6 +74,9 @@ export class ClientNetController {
         if (!ok) {
           // Fallback to request full snapshot if patch cannot be applied
           this.publish('object:request', { id }, 'patch-fallback-request');
+        } else {
+          const obj = this.registry.get(id);
+          obj?.onPatch?.(rev, ops);
         }
         break;
       }
@@ -88,4 +93,3 @@ export class ClientNetController {
     this.busPublish(message);
   }
 }
-

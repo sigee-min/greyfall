@@ -1,0 +1,178 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { nanoid } from 'nanoid';
+import { useGameBus } from '../../bus/game-bus';
+export function useLobbyChat({ registerLobbyHandler, publishLobbyMessage, participants, localParticipantId, sessionMeta }) {
+    const [chatMessages, setChatMessages] = useState([]);
+    const [channelReady, setChannelReady] = useState(() => {
+        const channel = sessionMeta?.session.channel;
+        return channel?.readyState === 'open';
+    });
+    const participantsRef = useRef(participants);
+    const localIdRef = useRef(localParticipantId);
+    const sessionMode = sessionMeta ? sessionMeta.mode : null;
+    const sessionKey = sessionMeta ? sessionMeta.session : null;
+    const modeRef = useRef(sessionMode);
+    const gameBus = useGameBus();
+    useEffect(() => {
+        participantsRef.current = participants;
+    }, [participants]);
+    useEffect(() => {
+        localIdRef.current = localParticipantId;
+    }, [localParticipantId]);
+    useEffect(() => {
+        modeRef.current = sessionMeta ? sessionMeta.mode : null;
+    }, [sessionMeta]);
+    useEffect(() => {
+        const channel = sessionMeta?.session.channel;
+        if (!channel) {
+            setChannelReady(false);
+            return undefined;
+        }
+        const handleStateChange = () => {
+            setChannelReady(channel.readyState === 'open');
+        };
+        handleStateChange();
+        channel.addEventListener('open', handleStateChange);
+        channel.addEventListener('close', handleStateChange);
+        channel.addEventListener('error', handleStateChange);
+        return () => {
+            channel.removeEventListener('open', handleStateChange);
+            channel.removeEventListener('close', handleStateChange);
+            channel.removeEventListener('error', handleStateChange);
+        };
+    }, [sessionMeta]);
+    useEffect(() => {
+        setChatMessages([]);
+    }, [sessionKey]);
+    useEffect(() => {
+        const unsubscribe = registerLobbyHandler('chat', (message) => {
+            const entry = message.body.entry;
+            const isSelf = localIdRef.current ? entry.authorId === localIdRef.current : false;
+            setChatMessages((previous) => [
+                ...previous,
+                {
+                    ...entry,
+                    isSelf
+                }
+            ]);
+            gameBus.publish('lobby:chat', { entry, self: isSelf });
+        });
+        return unsubscribe;
+    }, [gameBus, registerLobbyHandler]);
+    // Host-authoritative chat object: replace handler
+    useEffect(() => {
+        const unsubscribe = registerLobbyHandler('object:replace', (message) => {
+            if (message.body.id !== 'chatlog')
+                return;
+            const value = message.body.value;
+            const entries = Array.isArray(value?.entries) ? value.entries : Array.isArray(value?.list) ? value.list : null;
+            if (!entries)
+                return;
+            // Map to local shape and mark self messages
+            const mapped = entries.map((e) => ({
+                id: String(e.id),
+                authorId: String(e.authorId),
+                authorName: String(e.authorName),
+                authorTag: String(e.authorTag),
+                authorRole: e.authorRole,
+                body: String(e.body),
+                at: Number(e.at),
+                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
+            }));
+            setChatMessages(mapped);
+        });
+        return unsubscribe;
+    }, [registerLobbyHandler]);
+    // Host-authoritative chat object: patch handler (append/remove)
+    useEffect(() => {
+        const unsubscribe = registerLobbyHandler('object:patch', (message) => {
+            if (message.body.id !== 'chatlog')
+                return;
+            const ops = message.body.ops;
+            if (!Array.isArray(ops) || ops.length === 0)
+                return;
+            setChatMessages((prev) => {
+                let next = prev.slice();
+                for (const op of ops) {
+                    if (op?.op === 'insert') {
+                        const val = op.value;
+                        const list = Array.isArray(val) ? val : [val];
+                        for (const e of list) {
+                            const mapped = {
+                                id: String(e.id),
+                                authorId: String(e.authorId),
+                                authorName: String(e.authorName),
+                                authorTag: String(e.authorTag),
+                                authorRole: e.authorRole,
+                                body: String(e.body),
+                                at: Number(e.at),
+                                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
+                            };
+                            next.push(mapped);
+                        }
+                    }
+                    else if (op?.op === 'set') {
+                        // Treat as replace if full object provided
+                        const value = op.value;
+                        const entries = Array.isArray(value?.entries)
+                            ? value.entries
+                            : Array.isArray(value?.list)
+                                ? value.list
+                                : null;
+                        if (entries) {
+                            next = entries.map((e) => ({
+                                id: String(e.id),
+                                authorId: String(e.authorId),
+                                authorName: String(e.authorName),
+                                authorTag: String(e.authorTag),
+                                authorRole: e.authorRole,
+                                body: String(e.body),
+                                at: Number(e.at),
+                                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
+                            }));
+                        }
+                    }
+                }
+                return next;
+            });
+        });
+        return unsubscribe;
+    }, [registerLobbyHandler]);
+    const sendChatMessage = useCallback((body) => {
+        const trimmed = body.trim();
+        if (!trimmed)
+            return false;
+        const authorId = localIdRef.current;
+        if (!authorId) {
+            console.warn('[chat] send skipped – missing local participant');
+            return false;
+        }
+        // 채널이 열리지 않았어도 로컬 로그에는 추가하고, 전송은 큐에 쌓입니다.
+        const author = participantsRef.current.find((participant) => participant.id === authorId);
+        const authorRole = author?.role ?? modeRef.current ?? 'guest';
+        const entry = {
+            id: nanoid(12),
+            authorId,
+            authorName: author?.name ?? 'Unknown',
+            authorTag: author?.tag ?? '#????',
+            authorRole,
+            body: trimmed,
+            at: Date.now()
+        };
+        // Host-authoritative path: request Host to append; Host rebroadcasts chatlog snapshot/patch
+        const delivered = publishLobbyMessage('chat:append:request', { body: trimmed, authorId }, 'chat-send');
+        if (!delivered) {
+            console.info('[chat] queued until channel open');
+        }
+        return true;
+    }, [publishLobbyMessage]);
+    const chatLog = useMemo(() => chatMessages, [chatMessages]);
+    return {
+        chatMessages: chatLog,
+        sendChatMessage,
+        // 입력은 로컬 참가자 존재 여부만 확인해 허용하고,
+        // 전송은 내부적으로 큐잉되어 채널 오픈 시 플러시됩니다.
+        canSendChat: Boolean(localIdRef.current),
+        channelOpen: channelReady
+    };
+}

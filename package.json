@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
-    "test": "npm run lint && npm run typecheck"
+    "test": "npm run lint && npm run typecheck",
+    "coretest:build": "tsc -p tsconfig.test.json",
+    "coretest": "npm run coretest:build && node scripts/run-core-tests.mjs"
   },
   "dependencies": {
     "@pixi/filter-kawase-blur": "^5.1.1",
