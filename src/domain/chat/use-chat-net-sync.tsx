@@ -191,9 +191,8 @@ export function useChatNetSync({
       };
       const delivered = publishLobbyMessage('chat:append:request', { body: trimmed, authorId }, 'chat-send');
       if (delivered) {
-        const displayEntry: SessionChatLogEntry = { ...entry, isSelf: true };
-        setChatMessages((prev) => [...prev, displayEntry]);
-        gameBus.publish('lobby:chat', { entry, self: true });
+        // Do not locally echo; rely on host broadcast (object:patch/replace)
+        // to avoid duplicates on guests.
         return true;
       }
       console.info('[chat] send skipped – channel not open');

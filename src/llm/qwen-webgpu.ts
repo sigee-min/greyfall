@@ -161,12 +161,7 @@ function omitOnNewToken<T extends WebLLMCompletionRequest>(req: T): Omit<T, 'onN
 }
 
 async function chatCompletionCompat(engine: WebLLMEngine, req: WebLLMCompletionRequest): Promise<string> {
-  // Prefer legacy API if present (supports onNewToken callback)
-  if (typeof engine.chat?.completion === 'function') {
-    const completion = await engine.chat.completion(req);
-    return (completion?.output_text ?? '').toString();
-  }
-  // Fallback to newer API shape
+  // Modern API only: engine.chat.completions.create(...)
   const create = engine.chat?.completions?.create;
   if (typeof create === 'function') {
     const payload = omitOnNewToken(req) as WebLLMCompletionRequest;
@@ -177,7 +172,9 @@ async function chatCompletionCompat(engine: WebLLMEngine, req: WebLLMCompletionR
     if (res && typeof (res as any)[Symbol.asyncIterator] === 'function') {
       let output = '';
       let index = 0;
+      let last: any = null;
       for await (const chunk of res as AsyncIterable<any>) {
+        last = chunk;
         const token = extractTokenFromChunk(chunk);
         if (token) {
           output += token;
@@ -187,6 +184,15 @@ async function chatCompletionCompat(engine: WebLLMEngine, req: WebLLMCompletionR
             // ignore consumer errors
           }
         }
+      }
+      // if no incremental tokens were surfaced, try to read final text fields
+      if (!output && last) {
+        const finalText =
+          (typeof last.output_text === 'string' && last.output_text) ||
+          (last.choices && last.choices[0]?.message?.content) ||
+          last.text ||
+          '';
+        if (finalText) return String(finalText);
       }
       return output;
     }
@@ -198,7 +204,7 @@ async function chatCompletionCompat(engine: WebLLMEngine, req: WebLLMCompletionR
     if (text) return text;
     throw new Error('Empty completion result');
   }
-  throw new Error('WebLLM chat completion API not available');
+  throw new Error('WebLLM modern chat API (completions.create) not available');
 }
 
 function extractTokenFromChunk(chunk: any): string {
@@ -210,9 +216,8 @@ function extractTokenFromChunk(chunk: any): string {
 
 function isChatApiAvailable(engine: WebLLMEngine | null | undefined): engine is WebLLMEngine {
   if (!engine) return false;
-  const legacy = typeof engine.chat?.completion === 'function';
   const modern = typeof engine.chat?.completions?.create === 'function';
-  return legacy || modern;
+  return modern;
 }
 
 function isTransientEngineError(err: unknown): boolean {
