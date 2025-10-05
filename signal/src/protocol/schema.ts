@@ -255,6 +255,38 @@ const lobbyMapTravelRequestSchema = lobbyEnvelopeSchema.extend({
     })
 });
 
+const lobbyMapTravelProposeSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('map:travel:propose'),
+  body: z
+    .object({
+      requesterId: z.string().min(1),
+      direction: z.enum(['next', 'prev']).optional(),
+      toMapId: z.string().min(1).optional(),
+      quorum: z.enum(['majority', 'all']).optional()
+    })
+    .refine((v) => Boolean(v.direction) !== Boolean(v.toMapId), {
+      message: 'Provide either direction or toMapId'
+    })
+});
+
+const lobbyMapTravelVoteSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('map:travel:vote'),
+  body: z.object({ inviteId: z.string().min(6), voterId: z.string().min(1), approve: z.boolean() })
+});
+
+const lobbyMapTravelUpdateSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('map:travel:update'),
+  body: z.object({
+    inviteId: z.string().min(6),
+    status: z.enum(['proposed', 'approved', 'rejected', 'cancelled']),
+    targetMapId: z.string().min(1),
+    yes: z.number().int().nonnegative(),
+    no: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+    quorum: z.enum(['majority', 'all'])
+  })
+});
+
 // Interaction handshake (invite/accept/cancel/confirmed)
 const lobbyInteractInviteSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('interact:invite'),
@@ -296,6 +328,9 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyObjectAckSchema,
   lobbyChatAppendRequestSchema,
   lobbyFieldMoveRequestSchema,
+  lobbyMapTravelProposeSchema,
+  lobbyMapTravelVoteSchema,
+  lobbyMapTravelUpdateSchema,
   lobbyMapTravelRequestSchema,
   lobbyInteractInviteSchema,
   lobbyInteractAcceptSchema,
@@ -320,6 +355,9 @@ export type LobbyMessageBodies = {
   'chat:append:request': { body: string; authorId: string };
   'field:move:request': { playerId: string; mapId: string; fromFieldId: string; toFieldId: string };
   'map:travel:request': { requesterId: string; direction?: 'next' | 'prev'; toMapId?: string };
+  'map:travel:propose': { requesterId: string; direction?: 'next' | 'prev'; toMapId?: string; quorum?: 'majority' | 'all' };
+  'map:travel:vote': { inviteId: string; voterId: string; approve: boolean };
+  'map:travel:update': { inviteId: string; status: 'proposed' | 'approved' | 'rejected' | 'cancelled'; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all' };
   'interact:invite': { inviteId: string; fromId: string; toId: string; mapId: string; fieldId: string; verb: string };
   'interact:accept': { inviteId: string; toId: string };
   'interact:cancel': { inviteId: string; byId: string };
