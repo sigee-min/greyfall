@@ -378,7 +378,8 @@ function App() {
     toggleReady,
     sendChatMessage,
     selectedManager,
-    publishLobbyMessage
+    publishLobbyMessage,
+    registerLobbyHandler
   ]);
 
   const leaveSessionRef = useRef(leaveSession);
