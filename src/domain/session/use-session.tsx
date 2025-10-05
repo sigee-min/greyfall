@@ -214,8 +214,10 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         return false;
       }
       const { channel } = session;
+      const envelope = createLobbyMessage(kind, body);
+      // Echo to local subscribers immediately so UI reflects own messages even if channel is closed.
+      lobbyBus.publish(envelope);
       if (channel.readyState !== 'open') {
-        const envelope = createLobbyMessage(kind, body);
         // Keep queue bounded to MAX_PENDING_QUEUE by dropping oldest first
         while (pendingMessagesRef.current.length >= MAX_PENDING_QUEUE) {
           pendingMessagesRef.current.shift();
@@ -234,12 +236,11 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
         });
         return false;
       }
-      const envelope = createLobbyMessage(kind, body);
       channel.send(JSON.stringify(envelope));
       console.info('[lobby] send', { context, kind, body });
       return true;
     },
-    []
+    [lobbyBus]
   );
 
   const registerLobbyHandler = useCallback(

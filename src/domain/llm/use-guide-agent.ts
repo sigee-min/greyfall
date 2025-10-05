@@ -5,6 +5,7 @@ import { guideDisplayName } from './guide-profile';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../chat/use-lobby-chat';
 import type { SessionParticipant } from '../session/types';
 import { nanoid } from 'nanoid';
+import { executeAICommand, parseAICommand } from '../ai/ai-router';
 
 export type GuideAgentPolicy = {
   respondOnMention: boolean;
@@ -85,26 +86,35 @@ export function useGuideAgent({
             .slice(-fullPolicy.maxContext)
             .map((m) => `- ${m.role === 'assistant' ? '(안내인) ' : ''}${m.content}`)
             .join('\n');
-          const userPrompt = `대화 맥락:\n${context}\n\n마지막 요청에 1~2문장으로 간결하게 답하라. 존칭 유지.`;
-          const reply = (await generateQwenChat(userPrompt, {
+          const userPrompt = [
+            '당신의 출력은 JSON이어야 합니다.',
+            '형식: {"cmd": "chat", "body": string | object }',
+            '예: {"cmd":"chat","body":"안녕하세요."}',
+            '예: {"cmd":"chat","body":{"text":"안녕하세요.","tone":"formal"}}',
+            '대화 맥락:',
+            context,
+            '마지막 사용자 요청을 반영해 가장 적절한 chat 명령을 1개만 출력하세요.',
+          ].join('\n');
+
+          const raw = (await generateQwenChat(userPrompt, {
             systemPrompt: sys,
             temperature: 0.4,
             topP: 0.9,
             maxTokens: fullPolicy.maxTokens
           })).trim();
 
-          if (reply) {
-            pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${reply}` }, fullPolicy.maxContext);
-            const entryOut = {
-              id: nanoid(12),
-              authorId,
-              authorName: guideName,
-              authorTag: '#GUIDE',
-              authorRole: 'host' as const,
-              body: reply,
-              at: Date.now()
-            };
-            publishLobbyMessage('chat', { entry: entryOut }, 'guide-reply');
+          const parsed = parseAICommand(raw) ?? { cmd: 'chat', body: raw };
+          const executed = executeAICommand(parsed, {
+            manager,
+            publishLobbyMessage,
+            participants: _participants,
+            localParticipantId
+          });
+
+          // 히스토리 저장용: 사용자에게 보이는 실제 바디만 기록
+          const bodyText = typeof parsed.body === 'string' ? parsed.body : JSON.stringify(parsed.body);
+          if (executed && bodyText) {
+            pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${bodyText}` }, fullPolicy.maxContext);
             lastAtRef.current = Date.now();
           }
         } catch (err) {

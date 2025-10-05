@@ -124,23 +124,14 @@ export function useLobbyChat({
         at: Date.now()
       };
 
-      const displayEntry: SessionChatLogEntry = {
-        ...entry,
-        isSelf: true
-      };
-
-      setChatMessages((previous) => [...previous, displayEntry]);
-
       const delivered = publishLobbyMessage('chat', { entry }, 'chat-send');
       if (!delivered) {
         console.info('[chat] queued until channel open');
       }
 
-      gameBus.publish('lobby:chat', { entry, self: true });
-
       return true;
     },
-    [gameBus, publishLobbyMessage]
+    [publishLobbyMessage]
   );
 
   const chatLog = useMemo(() => chatMessages, [chatMessages]);

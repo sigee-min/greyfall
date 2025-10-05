@@ -66,7 +66,6 @@ export function GameStartLobby({
   const chatListRef = useRef<HTMLDivElement | null>(null);
   const progressPercent = llmProgress === null ? null : Math.round(Math.min(1, Math.max(0, llmProgress)) * 100);
   const guideAnnouncedRef = useRef(false);
-  const chatAutoOpenedRef = useRef(false);
   // 진행 상태 시각화를 위한 하트비트와 최신 업데이트 시각
   const [tick, setTick] = useState(0);
   const [lastLlmUpdateAt, setLastLlmUpdateAt] = useState<number | null>(null);
@@ -87,14 +86,7 @@ export function GameStartLobby({
     chatListRef.current.scrollTo({ top: chatListRef.current.scrollHeight, behavior: 'smooth' });
   }, [chatMessages, chatOpen]);
 
-  // 채널이 열리면 1회 자동으로 채팅 패널을 열어 안내
-  useEffect(() => {
-    if (chatOpen) return;
-    if (chatAutoOpenedRef.current) return;
-    if (!canSendChat) return;
-    chatAutoOpenedRef.current = true;
-    setChatOpen(true);
-  }, [canSendChat, chatOpen]);
+  // 자동 채팅 오픈 기능 제거됨 (사용자 수동으로 열도록 유지)
 
   // LLM 진행 상태 갱신 시각 기록
   useEffect(() => {
