@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { test } from './test-harness';
-import { ChatHostStore, CHAT_OBJECT_ID } from '../src/domain/net-objects/chat';
+import { test } from './test-harness.js';
+import { ChatHostStore, CHAT_OBJECT_ID } from '../src/domain/net-objects/chat.js';
 test('ChatHostStore: append publishes object:patch with insert op', () => {
     const sent = [];
     const publish = (kind, body) => {

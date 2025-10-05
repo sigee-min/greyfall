@@ -33,7 +33,26 @@ export class ClientNetObjectStore {
       if (kind === 'set') {
         result = structuredClone(value);
       } else if (kind === 'merge') {
-        if (result && typeof result === 'object') {
+        if (path) {
+          const target = (result as any)[path];
+          if (Array.isArray(target)) {
+            const items = Array.isArray(value) ? value : [value];
+            for (const patch of items) {
+              const id = (patch as any)?.id;
+              if (id == null) continue;
+              const idx = target.findIndex((e: any) => e?.id === id);
+              if (idx >= 0) {
+                target[idx] = { ...target[idx], ...patch };
+              } else {
+                target.push(patch);
+              }
+            }
+          } else if (target && typeof target === 'object') {
+            Object.assign(target, value ?? {});
+          } else {
+            (result as any)[path] = structuredClone(value ?? {});
+          }
+        } else if (result && typeof result === 'object') {
           Object.assign(result, value ?? {});
         } else {
           result = structuredClone(value ?? {});

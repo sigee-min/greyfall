@@ -31,5 +31,23 @@ export class HostParticipantsObject implements HostObject {
   onRequest(sinceRev?: number) {
     return this.replicator.onRequest(this.id, sinceRev, 'object-request participants');
   }
-}
 
+  // Patch helpers for more granular sync
+  upsert(participant: { id: string; [k: string]: unknown }, context = 'participants:upsert') {
+    const base = this.replicator.get(this.id);
+    if (!base) return this.broadcast(context);
+    return this.replicator.apply(this.id, [{ op: 'merge', path: 'list', value: [{ ...participant }] } as any], context);
+  }
+
+  update(participantId: string, changes: Record<string, unknown>, context = 'participants:update') {
+    const base = this.replicator.get(this.id);
+    if (!base) return this.broadcast(context);
+    return this.replicator.apply(this.id, [{ op: 'merge', path: 'list', value: [{ id: participantId, ...changes }] } as any], context);
+  }
+
+  remove(participantId: string, context = 'participants:remove') {
+    const base = this.replicator.get(this.id);
+    if (!base) return this.broadcast(context);
+    return this.replicator.apply(this.id, [{ op: 'remove', path: 'list', value: { id: participantId } } as any], context);
+  }
+}

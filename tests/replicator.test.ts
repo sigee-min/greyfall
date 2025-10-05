@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from './test-harness.js';
-import { HostReplicator } from '../src/domain/net-objects/replicator';
+import { HostReplicator } from '../src/domain/net-objects/replicator.js';
 
 test('HostReplicator: set publishes object:replace with rev++', () => {
   const sent: any[] = [];

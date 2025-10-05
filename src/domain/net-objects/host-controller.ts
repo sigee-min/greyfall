@@ -68,8 +68,9 @@ export class HostNetController {
 
     switch (message.kind) {
       case 'hello': {
-        this.lobbyStore.upsertFromWire(message.body.participant);
-        this.participants.onHello();
+        const p = message.body.participant;
+        this.lobbyStore.upsertFromWire(p);
+        this.participants.upsert(p, 'hello:merge');
         break;
       }
       case 'ready': {
@@ -78,12 +79,13 @@ export class HostNetController {
           p.id === participantId ? { ...p, ready } : p
         );
         this.lobbyStore.replaceFromWire(raw);
-        this.participants.onReady();
+        this.participants.update(participantId, { ready }, 'ready:merge');
         break;
       }
       case 'leave': {
-        this.lobbyStore.remove(message.body.participantId);
-        this.participants.onLeave();
+        const id = message.body.participantId;
+        this.lobbyStore.remove(id);
+        this.participants.remove(id, 'leave:remove');
         break;
       }
       case 'object:request': {
