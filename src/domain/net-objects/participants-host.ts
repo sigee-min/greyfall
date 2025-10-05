@@ -54,4 +54,8 @@ export class HostParticipantsObject implements HostObject {
   getSnapshot() {
     return this.replicator.get(this.id);
   }
+
+  getLogsSince(sinceRev: number) {
+    return this.replicator.getLogsSince(this.id, sinceRev);
+  }
 }

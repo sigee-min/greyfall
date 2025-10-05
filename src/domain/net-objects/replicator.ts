@@ -23,6 +23,11 @@ export class HostReplicator {
     return this.state.get(id) ?? null;
   }
 
+  getLogsSince(id: string, sinceRev: number) {
+    const list = this.logs.get(id) ?? [];
+    return list.filter((e) => e.rev > sinceRev);
+  }
+
   set(id: string, value: unknown, context = 'replicator:set') {
     const current = this.state.get(id);
     const rev = (current?.rev ?? 0) + 1;

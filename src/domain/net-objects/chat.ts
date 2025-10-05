@@ -21,6 +21,7 @@ export type Publish = <K extends keyof LobbyMessageBodies>(
 export class ChatHostStore {
   private log: ChatEntry[] = [];
   private rev = 0;
+  private opsLog: { rev: number; ops: any[] }[] = [];
   constructor(private publish: Publish, private max = 200) {}
 
   append(entry: ChatEntry, context = 'chat-append') {
@@ -28,9 +29,11 @@ export class ChatHostStore {
     while (this.log.length > this.max) this.log.shift();
     // increment revision and send incremental patch to append the entry
     const nextRev = ++this.rev;
+    const ops = [{ op: 'insert', path: 'entries', value: entry }] as any[];
+    this.opsLog.push({ rev: nextRev, ops });
     this.publish(
       'object:patch',
-      { id: CHAT_OBJECT_ID, rev: nextRev, ops: [{ op: 'insert', path: 'entries', value: entry }] } as any,
+      { id: CHAT_OBJECT_ID, rev: nextRev, ops },
       context
     );
   }
@@ -46,5 +49,9 @@ export class ChatHostStore {
 
   snapshot() {
     return { rev: this.rev, value: { entries: this.log } } as const;
+  }
+
+  getLogsSince(sinceRev: number) {
+    return this.opsLog.filter((e) => e.rev > sinceRev);
   }
 }

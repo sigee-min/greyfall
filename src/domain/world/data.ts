@@ -7,7 +7,7 @@ const MAP_LUMENFORD: MapNode = {
     '성유와 등불의 도시. 폭풍 전선을 막아내는 격자와 검은 수로 위에 지어진 난민 수도. 상업과 비밀, 의식과 과학이 얽혀 있다.',
   entryFieldId: 'gate',
   prev: null,
-  next: 'LIBRARY',
+  next: 'BACKSTREETS',
   theme: {
     tag: 'dark-cyber-worn-teal',
     mood: 'tense-hopeful',
@@ -166,14 +166,121 @@ const MAP_LUMENFORD: MapNode = {
   ],
 };
 
+const MAP_BACKSTREETS: MapNode = {
+  id: 'BACKSTREETS',
+  name: '루멘포드 뒷골목',
+  description:
+    '도시와 도시 사이를 꿰매는 골목망. 젖은 콘크리트, 청록 네온, 증기가 교차하며 빠르게 이동하기 좋지만 매복도 잦다.',
+  entryFieldId: 'alley-gate',
+  prev: 'LUMENFORD',
+  next: 'LIBRARY',
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'noir-transit' },
+  bg: {
+    path: '/assets/bg/maps/backstreets/main.webp',
+    position: 'center 65%',
+    overlay: 'grain',
+    grade: 'cool',
+    description:
+      '좁은 뒷골목. 파이프에서 뿜어 나오는 흰 증기가 천천히 흘러가고, 낡은 청록 네온 간판이 불규칙하게 깜빡인다. ' +
+      '빗방울이 드문드문 떨어져 젖은 아스팔트에 타원형 반사를 만든다. 세탁줄과 전선이 프레임을 가로지른다.',
+    gifRecommended: true,
+    llmPrompt:
+      'Narrow worn‑teal cyberpunk back alley; slow steam from wall pipes; irregular teal neon flicker; sparse raindrops on wet asphalt; laundry lines and cables crossing; subtle loop.',
+  },
+  music: {
+    mood: 'noir ticks + alley ambience',
+    tracks: ['/assets/audio/maps/backstreets/noir.ogg'],
+    loop: true,
+    volume: 0.65,
+    description:
+      '미세한 메트로놈틱한 틱(우드/플라스틱), 낮은 패드, 물 떨어지는 잔향과 배기팬 저역 소음. ' +
+      '템포는 느리고, 공간감은 좁은 골목 리버브를 적용.',
+    llmPrompt:
+      'Minimal noir percussive ticks (wood/plastic), low pad, dripping water tails and low fan hum; slow tempo; narrow alley reverb; restrained mix.',
+  },
+  fields: [
+    {
+      id: 'alley-gate',
+      name: '골목 입구(Entry)',
+      kind: 'entry',
+      description: '큰 도로에서 꺾여 들어오는 입구. 보안 카메라와 낡은 표지판.',
+      neighbors: ['market-passage', 'checkpoint'],
+      bg: {
+        path: '/assets/bg/maps/backstreets/alley_gate.webp',
+        position: 'center 70%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '골목 표지판의 흐릿한 페인트, 고드름처럼 맺힌 물방울. 카메라 적외선 LED 링이 아주 약하게 빛난다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Alley mouth with faded signage, hanging droplets like tiny icicles; faint IR LED ring glow on a security cam; subtle loop.',
+      },
+    },
+    {
+      id: 'market-passage',
+      name: '시장 통로',
+      kind: 'market',
+      description: '상점 뒤편 통로. 목재 팔레트와 포장 상자 더미, 빠르게 지나가는 그림자.',
+      neighbors: ['alley-gate', 'rooftops'],
+      bg: {
+        path: '/assets/bg/maps/backstreets/market_passage.webp',
+        position: 'center 60%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '젖은 시멘트 바닥에 팔레트의 거친 나뭇결, 상자 라벨의 바랜 잉크. 간헐적 발소리 그림자가 벽면을 스친다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Back‑market passage with wet concrete, rough wooden pallets, faded ink labels; occasional shadow of footsteps sliding across the wall; seamless loop.',
+      },
+    },
+    {
+      id: 'checkpoint',
+      name: '임시 검문소',
+      kind: 'infrastructure',
+      description: '메쉬 펜스와 이동식 배리어. 출입 기록표가 비에 젖어 들러붙어 있다.',
+      neighbors: ['alley-gate'],
+      bg: {
+        path: '/assets/bg/maps/backstreets/checkpoint.webp',
+        position: 'center',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '메쉬 펜스에 물방울이 맺혀 작게 반짝이고, 이동식 배리어의 반사띠가 젖은 바닥에서 늘어진다.',
+        llmPrompt:
+          'Mesh fence with beads of water, portable barrier with retroreflective tape elongated on wet ground; cool tone; high texture detail.',
+      },
+    },
+    {
+      id: 'rooftops',
+      name: '지붕길',
+      kind: 'district',
+      description: '비상 사다리를 타고 오르는 지붕길. 전선과 환기구, 낮게 흐르는 구름.',
+      neighbors: ['market-passage'],
+      bg: {
+        path: '/assets/bg/maps/backstreets/rooftops.webp',
+        position: 'center 45%',
+        overlay: 'fog',
+        grade: 'cool',
+        description:
+          '지붕 위 전선 다발과 회색 환기구. 멀리 바람에 밀린 구름층이 낮게 흐른다. 드문 번개가 먼 곳에서 반짝.',
+        gifRecommended: true,
+        llmPrompt:
+          'Rooftop with cable bundles and gray vents; low clouds drifting; occasional distant lightning glint; subtle parallax fog; loopable.',
+      },
+    },
+  ],
+};
+
 const MAP_LIBRARY: MapNode = {
   id: 'LIBRARY',
   name: '유적도서관',
   description:
     '봉인된 지하 열람실과 의식실이 연결된 잔해 도서관. 지식은 힘이지만 대가가 따른다.',
   entryFieldId: 'atrium',
-  prev: 'LUMENFORD',
-  next: 'SEWERS',
+  prev: 'BACKSTREETS',
+  next: 'CAUSEWAY',
   theme: { tag: 'dark-cyber-worn-teal', mood: 'mystic-danger' },
   bg: {
     path: '/assets/bg/maps/library/atrium.webp',
@@ -281,13 +388,102 @@ const MAP_LIBRARY: MapNode = {
   ],
 };
 
+const MAP_CAUSEWAY: MapNode = {
+  id: 'CAUSEWAY',
+  name: '폭풍 경계 가도',
+  description:
+    '도시와 도시 사이의 외곽 순환로. 유리먼지와 잔잔한 낙진이 바람을 타고 스치며, 멀리 폭풍벽이 번개로 깜빡인다.',
+  entryFieldId: 'outer-ring',
+  prev: 'LIBRARY',
+  next: 'SEWERS',
+  theme: { tag: 'dark-cyber-worn-teal', mood: 'windswept-peril' },
+  bg: {
+    path: '/assets/bg/maps/causeway/main.webp',
+    position: 'center 55%',
+    overlay: 'fog',
+    grade: 'cool',
+    description:
+      '넓은 외곽 가도, 바닥에는 바랜 차선과 균열. 낮게 깔린 먼지층이 바람에 쓸려가며, ' +
+      '수평선 너머 폭풍벽에서 희미한 번개가 주기적으로 번쩍인다.',
+    gifRecommended: true,
+    llmPrompt:
+      'Wide outer causeway with faded lane markings and cracks; low dust layer swept by wind; distant storm wall with periodic lightning; loopable wind motion.',
+  },
+  music: {
+    mood: 'wind wall + distant thunder',
+    tracks: ['/assets/audio/maps/causeway/wind_wall.ogg'],
+    loop: true,
+    volume: 0.6,
+    description:
+      '넓은 바람 소리와 먼 폭풍의 저주파 우르릉. 때때로 얇은 금속판 공명음이 짧게 섞인다. 공간감은 매우 넓음.',
+    llmPrompt:
+      'Broad wind wall ambience with low distant thunder; occasional thin metal resonance; very wide spatial field; restrained dynamics.',
+  },
+  fields: [
+    {
+      id: 'outer-ring',
+      name: '외곽 링(Entry)',
+      kind: 'entry',
+      description: '순환로 진입 구간. 표지판과 바리케이드 잔해.',
+      neighbors: ['storm-bridge', 'watchpost'],
+      bg: {
+        path: '/assets/bg/maps/causeway/outer_ring.webp',
+        position: 'center 60%',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '휘어진 표지판, 찢긴 배너 천 조각이 바람에 팔랑. 고정 볼트가 녹슬어 텍스처가 선명하다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Bent signposts and torn banner strips flapping in the wind; rusty bolts with sharp texture; loopable flutter.',
+      },
+    },
+    {
+      id: 'storm-bridge',
+      name: '폭풍교',
+      kind: 'infrastructure',
+      description: '낙차를 넘어가는 다리. 유리먼지가 바람에 반짝이며 지나간다.',
+      neighbors: ['outer-ring', 'watchpost'],
+      bg: {
+        path: '/assets/bg/maps/causeway/storm_bridge.webp',
+        position: 'center 55%',
+        overlay: 'fog',
+        grade: 'cool',
+        description:
+          '다리 상판 위로 미세한 유리먼지와 모래가 줄무늬로 쓸려간다. 손잡이 금속 표면에 작은 점상 반짝임.',
+        gifRecommended: true,
+        llmPrompt:
+          'Bridge deck with fine glass dust swept into striations; tiny point glints along metal handrails; loopable wind/dust motion.',
+      },
+    },
+    {
+      id: 'watchpost',
+      name: '감시초소',
+      kind: 'junction',
+      description: '폐쇄된 초소. 도로 위 카메라와 비상 조명만 살아 있다.',
+      neighbors: ['outer-ring', 'storm-bridge'],
+      bg: {
+        path: '/assets/bg/maps/causeway/watchpost.webp',
+        position: 'center',
+        overlay: 'grain',
+        grade: 'cool',
+        description:
+          '작은 박스형 초소 내부에 잔광. 외부 비상등이 간헐적으로 점멸하며 주변 바닥에 장방형 빛 패턴을 만든다.',
+        gifRecommended: true,
+        llmPrompt:
+          'Boxy roadside watchpost with faint interior afterglow; exterior emergency light blinking intermittently, casting rectangular light patterns; loopable.',
+      },
+    },
+  ],
+};
+
 const MAP_SEWERS: MapNode = {
   id: 'SEWERS',
   name: '공허 수로',
   description:
     '도시 아래 흐르는 검은 물길. 소음은 멀리 퍼지고 빛은 큰 대가를 부른다.',
   entryFieldId: 'outfall',
-  prev: 'LIBRARY',
+  prev: 'CAUSEWAY',
   next: null,
   theme: { tag: 'dark-cyber-worn-teal', mood: 'perilous' },
   bg: {
@@ -398,5 +594,5 @@ export const WORLD_STATIC: WorldIndex = {
   id: 'GREYFALL_CORE',
   name: 'Greyfall — Solas Basin',
   head: 'LUMENFORD',
-  maps: [MAP_LUMENFORD, MAP_LIBRARY, MAP_SEWERS],
+  maps: [MAP_LUMENFORD, MAP_BACKSTREETS, MAP_LIBRARY, MAP_CAUSEWAY, MAP_SEWERS],
 };

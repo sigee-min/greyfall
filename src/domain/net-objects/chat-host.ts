@@ -20,4 +20,8 @@ export class HostChatObject implements HostObject {
   getSnapshot() {
     return this.store.snapshot();
   }
+
+  getLogsSince(sinceRev: number) {
+    return this.store.getLogsSince(sinceRev);
+  }
 }

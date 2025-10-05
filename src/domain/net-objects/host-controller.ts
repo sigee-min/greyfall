@@ -31,6 +31,7 @@ export class HostNetController {
   private readonly sendToPeer?: (peerId: string, message: LobbyMessage) => boolean;
   private readonly ackTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly lastSentPerPeer = new Map<string, number>();
+  private readonly ackedRevPerPeer = new Map<string, number>();
 
   constructor({ publish, lobbyStore, busPublish, getPeerIds, sendToPeer }: Deps) {
     // wrap publish to track object acks
@@ -117,15 +118,41 @@ export class HostNetController {
       if (last !== rev) return; // newer rev sent
       // targeted resend for this peer (if available), otherwise fallback broadcast
       if (peerId && this.sendToPeer) {
-        let msg: LobbyMessage | null = null;
-        if (id === PARTICIPANTS_OBJECT_ID) {
-          const value = makeParticipantsSnapshot(this.lobbyStore.snapshotWire(), 4);
-          msg = createLobbyMessage('object:replace', { id, rev, value } as any);
-        } else if (id === 'chatlog') {
-          const snap = this.chat.getSnapshot?.() as { rev: number; value: unknown } | undefined;
-          if (snap) msg = createLobbyMessage('object:replace', { id, rev: snap.rev, value: snap.value } as any);
+        const baseKey = `${peerId}:${id}`;
+        const acked = this.ackedRevPerPeer.get(baseKey) ?? 0;
+        // Try incremental resend from acked+1 to last
+        let sentIncremental = false;
+        if (id === PARTICIPANTS_OBJECT_ID && (this.participants as any).getLogsSince) {
+          const logs = (this.participants as any).getLogsSince(acked) as { rev: number; ops: any[] }[];
+          if (logs && logs.length > 0 && logs.length <= 5) {
+            for (const entry of logs) {
+              const msg = createLobbyMessage('object:patch', { id, rev: entry.rev, ops: entry.ops } as any);
+              this.sendToPeer(peerId, msg);
+            }
+            sentIncremental = true;
+          }
+        } else if (id === 'chatlog' && (this.chat as any).getLogsSince) {
+          const logs = (this.chat as any).getLogsSince(acked) as { rev: number; ops: any[] }[];
+          if (logs && logs.length > 0 && logs.length <= 20) {
+            for (const entry of logs) {
+              const msg = createLobbyMessage('object:patch', { id, rev: entry.rev, ops: entry.ops } as any);
+              this.sendToPeer(peerId, msg);
+            }
+            sentIncremental = true;
+          }
         }
-        if (msg) this.sendToPeer(peerId, msg);
+        if (!sentIncremental) {
+          // Fallback snapshot
+          let msg: LobbyMessage | null = null;
+          if (id === PARTICIPANTS_OBJECT_ID) {
+            const value = makeParticipantsSnapshot(this.lobbyStore.snapshotWire(), 4);
+            msg = createLobbyMessage('object:replace', { id, rev, value } as any);
+          } else if (id === 'chatlog') {
+            const snap = this.chat.getSnapshot?.() as { rev: number; value: unknown } | undefined;
+            if (snap) msg = createLobbyMessage('object:replace', { id, rev: snap.rev, value: snap.value } as any);
+          }
+          if (msg) this.sendToPeer(peerId, msg);
+        }
       } else {
         // broadcast fallback
         if (id === 'participants') this.participants.broadcast('ack:resend');
@@ -149,5 +176,7 @@ export class HostNetController {
       // If timers were rotated due to newer rev, still log for diagnostics
       console.debug('[object:ack] late or already resolved', { id, rev });
     }
+    // record last acknowledged rev per peer/object
+    if (peerId) this.ackedRevPerPeer.set(`${peerId}:${id}`, rev);
   }
 }
