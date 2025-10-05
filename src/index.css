@@ -3,26 +3,26 @@
 @tailwind utilities;
 
 :root {
-  /* Dark‑cyber palette: sapphire blue primary, electric cyan accent */
-  --background: 230 40% 5%;
-  --foreground: 220 20% 94%;
-  --muted: 224 24% 14%;
-  --muted-foreground: 220 12% 70%;
-  --popover: 225 28% 10%;
-  --popover-foreground: 220 20% 94%;
-  --card: 225 28% 10%;
-  --card-foreground: 220 20% 94%;
-  --border: 225 24% 18%;
-  --input: 225 24% 18%;
-  --primary: 222 88% 58%; /* sapphire blue */
-  --primary-foreground: 220 33% 8%;
-  --secondary: 225 22% 22%;
-  --secondary-foreground: 220 20% 94%;
-  --accent: 199 95% 60%; /* electric cyan */
-  --accent-foreground: 220 33% 8%;
+  /* Dark‑cyber (worn teal): muted teal primary, patina green accent */
+  --background: 200 25% 5%;
+  --foreground: 200 12% 92%;
+  --muted: 200 16% 14%;
+  --muted-foreground: 200 12% 70%;
+  --popover: 200 22% 10%;
+  --popover-foreground: 200 12% 92%;
+  --card: 200 22% 10%;
+  --card-foreground: 200 12% 92%;
+  --border: 200 18% 18%;
+  --input: 200 18% 18%;
+  --primary: 188 36% 47%; /* worn teal */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 200 18% 22%;
+  --secondary-foreground: 200 12% 92%;
+  --accent: 172 28% 48%; /* patina green */
+  --accent-foreground: 210 40% 98%;
   --destructive: 354 64% 45%;
   --destructive-foreground: 0 0% 98%;
-  --ring: 199 95% 60%;
+  --ring: 188 42% 54%;
   --radius: 0.75rem;
 }
 
@@ -71,8 +71,8 @@ select,
 .scrollbar-lobby::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
-    hsl(var(--primary) / 0.7),
-    hsl(var(--primary) / 0.45)
+    hsl(var(--primary) / 0.65),
+    hsl(var(--primary) / 0.4)
   );
   border-radius: 9999px;
   border: 2px solid hsl(var(--card) / 0.2);
@@ -81,8 +81,8 @@ select,
 .scrollbar-lobby::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(
     180deg,
-    hsl(var(--primary) / 0.82),
-    hsl(var(--primary) / 0.6)
+    hsl(var(--primary) / 0.78),
+    hsl(var(--primary) / 0.56)
   );
 }
 
