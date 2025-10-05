@@ -41,6 +41,16 @@ export type ChatOptions = {
 };
 
 type WebLLMProgress = { text?: string; progress?: number };
+type Phase = 'prepare' | 'download' | 'load-lib' | 'compile' | 'engine-ready' | 'chat-ready';
+
+function clamp01(n: number) { return Math.max(0, Math.min(1, n)); }
+function segment(progress: number | undefined, start: number, end: number, last: number): number {
+  if (typeof progress === 'number' && !Number.isNaN(progress)) {
+    const p = start + clamp01(progress) * (end - start);
+    return Math.max(last, Math.min(0.9, p));
+  }
+  return Math.max(last, Math.min(0.9, last + 0.01));
+}
 
 type WebLLMChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -52,6 +62,8 @@ type WebLLMCompletionRequest = {
   stream?: boolean;
   signal?: AbortSignal;
   onNewToken?: (token: string, progress?: WebLLMProgress, metadata?: { token_id: number }) => void;
+  // OpenAI-compatible extra fields supported by WebLLM
+  response_format?: { type: 'json_object' | string };
 };
 
 // Compatibility types for different WebLLM chat APIs
@@ -120,12 +132,33 @@ export async function loadEngineByManager(
   setInitialising(true);
   const attempts = resolveProfiles(manager);
   const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+  let lastP = 0;
   const wrappedProgress = (report: WebLLMProgress) => {
     try {
-      onProgress?.(report);
-      if (debug && (report.text || typeof report.progress === 'number')) {
-        console.debug('[webllm] progress', report);
+      const t = (report.text || '').toLowerCase();
+      let phase: Phase = 'prepare';
+      let p = lastP;
+      let text = report.text ?? '엔진 초기화 중';
+      if (/download|fetch|cache|artifact|weight/.test(t)) {
+        phase = 'download';
+        text = '모델 파일 내려받는 중';
+        p = segment(report.progress, 0.05, 0.55, lastP);
+      } else if (/wasm|model lib|library|load lib|load model/.test(t)) {
+        phase = 'load-lib';
+        text = '모델 라이브러리 로드 중';
+        p = segment(report.progress, 0.55, 0.7, lastP);
+      } else if (/compile|build|graph|kernel/.test(t)) {
+        phase = 'compile';
+        text = '그래프 컴파일 중';
+        p = segment(report.progress, 0.7, 0.9, lastP);
+      } else {
+        // Fallback: map overall progress into 0.05..0.9 window
+        text = report.text || '엔진 초기화 중';
+        p = segment(report.progress, 0.05, 0.9, lastP);
       }
+      lastP = p;
+      onProgress?.({ text, progress: p });
+      if (debug) console.debug('[webllm] progress', { phase, text, p, raw: report });
     } catch {}
   };
 
@@ -148,6 +181,7 @@ export async function loadEngineByManager(
           { initProgressCallback: wrappedProgress }
         ) as any)) as WebLLMEngine;
         console.info('[webllm] model initialised', { id: profile.id });
+        try { onProgress?.({ text: '엔진 초기화 완료', progress: Math.max(0.92, (lastP || 0)) }); } catch {}
         return eng;
       } catch (error) {
         console.warn('[webllm] model init failed', { id: profile.id, error });
@@ -197,6 +231,8 @@ export async function generateChat(prompt: string, options: ChatOptions = {}) {
     temperature,
     top_p: topP,
     max_tokens: maxTokens,
+    // Encourage strict JSON envelope
+    response_format: { type: 'json_object' },
     stream: Boolean(onToken),
     onNewToken: onToken
       ? (token: string, progress?: WebLLMProgress, metadata?: { token_id: number }) => {
@@ -328,9 +364,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function ensureChatApiReady(timeoutMs = 8000): Promise<void> {
+export async function ensureChatApiReady(timeoutMs = 8000, onProgress?: (report: WebLLMProgress) => void): Promise<void> {
   const eng = await (getEnginePromise() ?? loadEngineByManager('smart'));
+  try { onProgress?.({ text: '채팅 API 준비 중', progress: 0.94 }); } catch {}
   await waitForChatApi(eng, timeoutMs);
+  try { onProgress?.({ text: '채팅 API 준비 완료', progress: 0.96 }); } catch {}
 }
 
 // Actively exercise chat API with a minimal request. Does not trigger initialisation

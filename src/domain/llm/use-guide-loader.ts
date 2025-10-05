@@ -49,10 +49,23 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
           lastUpdateAtRef.current = Date.now();
         });
         // Ensure chat API is actually callable before reporting ready
-        await ensureChatApiReady(8000);
+        await ensureChatApiReady(8000, (report: { text?: string; progress?: number }) => {
+          if (cancelled) return;
+          if (report.text) setStatus(report.text);
+          if (typeof report.progress === 'number') {
+            setProgress((prev) => Math.max(prev ?? 0, Math.min(1, Math.max(0, report.progress!))));
+          }
+          lastUpdateAtRef.current = Date.now();
+        });
         // Active probe to avoid proxy timing race
         if (!(await probeChatApiActive(1200))) {
-          await new Promise((r) => setTimeout(r, 300));
+          setStatus('헬스 체크 중…');
+          // Try a few short retries with slight progress bumps to keep UI lively
+          for (let i = 0; i < 5; i++) {
+            await new Promise((r) => setTimeout(r, 300));
+            setProgress((prev) => Math.min(0.985, (prev ?? 0) + 0.005));
+            if (await probeChatApiActive(750)) break;
+          }
         }
 
         if (cancelled) return;
