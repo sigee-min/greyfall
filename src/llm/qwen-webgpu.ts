@@ -182,7 +182,7 @@ async function chatCompletionCompat(engine: WebLLMEngine, req: WebLLMCompletionR
         if (token) {
           output += token;
           try {
-            req.onNewToken?.(token, index++);
+            req.onNewToken?.(token, undefined, { token_id: index++ });
           } catch {
             // ignore consumer errors
           }

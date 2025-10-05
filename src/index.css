@@ -3,26 +3,26 @@
 @tailwind utilities;
 
 :root {
-  /* Dark‑fantasy x Sci‑tech: ember gold primary, neon cyan accent */
-  --background: 250 23% 6%;
-  --foreground: 40 15% 92%;
-  --muted: 252 15% 16%;
-  --muted-foreground: 252 13% 72%;
-  --popover: 252 20% 10%;
-  --popover-foreground: 40 15% 92%;
-  --card: 252 20% 10%;
-  --card-foreground: 40 15% 92%;
-  --border: 252 18% 18%;
-  --input: 252 18% 18%;
-  --primary: 35 88% 56%; /* ember gold */
-  --primary-foreground: 24 16% 10%;
-  --secondary: 260 13% 22%;
-  --secondary-foreground: 40 15% 92%;
-  --accent: 188 94% 55%; /* neon cyan */
-  --accent-foreground: 210 40% 98%;
+  /* Dark‑cyber palette: sapphire blue primary, electric cyan accent */
+  --background: 230 40% 5%;
+  --foreground: 220 20% 94%;
+  --muted: 224 24% 14%;
+  --muted-foreground: 220 12% 70%;
+  --popover: 225 28% 10%;
+  --popover-foreground: 220 20% 94%;
+  --card: 225 28% 10%;
+  --card-foreground: 220 20% 94%;
+  --border: 225 24% 18%;
+  --input: 225 24% 18%;
+  --primary: 222 88% 58%; /* sapphire blue */
+  --primary-foreground: 220 33% 8%;
+  --secondary: 225 22% 22%;
+  --secondary-foreground: 220 20% 94%;
+  --accent: 199 95% 60%; /* electric cyan */
+  --accent-foreground: 220 33% 8%;
   --destructive: 354 64% 45%;
   --destructive-foreground: 0 0% 98%;
-  --ring: 188 94% 55%;
+  --ring: 199 95% 60%;
   --radius: 0.75rem;
 }
 
