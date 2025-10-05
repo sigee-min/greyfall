@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { cn } from '../lib/utils';
+import { FallbackBackground } from '../ui/common/fallback-bg';
 import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/qwen-webgpu';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
 import { useBroadcastLlmProgress, useReceiveLlmProgress } from '../domain/llm/use-llm-progress-bridge';
 import { executeAICommand } from '../domain/ai/ai-router';
+import { LlmStreamConsole } from '../ui/cards/llm-stream-console';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 import type { RegisterLobbyHandler } from '../domain/chat/use-lobby-chat';
@@ -65,6 +67,7 @@ export function GameStartLobby({
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
+  const [llmTesterOpen, setLlmTesterOpen] = useState(false);
   const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError } = useGuideLoader({
     manager: llmManager,
     enabled: mode === 'host'
@@ -141,19 +144,14 @@ export function GameStartLobby({
   const isStalled = isActiveLoading && (secondsSinceUpdate ?? 0) > 20;
 
   const mapLlmUiText = (text: string | null | undefined) => {
-    if (!text) return '엔진 초기화 중…';
-    const t = text.toLowerCase();
-    if (t.includes('download') || t.includes('fetch')) return '모델 내려받는 중…';
-    if (t.includes('load tokenizer') || t.includes('token')) return '토크나이저 준비 중…';
-    if (t.includes('compile') || t.includes('kernel') || t.includes('shader')) return 'WebGPU 컴파일 중…';
-    if (t.includes('initialize') || t.includes('init') || t.includes('start')) return '엔진 초기화 중…';
-    if (t.includes('warmup') || t.includes('prefill')) return '엔진 예열 중…';
-    if (t.includes('finish') || t.includes('ready')) return '엔진 준비 완료';
-    return '자료를 불러오는 중…';
+    // 엔진에서 제공하는 원문(progress.text)을 그대로 표시합니다.
+    // 값이 없을 때만 간단한 기본 문구로 대체합니다.
+    if (!text || !String(text).trim()) return 'Loading…';
+    return String(text);
   };
 
   const displayStatus = useMemo(() => {
-    if (uiError) return '심판자 영입 실패';
+    if (uiError) return uiError;
     const base = mapLlmUiText(uiStatus);
     return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
   }, [uiError, uiStatus, isActiveLoading, tick]);
@@ -210,14 +208,8 @@ export function GameStartLobby({
   const chatPlaceholder = useMemo(() => '메시지를 입력하세요 (Shift+Enter로 줄바꿈)', []);
 
   return (
-    <div
-      className="relative min-h-screen w-screen overflow-hidden bg-slate-950 text-foreground"
-      style={{
-        backgroundImage: `url(${background})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      }}
-    >
+    <div className="relative min-h-screen w-screen overflow-hidden bg-slate-950 text-foreground">
+      <FallbackBackground src={background} />
       <div className="absolute inset-0 bg-slate-950/40" />
 
       <div className="relative z-10 flex min-h-screen flex-col">
@@ -248,6 +240,13 @@ export function GameStartLobby({
                 className="rounded-md border border-primary/60 px-3 py-2 text-primary transition hover:bg-primary/10"
               >
                 Lobby Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setLlmTesterOpen(true)}
+                className="rounded-md border border-border/60 px-3 py-2 transition hover:border-primary hover:text-primary"
+              >
+                LLM Test
               </button>
                 {onOptions && (
                   <button type="button" onClick={onOptions} className="rounded-md border border-border/60 px-3 py-2 transition hover:border-primary hover:text-primary">
@@ -591,6 +590,18 @@ export function GameStartLobby({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {llmTesterOpen && (
+        <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/40 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 z-0" data-cursor="pointer" aria-hidden="true" onClick={() => setLlmTesterOpen(false)} />
+          <div
+            className="relative z-10 h-full w-full max-w-full border-l border-border/60 bg-card/95 shadow-2xl transition-transform sm:w-[36rem] sm:rounded-l-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <LlmStreamConsole defaultManager={llmManager} onClose={() => setLlmTesterOpen(false)} />
           </div>
         </div>
       )}

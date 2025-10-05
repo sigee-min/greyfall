@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cn } from '../lib/utils';
+import { FallbackBackground } from '../ui/common/fallback-bg';
 
 type GameLobbyProps = {
   playerName: string;
@@ -25,14 +26,8 @@ export function GameLobby({
   const joinCodeFilled = joinCode.trim().length > 0;
 
   return (
-    <div
-      className="relative flex h-screen min-h-screen w-screen items-center justify-between overflow-hidden bg-slate-950 text-foreground"
-      style={{
-        backgroundImage: `url(${background})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      }}
-    >
+    <div className="relative flex h-screen min-h-screen w-screen items-center justify-between overflow-hidden bg-slate-950 text-foreground">
+      <FallbackBackground src={background} />
       <div className="absolute inset-0 bg-slate-950/40" />
 
       <section className="relative z-10 mx-auto flex h-full w-full max-w-7xl flex-col items-center justify-center gap-12 px-6 py-12 sm:px-10 md:px-16 lg:flex-row lg:items-center lg:gap-20">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import type * as PIXI from 'pixi.js';
 import { cn } from '../lib/utils';
+import { FallbackBackground } from '../ui/common/fallback-bg';
 import { createStage, type StageRef } from './stage-app';
 import { createGridLayer } from './layers/grid';
 import { createFogLayer, syncFog, type FogLayer } from './layers/fog';
@@ -80,22 +81,14 @@ export function StageViewport({ children, background, className }: StageViewport
     syncFog(layers.fog, scene.fog);
   }, [layersRef, scene, selectedTokenId]);
 
-  const style = background
-    ? {
-        backgroundImage: `url(${background})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      }
-    : undefined;
-
   return (
     <div
       className={cn(
         'relative h-screen w-screen overflow-hidden bg-slate-950 text-foreground',
         className
       )}
-      style={style}
     >
+      {background ? <FallbackBackground src={background} /> : null}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 bg-slate-950/55" />
       {children}

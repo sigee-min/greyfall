@@ -82,10 +82,32 @@ export async function loadQwenEngineByManager(
       try {
         console.info('[webllm] trying model', { id: profile.id });
         const worker = new Worker(new URL('./mlc-worker.ts', import.meta.url), { type: 'module' });
-        enginePromise = CreateWebWorkerMLCEngine(worker as unknown as Worker, profile.id, {
-          initProgressCallback: onProgress
-        }) as unknown as Promise<WebLLMEngine>;
-        console.info('[webllm] model initialised', { id: profile.id });
+        // Surface worker-level errors (네트워크/CORS/MIME 등) 관측 강화
+        worker.addEventListener('error', (ev) => {
+          console.error('[webllm] worker error', ev);
+        });
+        worker.addEventListener('messageerror', (ev) => {
+          console.error('[webllm] worker messageerror', ev);
+        });
+        const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+        const wrappedProgress = (report: WebLLMProgress) => {
+          try {
+            onProgress?.(report);
+            if (debug && (report.text || typeof report.progress === 'number')) {
+              console.debug('[webllm] progress', report);
+            }
+          } catch {}
+        };
+        // Ensure "initialised" 로그는 실제 resolve 시점에만 출력
+        enginePromise = (async () => {
+          const eng = (await (CreateWebWorkerMLCEngine(
+            worker as unknown as Worker,
+            profile.id,
+            { initProgressCallback: wrappedProgress }
+          ) as any)) as WebLLMEngine;
+          console.info('[webllm] model initialised', { id: profile.id });
+          return eng;
+        })();
         break;
       } catch (error) {
         console.warn('[webllm] model init failed', { id: profile.id, error });
