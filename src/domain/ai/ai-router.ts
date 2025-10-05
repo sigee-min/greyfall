@@ -11,15 +11,6 @@ const EnvelopeSchema = z.object({ cmd: z.string().min(1), body: z.any().optional
 
 const DEBUG = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
 
-function stripThinkBlocks(input: string): string {
-  return input.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-}
-
-function extractFencedJson(input: string): string | null {
-  const m = input.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  return m ? m[1].trim() : null;
-}
-
 function extractFirstJsonObject(input: string): string | null {
   let start = -1;
   let depth = 0;
@@ -65,11 +56,8 @@ export function parseAICommand(text: string): AICommand | null {
     if (parsed.success) return { cmd: parsed.data.cmd, body: parsed.data.body };
   } catch {}
 
-  // 2) cleanup and relaxed extraction
-  let working = stripThinkBlocks(original);
-  const fenced = extractFencedJson(working);
-  if (fenced) working = fenced;
-  const jsonSlice = extractFirstJsonObject(working) ?? working.trim();
+  // 2) relaxed extraction without regex: find first JSON object only
+  const jsonSlice = extractFirstJsonObject(original) ?? original.trim();
   log('cleaned', jsonSlice.slice(0, 240));
   try {
     const obj = JSON.parse(jsonSlice) as unknown;

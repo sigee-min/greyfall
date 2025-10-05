@@ -7,6 +7,8 @@ import { getPersona } from './personas';
 
 // 매니저별 동시 실행 방지용 락 (StrictMode/HMR 중복 호출 대응)
 const inflightByManager = new Map<LlmManagerKind, Promise<void>>();
+// Track first successful generation per manager to extend cold-start timeout
+const firstGenDoneByManager = new Map<LlmManagerKind, boolean>();
 
 export type AIGatewayParams = {
   manager: LlmManagerKind;
@@ -30,6 +32,7 @@ export async function requestAICommand({
   const envMax = Number((import.meta as any).env?.VITE_LLM_MAX_TOKENS);
   const maxTok = Number.isFinite(envMax) && envMax > 0 ? Math.min(2048, Math.max(32, envMax)) : 128;
   const envTimeout = Number((import.meta as any).env?.VITE_LLM_TIMEOUT_MS);
+  const envColdTimeout = Number((import.meta as any).env?.VITE_LLM_COLD_TIMEOUT_MS);
   const defaultTimeout = (() => {
     if (Number.isFinite(envTimeout) && envTimeout! > 0) return Math.min(120_000, Math.max(5_000, envTimeout!));
     if (manager === 'hasty') return 35_000;
@@ -37,6 +40,11 @@ export async function requestAICommand({
     return 60_000;
   })();
   const effectiveTimeout = Math.max(1_000, Math.min(120_000, timeoutMs ?? defaultTimeout));
+  const coldStartTimeout = (() => {
+    if (Number.isFinite(envColdTimeout) && envColdTimeout! > 0) return Math.min(180_000, Math.max(20_000, envColdTimeout!));
+    // generous default for first token compile on slower GPUs (Windows)
+    return 90_000;
+  })();
   // 동적 import로 LLM 런타임 지연 로딩
   const {
     generateChat,
@@ -69,11 +77,11 @@ export async function requestAICommand({
     '가능한 명령과 설명:',
     capabilities,
     '',
-    '출력은 반드시 JSON 한 줄로만 작성:',
+    '모든 응답과 명령 body 문자열은 반드시 한국어로 작성하세요.',
+    '최종적으로 아래 형식의 JSON 한 줄로 작성하세요:',
     '{"cmd": "<명령>", "body": <고정타입>}',
     '각 명령의 body는 고정 타입을 따릅니다(예: chat → string).',
     '반드시 위 목록의 명령(cmd) 중 하나만 선택하세요. 목록에 정확히 매칭되지 않으면 chat을 사용하세요.',
-    '불확실하거나 다른 형식의 응답은 금지됩니다. 설명/사고 과정은 포함하지 말고 JSON 한 줄만 출력하세요.',
   ].join('\n');
 
   const user = [
@@ -102,7 +110,9 @@ export async function requestAICommand({
     // 2) 본 호출 (+ 트랜지언트 1회 재시도는 generateChat 내부 + 아래 보강)
     // 타임아웃은 실제 생성 단계에만 적용 (사전 준비는 별도 내부 타임아웃으로 보호됨)
     const ctl = new AbortController();
-    const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), effectiveTimeout);
+    const isFirstGen = !firstGenDoneByManager.get(manager);
+    const genTimeout = isFirstGen ? Math.max(effectiveTimeout, coldStartTimeout) : effectiveTimeout;
+    const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), genTimeout);
     try {
       raw = (
         await generateChat(user, {
@@ -159,6 +169,7 @@ export async function requestAICommand({
   }
   const parsed = parseAICommand(raw);
   if (parsed) {
+    firstGenDoneByManager.set(manager, true);
     // Command registry initialisation happens inside executeAICommand.
     // Do not attempt to validate here; return as-is and let the executor handle policy/unknowns.
     release();
@@ -166,20 +177,13 @@ export async function requestAICommand({
   }
   let bodyText = fallbackChatText;
   if (raw) {
+    firstGenDoneByManager.set(manager, true);
     // Received output but could not parse the expected JSON envelope — salvage as chat text
     const preview = typeof raw === 'string' ? raw.slice(0, 160) : String(raw);
     console.warn('[ai-gateway] Unparseable LLM output; falling back to chat', { preview });
-    try {
-      const cleaned = String(raw)
-        // remove think blocks
-        .replace(/<think>[\s\S]*?<\/think>/gi, '')
-        // strip code fences while keeping inner text
-        .replace(/```[a-zA-Z]*\n([\s\S]*?)```/g, '$1')
-        .trim();
-      if (cleaned) bodyText = cleaned.slice(0, 400);
-    } catch {
-      // keep fallbackChatText
-    }
+    // Keep it simple: no regex cleanup since model outputs pure JSON now
+    const trimmed = String(raw).trim();
+    if (trimmed) bodyText = trimmed.slice(0, 400);
   } else {
     console.warn('[ai-gateway] Empty LLM output; falling back to chat');
   }

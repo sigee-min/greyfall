@@ -2,6 +2,8 @@ import { FormEvent, useState } from 'react';
 import { nanoid } from 'nanoid';
 import { requestChoices, type CardPrompt } from '../../llm/webgpu';
 import { useCharacterStore, type StatKey } from '../../store/character';
+import { computeModifiers, type CheckKind } from '../../domain/character/checks';
+import { useGlobalBus } from '../../bus/global-bus';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 import { useGreyfallStore } from '../../store';
 
@@ -12,12 +14,27 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stats = useCharacterStore((s) => s.stats);
+  const passives = useCharacterStore((s) => s.passives);
+  const bus = useGlobalBus();
   // publish/localParticipantId come from props
 
   function parseRoll(input: string): { dice: number; mod: number; label: string } | null {
     const m = input.trim().match(/^\/roll\s+(.+)$/i);
     if (!m) return null;
     const expr = m[1].trim();
+    // check keywords
+    const ckMap: Record<string, CheckKind> = {
+      'evade': 'evade', '회피': 'evade',
+      'triage': 'triage', '응급': 'triage', '의무': 'triage',
+      'precision': 'precision', '정밀': 'precision',
+      'eng': 'engineering', 'engineering': 'engineering', '공학': 'engineering',
+      'med': 'medicine', 'medicine': 'medicine', '의술': 'medicine'
+    };
+    if (ckMap[expr]) {
+      const kind = ckMap[expr];
+      const { mod, labels } = computeModifiers({ stats, passives, kind });
+      return { dice: 20, mod, label: labels.join('+') };
+    }
     // stat+N or d20+N
     if (/^d?20(\s*[+\-]\s*\d+)?$/i.test(expr)) {
       const mm = expr.match(/^d?20(\s*([+\-])\s*(\d+))?$/i)!;
@@ -44,9 +61,14 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
     if (parsed) {
       const d = Math.floor(Math.random() * parsed.dice) + 1;
       const total = d + parsed.mod;
-      const summary = `/roll ${parsed.label} → [${d}] ${parsed.mod >= 0 ? '+' : ''}${parsed.mod} = ${total}`;
+      const isCrit = d === 20;
+      const isFail = d === 1;
+      const dieIcon = '🎲';
+      const critIcon = isCrit ? '✨' : isFail ? '💥' : '';
+      const summary = `${dieIcon} /roll ${parsed.label} → [${d}] ${parsed.mod >= 0 ? '+' : ''}${parsed.mod} = ${total} ${critIcon}`;
       appendLog({ id: nanoid(6), body: summary });
       if (localParticipantId) publish('chat:append:request' as any, { body: summary, authorId: localParticipantId } as any, 'roll');
+      bus.publish('toast:show', { title: 'Roll', message: summary, status: isCrit ? 'success' : isFail ? 'warning' : 'info', durationMs: 2200, icon: '🎲' });
       setIntent('');
       return;
     }
