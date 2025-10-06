@@ -4,6 +4,7 @@ import { getActiveModelPreset } from '../engine-selection';
 type CpuState = {
   worker: Worker | null;
   initialised: boolean;
+  progressCb?: (report: { text?: string; progress?: number }) => void;
 };
 
 const state: CpuState = { worker: null, initialised: false };
@@ -13,6 +14,7 @@ function ensureWorker(): Worker {
   const w = new Worker(new URL('./cpu.worker.ts', import.meta.url), { type: 'module' });
   w.addEventListener('message', (ev) => {
     if (ev.data?.type === 'progress') {
+      try { state.progressCb?.({ text: ev.data?.text, progress: ev.data?.progress }); } catch {}
       // infer initialised from final progress label
       if (String(ev.data?.text || '').includes('완료')) state.initialised = true;
     }
@@ -37,6 +39,7 @@ export async function loadCpuEngineByManager(
   onProgress?: (report: { text?: string; progress?: number }) => void
 ): Promise<void> {
   const w = ensureWorker();
+  state.progressCb = onProgress;
   onProgress?.({ text: '엔진 초기화 중 (CPU)', progress: 0.05 });
   const preset = getActiveModelPreset();
   const appConfig = (preset?.appConfig || {}) as Record<string, unknown>;

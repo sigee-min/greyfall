@@ -15,6 +15,7 @@
     "coretest": "npm run coretest:build && CORETEST_FILES='(ack-resend|host-router-limit|client-patch-queue)' node scripts/run-core-tests.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.0.0",
     "@mlc-ai/web-llm": "^0.2.79",
     "@pixi/filter-kawase-blur": "^5.1.1",
     "@pixi/filter-noise": "^5.2.0",

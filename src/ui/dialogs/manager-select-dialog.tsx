@@ -4,12 +4,16 @@ import { useI18n } from '../../i18n';
 type Props = {
   open: boolean;
   onClose: () => void;
+  // GPU 선택 시 호출
   onSelect: (manager: 'fast' | 'smart') => void;
+  // 저사양(CPU) 선택 시 호출 (예: 'gemma3-1b')
+  onSelectCpuModel?: (modelId: string) => void;
 };
 
-export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
+export function ManagerSelectDialog({ open, onClose, onSelect, onSelectCpuModel }: Props) {
   if (!open) return null;
   const { t } = useI18n();
+  const [tab, setTab] = React.useState<'low' | 'high'>('high');
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
       <div className="hud-card w-[min(640px,92vw)] rounded-2xl border border-border/60 p-6 shadow-2xl">
@@ -26,40 +30,92 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
             {t('common.close')}
           </button>
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+        <div className="mb-4 flex items-center gap-2">
           <button
             type="button"
-            className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
-            onClick={() => onSelect('fast')}
+            className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-widest ${tab === 'low' ? 'bg-primary text-primary-foreground' : 'border border-border/60 text-muted-foreground'}`}
+            onClick={() => setTab('low')}
           >
-            <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                <path fill="currentColor" d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/>
-              </svg>
-            </span>
-            <span>
-              <p className="text-sm font-semibold text-foreground">{t('manager.fast')}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('manager.fast.desc')}</p>
-            </span>
+            저사양
           </button>
-
           <button
             type="button"
-            className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
-            onClick={() => onSelect('smart')}
+            className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-widest ${tab === 'high' ? 'bg-primary text-primary-foreground' : 'border border-border/60 text-muted-foreground'}`}
+            onClick={() => setTab('high')}
           >
-            <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                <path fill="currentColor" d="M12 2 19 6v6c0 5-3.5 9-7 10C8.5 21 5 17 5 12V6l7-4z"/>
-              </svg>
-            </span>
-            <span>
-              <p className="text-sm font-semibold text-foreground">{t('manager.smart')}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('manager.smart.desc')}</p>
-            </span>
+            고사양
           </button>
         </div>
+
+        {tab === 'low' ? (
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+            <button
+              type="button"
+              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
+              onClick={() => onSelectCpuModel?.('gemma3-1b')}
+            >
+              <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                  <path fill="currentColor" d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/>
+                </svg>
+              </span>
+              <span>
+                <p className="text-sm font-semibold text-foreground">Fast — Gemma 3 1B (ONNX)</p>
+                <p className="mt-1 text-xs text-muted-foreground">CPU 경로 — 경량</p>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
+              onClick={() => onSelectCpuModel?.('qwen-4b')}
+            >
+              <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                  <path fill="currentColor" d="M12 2 19 6v6c0 5-3.5 9-7 10C8.5 21 5 17 5 12V6l7-4z"/>
+                </svg>
+              </span>
+              <span>
+                <p className="text-sm font-semibold text-foreground">Smart — Qwen 4B (ONNX)</p>
+                <p className="mt-1 text-xs text-muted-foreground">CPU 경로 — 상대 고성능</p>
+              </span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+            <button
+              type="button"
+              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
+              onClick={() => onSelect('fast')}
+            >
+              <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                  <path fill="currentColor" d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/>
+                </svg>
+              </span>
+              <span>
+                <p className="text-sm font-semibold text-foreground">{t('manager.fast')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('manager.fast.desc')}</p>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
+              onClick={() => onSelect('smart')}
+            >
+              <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                  <path fill="currentColor" d="M12 2 19 6v6c0 5-3.5 9-7 10C8.5 21 5 17 5 12V6l7-4z"/>
+                </svg>
+              </span>
+              <span>
+                <p className="text-sm font-semibold text-foreground">{t('manager.smart')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('manager.smart.desc')}</p>
+              </span>
+            </button>
+          </div>
+        )}
         <div className="mt-5 rounded-xl border border-border/60 bg-background/60 p-4 text-xs text-muted-foreground">
           <p className="font-semibold text-foreground">{t('manager.notesTitle', { highlight: t('manager.notesPre') })}</p>
           <ul className="mt-2 list-disc space-y-1 pl-4">

@@ -10,6 +10,7 @@ import { ManagerSelectDialog } from './ui/dialogs/manager-select-dialog';
 import { ErrorDialog } from './ui/dialogs/error-dialog';
 import { GameLobby } from './scenes/game-lobby';
 import { GameStartLobby } from './scenes/game-start-lobby';
+import { chooseModel } from './llm/selection-storage';
 import { useSession } from './domain/session';
 import { useLobbyChat } from './domain/chat/use-lobby-chat';
 import { exitFullscreen, getFullscreenElement, requestFullscreen, logFullscreenState } from './lib/fullscreen';
@@ -205,6 +206,25 @@ function App() {
   const handleManagerSelect = useCallback(
     async (manager: 'fast' | 'smart') => {
       setSelectedManager(manager);
+      setManagerOpen(false);
+      try {
+        await createGame(playerName);
+        changeScene('startLobby');
+      } catch (error) {
+        console.error(error);
+        globalBus.publish('error:show', {
+          message: '호스트 세션을 시작하지 못했습니다. 콘솔 로그를 확인해 주세요.',
+          context: 'create-game',
+          cause: error
+        });
+      }
+    },
+    [changeScene, createGame, globalBus, playerName]
+  );
+
+  const handleCpuModelSelect = useCallback(
+    async (modelId: string) => {
+      chooseModel(modelId);
       setManagerOpen(false);
       try {
         await createGame(playerName);
@@ -472,6 +492,7 @@ function App() {
         open={managerOpen}
         onClose={() => setManagerOpen(false)}
         onSelect={handleManagerSelect}
+        onSelectCpuModel={handleCpuModelSelect}
       />
       <ErrorDialog open={Boolean(errorMessage)} message={errorMessage ?? ''} onClose={dismissError} />
     </>

@@ -19,12 +19,25 @@ const PRESETS: ModelPreset[] = [
     backend: 'cpu',
     manager: 'smart',
     packaging: 'onnx',
-    // Fill these URLs when your assets/CDN are ready
     appConfig: {
-      // Example: 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js'
-      ortScriptUrl: '',
-      // Example model url served by your app/CDN: '/models/gemma3-1b/model.onnx'
-      modelUrl: ''
+      // Transformers.js (HF) quick path
+      hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
+      dtype: 'q4'
+      // Optional direct ORT fallback (self-hosted)
+      // ortScriptUrl: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
+      // modelUrl: '/models/gemma3-1b/model.onnx'
+    }
+  },
+  {
+    id: 'qwen-4b',
+    label: 'Qwen 4B (ONNX)',
+    backend: 'cpu',
+    manager: 'smart',
+    packaging: 'onnx',
+    appConfig: {
+      // Replace with the exact HF repo when finalized
+      hfModelId: 'onnx-community/Qwen2-4B-Instruct-ONNX',
+      dtype: 'q4'
     }
   }
 ];
