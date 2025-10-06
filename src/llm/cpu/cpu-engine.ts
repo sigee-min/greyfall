@@ -1,4 +1,5 @@
 import type { ChatOptions } from '../webllm-engine';
+import { getActiveModelPreset } from '../engine-selection';
 
 type CpuState = {
   worker: Worker | null;
@@ -37,7 +38,9 @@ export async function loadCpuEngineByManager(
 ): Promise<void> {
   const w = ensureWorker();
   onProgress?.({ text: '엔진 초기화 중 (CPU)', progress: 0.05 });
-  w.postMessage({ type: 'init', modelId: 'gemma3-1b' });
+  const preset = getActiveModelPreset();
+  const appConfig = (preset?.appConfig || {}) as Record<string, unknown>;
+  w.postMessage({ type: 'init', modelId: preset?.id || 'gemma3-1b', appConfig });
   // Minimal settle delay
   await new Promise((r) => setTimeout(r, 10));
 }

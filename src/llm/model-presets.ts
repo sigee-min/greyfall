@@ -18,7 +18,14 @@ const PRESETS: ModelPreset[] = [
     label: 'Gemma 3 1B (ONNX)',
     backend: 'cpu',
     manager: 'smart',
-    packaging: 'onnx'
+    packaging: 'onnx',
+    // Fill these URLs when your assets/CDN are ready
+    appConfig: {
+      // Example: 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js'
+      ortScriptUrl: '',
+      // Example model url served by your app/CDN: '/models/gemma3-1b/model.onnx'
+      modelUrl: ''
+    }
   }
 ];
 
