@@ -387,6 +387,7 @@ function sleep(ms: number): Promise<void> {
 export async function ensureChatApiReady(timeoutMs = 8000, onProgress?: (report: WebLLMProgress) => void): Promise<void> {
   const eng = await (getEnginePromise() ?? loadEngineByManager('smart'));
   try { onProgress?.({ text: '채팅 API 준비 중', progress: 0.94 }); } catch {}
+  try { /* optional emit to shared bus later if needed */ } catch {}
   await waitForChatApi(eng, timeoutMs);
   try { onProgress?.({ text: '채팅 API 준비 완료', progress: 0.96 }); } catch {}
 }
