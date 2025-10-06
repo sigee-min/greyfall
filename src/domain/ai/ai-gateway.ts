@@ -3,7 +3,7 @@ import { parseAICommand, type AICommand } from './ai-router';
 // LLM 모듈은 동적 import로 지연 로딩해 초기 번들을 줄입니다.
 // 타입은 이 파일에서 별도로 정의해 정적 의존성을 제거합니다.
 export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
-import { getPersona } from './personas';
+// Persona prompts removed
 
 // 매니저별 동시 실행 방지용 락 (StrictMode/HMR 중복 호출 대응)
 const inflightByManager = new Map<LlmManagerKind, Promise<void>>();
@@ -69,7 +69,6 @@ export async function requestAICommand({
   } catch {
     // 이전 요청 에러는 게이트웨이 로직에는 영향 없음
   }
-  const persona = getPersona(manager);
   const capabilities = commandRegistry
     .list()
     .map((c) => `- ${c.cmd}: ${c.doc}`)
@@ -79,8 +78,7 @@ export async function requestAICommand({
   const ALLOWED = new Set(allowedList);
 
   const sys = [
-    `당신은 작전 심판자 "${persona.name}"입니다.`,
-    ...persona.systemDirectives,
+    '역할: 실시간 게임 진행 보조자(심판자) — 간결하고 안전하게 명령만 선택합니다.',
     '가능한 명령과 설명:',
     capabilities,
     '',
@@ -115,30 +113,34 @@ export async function requestAICommand({
         }
       }
       const sysCmd = [
-        `당신은 작전 심판자 \"${persona.name}\"입니다.`,
-        ...persona.systemDirectives,
+        '역할: 실시간 게임 진행 보조자(심판자) — 간결하고 안전하게 명령만 선택합니다.',
         `허용 명령(cmd): ${allowedCmds}`,
         '아래 형식의 JSON 한 줄로만 출력하세요:',
         '{"cmd":"<명령>"}',
         '설명이나 추가 텍스트는 쓰지 마세요.'
       ].join('\\n');
-      const ctl1 = new AbortController();
-      const t1 = setTimeout(() => ctl1.abort('ai-gateway-two-phase-cmd'), Math.min(10_000, Math.max(2_000, (timeoutMs ?? defaultTimeout) / 3)));
-      let rawCmd = '';
-      try {
-        rawCmd = (
-          await generateChat(user, { systemPrompt: sysCmd, temperature: 0, maxTokens: 24, signal: ctl1.signal })
-        ).trim();
-      } finally { clearTimeout(t1); }
-      const chosen = parseAICommand(rawCmd);
-      if (chosen && ALLOWED.has(chosen.cmd)) {
+      let best: AICommand | null = null;
+      let bestScore = -1;
+      const attempts = Math.max(1, Math.min(5, (typeof (arguments[0] as any)?.maxAttempts === 'number' ? (arguments[0] as any).maxAttempts : 3)));
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        // Phase 1: cmd 선택
+        const ctl1 = new AbortController();
+        const t1 = setTimeout(() => ctl1.abort('ai-gateway-two-phase-cmd'), Math.min(10_000, Math.max(2_000, (timeoutMs ?? defaultTimeout) / 3)));
+        let rawCmd = '';
+        try {
+          rawCmd = (
+            await generateChat(user, { systemPrompt: sysCmd, temperature: 0, maxTokens: 24, signal: ctl1.signal })
+          ).trim();
+        } finally { clearTimeout(t1); }
+        const chosen = parseAICommand(rawCmd);
+        if (!chosen || !ALLOWED.has(chosen.cmd)) continue;
+        // Phase 2: body 작성
         let bodyHint = '';
         if (chosen.cmd === 'chat') bodyHint = 'body는 string (메시지 텍스트) 입니다.';
         else if (chosen.cmd === 'llm.readyz') bodyHint = 'body는 string, 임의의 값이어도 됩니다.';
         else if (chosen.cmd === 'mission.start') bodyHint = 'body는 비워도 됩니다(null 또는 빈 객체).';
         const sysBody = [
-          `당신은 작전 심판자 \"${persona.name}\"입니다.`,
-          ...persona.systemDirectives,
+          '역할: 실시간 게임 진행 보조자(심판자) — 간결하고 안전하게 명령만 선택합니다.',
           `선택한 명령(cmd): ${chosen.cmd}`,
           bodyHint,
           '아래 형식의 JSON 한 줄로만 출력하세요:',
@@ -146,17 +148,44 @@ export async function requestAICommand({
         ].join('\\n');
         const ctl2 = new AbortController();
         const t2 = setTimeout(() => ctl2.abort('ai-gateway-two-phase-body'), Math.min(14_000, Math.max(3_000, (timeoutMs ?? defaultTimeout) / 2)));
+        let rawBody = '';
         try {
-          raw = (
+          rawBody = (
             await generateChat(user, { systemPrompt: sysBody, temperature, maxTokens: maxTokens ?? maxTok, signal: ctl2.signal })
           ).trim();
         } finally { clearTimeout(t2); }
-        const out = parseAICommand(raw);
-        if (out && ALLOWED.has(out.cmd)) {
+        const out = parseAICommand(rawBody);
+        if (!out || !ALLOWED.has(out.cmd)) continue;
+        // Phase 3: 점수 평가 (기본 활성)
+        const sysScore = '너는 출력 검토관이다. 아래 JSON 출력이 사용자 요청과 규칙을 따르는지 0~10점으로 평가하고, JSON 한 줄로만 돌려줘: {"score": <0..10>, "reason": "..."}';
+        const userScore = [
+          '허용 명령(cmd): ' + allowedCmds,
+          '사용자 요청:',
+          user,
+          '생성된 출력(JSON):',
+          JSON.stringify(out)
+        ].join('\\n');
+        const ctl3 = new AbortController();
+        const t3 = setTimeout(() => ctl3.abort('ai-gateway-two-phase-score'), Math.min(8_000, Math.max(2_000, (timeoutMs ?? defaultTimeout) / 3)));
+        let scoredRaw = '';
+        try {
+          scoredRaw = (
+            await generateChat(userScore, { systemPrompt: sysScore, temperature: 0, maxTokens: 24, signal: ctl3.signal })
+          ).trim();
+        } finally { clearTimeout(t3); }
+        const sr = ((): { score: number } | null => { try { return JSON.parse(scoredRaw) as any; } catch { return null; } })();
+        const sc = Math.max(0, Math.min(10, Math.round(Number(sr?.score ?? 0))));
+        if (sc > bestScore) { bestScore = sc; best = out; }
+        if (sc >= (typeof (arguments[0] as any)?.minScore === 'number' ? (arguments[0] as any).minScore : 6)) {
           firstGenDoneByManager.set(manager, true);
           release();
           return out;
         }
+      }
+      if (best) {
+        firstGenDoneByManager.set(manager, true);
+        release();
+        return best;
       }
       // If two-phase failed, fall through to single-shot below
     } catch {}
