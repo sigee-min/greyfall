@@ -14,8 +14,8 @@ export type ModelPreset = {
 // Product defaults: extend as more models are added.
 const PRESETS: ModelPreset[] = [
   {
-    id: 'gemma3n-e4b',
-    label: 'Gemma 3n E4B',
+    id: 'gemma3-1b',
+    label: 'Gemma 3 1B (ONNX)',
     backend: 'cpu',
     manager: 'smart',
     packaging: 'onnx'
@@ -29,4 +29,3 @@ export function getPresetById(id: string): ModelPreset | null {
 export function listPresets(): ModelPreset[] {
   return [...PRESETS];
 }
-

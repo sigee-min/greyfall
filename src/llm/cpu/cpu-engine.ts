@@ -37,7 +37,7 @@ export async function loadCpuEngineByManager(
 ): Promise<void> {
   const w = ensureWorker();
   onProgress?.({ text: '엔진 초기화 중 (CPU)', progress: 0.05 });
-  w.postMessage({ type: 'init', modelId: 'gemma3n-e4b' });
+  w.postMessage({ type: 'init', modelId: 'gemma3-1b' });
   // Minimal settle delay
   await new Promise((r) => setTimeout(r, 10));
 }
@@ -125,4 +125,3 @@ export async function generateCpuChat(
   }
   return p;
 }
-
