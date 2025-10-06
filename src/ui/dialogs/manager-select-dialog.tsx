@@ -60,15 +60,15 @@ export function ManagerSelectDialog({ open, onClose, onSelect, onSelectCpuModel 
                 </svg>
               </span>
               <span>
-                <p className="text-sm font-semibold text-foreground">Fast — Gemma 3 1B (ONNX)</p>
-                <p className="mt-1 text-xs text-muted-foreground">CPU 경로 — 경량</p>
+                <p className="text-sm font-semibold text-foreground">Fast</p>
+                <p className="mt-1 text-xs text-muted-foreground">저사양 — 경량</p>
               </span>
             </button>
 
             <button
               type="button"
               className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
-              onClick={() => onSelectCpuModel?.('qwen-4b')}
+              onClick={() => onSelectCpuModel?.('granite-micro')}
             >
               <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -76,8 +76,8 @@ export function ManagerSelectDialog({ open, onClose, onSelect, onSelectCpuModel 
                 </svg>
               </span>
               <span>
-                <p className="text-sm font-semibold text-foreground">Smart — Qwen 4B (ONNX)</p>
-                <p className="mt-1 text-xs text-muted-foreground">CPU 경로 — 상대 고성능</p>
+                <p className="text-sm font-semibold text-foreground">Smart</p>
+                <p className="mt-1 text-xs text-muted-foreground">저사양 — 향상형</p>
               </span>
             </button>
           </div>

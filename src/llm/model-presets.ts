@@ -23,21 +23,17 @@ const PRESETS: ModelPreset[] = [
       // Transformers.js (HF) quick path
       hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
       dtype: 'q4'
-      // Optional direct ORT fallback (self-hosted)
-      // ortScriptUrl: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
-      // modelUrl: '/models/gemma3-1b/model.onnx'
     }
   },
   {
-    id: 'qwen-4b',
-    label: 'Qwen 4B (ONNX)',
+    id: 'granite-micro',
+    label: 'Granite 4.0 Micro (ONNX)',
     backend: 'cpu',
     manager: 'smart',
     packaging: 'onnx',
     appConfig: {
-      // Replace with the exact HF repo when finalized
-      hfModelId: 'onnx-community/Qwen2-4B-Instruct-ONNX',
-      dtype: 'q4'
+      hfModelId: 'onnx-community/granite-4.0-micro-ONNX-web',
+      device: 'webgpu'
     }
   }
 ];

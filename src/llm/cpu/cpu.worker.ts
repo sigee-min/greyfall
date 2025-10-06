@@ -36,9 +36,13 @@ self.onmessage = async (evt: MessageEvent<InMessage>) => {
       // Preferred: Transformers.js pipeline (downloads from HF Hub by default)
       try {
         const hfModelId = String(cfg?.hfModelId || 'onnx-community/gemma-3-1b-it-ONNX-GQA');
-        const dtype = (cfg?.dtype as string) || 'q4';
+        const dtype = (cfg?.dtype as string) || undefined;
+        const device = (cfg?.device as string) || undefined;
+        const opts: Record<string, unknown> = {};
+        if (dtype) opts.dtype = dtype;
+        if (device) opts.device = device;
         emitProgress('파이프라인 준비 (HF Transformers)', 0.25);
-        hfGenerator = await pipeline('text-generation', hfModelId, { dtype } as any);
+        hfGenerator = await pipeline('text-generation', hfModelId, opts as any);
         backend = 'hf';
         emitProgress('모델 파이프라인 준비 완료', 0.9);
       } catch (_e) {
