@@ -1,6 +1,4 @@
 import { commandRegistry } from '../command-registry';
-import { getPersona } from '../personas';
-import type { LlmManagerKind } from '../../../llm/webllm-engine';
 
 export type AllowedSummary = {
   allowedList: string[];
@@ -18,35 +16,6 @@ export function summariseAllowed(): AllowedSummary {
     .map((c) => `- ${c.cmd}: ${c.doc}`)
     .join('\n');
   return { allowedList, allowedSet, allowedCmdsText, capabilitiesDoc };
-}
-
-export function buildSystemPrompt(manager: LlmManagerKind, allowedCmdsText: string, capabilitiesDoc: string): string {
-  const persona = getPersona(manager);
-  const personaLines = persona.systemDirectives.join('\\n');
-  return [
-    personaLines,
-    '역할: 실시간 게임 진행 보조자(심판자) — 간결하고 안전하게 명령만 선택합니다.',
-    '가능한 명령과 설명:',
-    capabilitiesDoc,
-    '',
-    '모든 응답과 명령 body 문자열은 반드시 한국어로 작성하세요.',
-    `허용 명령(cmd): ${allowedCmdsText}`,
-    '최종적으로 아래 형식의 JSON 한 줄로 작성하세요:',
-    '{"cmd": "<명령>", "body": <고정타입>}',
-    '각 명령의 body는 고정 타입을 따릅니다(예: chat → string).',
-    '반드시 위 목록의 명령(cmd) 중 하나만 선택하세요. 목록에 정확히 매칭되지 않으면 chat을 사용하세요.'
-  ].join('\n');
-}
-
-export function buildUserPrompt(userInstruction: string, contextText?: string): string {
-  return [
-    userInstruction,
-    contextText ? '' : undefined,
-    contextText ? '맥락:' : undefined,
-    contextText ?? undefined
-  ]
-    .filter(Boolean)
-    .join('\n');
 }
 
 export function buildTwoPhaseCmdPrompt(allowedCmdsText: string): string {

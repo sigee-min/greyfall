@@ -13,8 +13,8 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
       <div className="hud-card w-[min(640px,92vw)] rounded-2xl border border-border/60 p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-accent/80">Judgement</p>
-            <h3 className="text-xl font-semibold text-foreground">운명의 심판자를 고르시오.</h3>
+            <p className="text-xs uppercase tracking-[0.35em] text-accent/80">LLM Model</p>
+            <h3 className="text-xl font-semibold text-foreground">모델 설정을 선택하세요.</h3>
           </div>
           <button
             type="button"
@@ -37,8 +37,8 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
               </svg>
             </span>
             <span>
-              <p className="text-sm font-semibold text-foreground">강림</p>
-              <p className="mt-1 text-xs text-muted-foreground">즉각 대응</p>
+              <p className="text-sm font-semibold text-foreground">Hasty</p>
+              <p className="mt-1 text-xs text-muted-foreground">가벼운 모델(즉시 응답)</p>
             </span>
           </button>
           <button
@@ -52,8 +52,8 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
               </svg>
             </span>
             <span>
-              <p className="text-sm font-semibold text-foreground">백무상</p>
-              <p className="mt-1 text-xs text-muted-foreground">민첩함</p>
+              <p className="text-sm font-semibold text-foreground">Fast</p>
+              <p className="mt-1 text-xs text-muted-foreground">균형형</p>
             </span>
           </button>
 
@@ -68,8 +68,8 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
               </svg>
             </span>
             <span>
-              <p className="text-sm font-semibold text-foreground">흑무상</p>
-              <p className="mt-1 text-xs text-muted-foreground">신중함</p>
+              <p className="text-sm font-semibold text-foreground">Smart</p>
+              <p className="mt-1 text-xs text-muted-foreground">정밀형</p>
             </span>
           </button>
         </div>

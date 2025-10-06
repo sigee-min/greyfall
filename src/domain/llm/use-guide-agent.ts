@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { LlmManagerKind } from '../../llm/webllm-engine';
 // LLM 호출은 ai-gateway 단일 창구를 사용합니다.
-import { guideDisplayName } from './guide-profile';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../chat/use-lobby-chat';
 import type { SessionParticipant } from '../session/types';
 // import { nanoid } from 'nanoid';
@@ -35,7 +34,7 @@ export function useGuideAgent({
   participants: _participants,
   policy
 }: UseGuideAgentOptions) {
-  const guideName = useMemo(() => guideDisplayName(manager), [manager]);
+  const guideName = useMemo(() => 'AI', []);
   const authorId = useMemo(() => (localParticipantId ? `guide:${localParticipantId}` : 'guide:host'), [localParticipantId]);
   // Keep for potential future use: local participant snapshot
   // const self = useMemo(() => participants.find((p) => p.id === localParticipantId) ?? null, [participants, localParticipantId]);
@@ -84,7 +83,7 @@ export function useGuideAgent({
         try {
           const context = historyRef.current
             .slice(-fullPolicy.maxContext)
-            .map((m) => `- ${m.role === 'assistant' ? '(심판자) ' : ''}${m.content}`)
+            .map((m) => `- ${m.role === 'assistant' ? '(AI) ' : ''}${m.content}`)
             .join('\n');
           const parsed = await requestAICommand({
             manager,

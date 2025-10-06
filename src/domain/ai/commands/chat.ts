@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { CommandSpec } from '../command-registry';
-import { guideDisplayName } from '../../llm/guide-profile.js';
 import { nanoid } from 'nanoid';
 
 // 단일 고정 타입: string (프로토콜의 body와 동일)
@@ -26,14 +25,14 @@ function coerceToString(input: unknown): unknown {
 export const ChatCommand: CommandSpec<string> = {
   cmd: 'chat',
   schema: ChatBodySchema,
-  doc: 'chat — 심판자 이름으로 채팅 전송. body는 string 고정.',
+  doc: 'chat — AI 이름으로 채팅 전송. body는 string 고정.',
   policy: { role: 'host', cooldownMs: 2500 },
   coerce: coerceToString,
   handler: (text, ctx) => {
     const body = (text ?? '').toString().trim();
     if (!body) return false;
-    const guide = guideDisplayName(ctx.manager);
-    const authorId = ctx.localParticipantId ? `guide:${ctx.localParticipantId}` : 'guide:host';
+    const guide = 'AI';
+    const authorId = ctx.localParticipantId ? `ai:${ctx.localParticipantId}` : 'ai:host';
     const entry = {
       id: nanoid(12),
       authorId,
