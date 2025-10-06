@@ -18,9 +18,11 @@ export function summariseAllowed(): AllowedSummary {
   return { allowedList, allowedSet, allowedCmdsText, capabilitiesDoc };
 }
 
-export function buildTwoPhaseCmdPrompt(allowedCmdsText: string): string {
+export function buildTwoPhaseCmdPrompt(allowedCmdsText: string, capabilitiesDoc: string): string {
   return [
     '역할: 실시간 게임 진행 보조자(심판자) — 간결하고 안전하게 명령만 선택합니다.',
+    '가능한 명령과 설명:',
+    capabilitiesDoc,
     `허용 명령(cmd): ${allowedCmdsText}`,
     '명령(cmd)은 위의 목록과 "정확히 동일한" 문자열만 허용됩니다.',
     "슬래시(/) 접두어를 사용하지 마세요. 예: '/start' → 'mission.start'",
