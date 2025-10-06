@@ -9,6 +9,9 @@ import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/webllm-engine';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
 import { useBroadcastLlmProgress, useReceiveLlmProgress } from '../domain/llm/use-llm-progress-bridge';
+import { useBroadcastLlmConfig, useReceiveLlmConfig } from '../domain/llm/use-llm-config-bridge';
+import { getActiveModelPreset } from '../llm/engine-selection';
+import { chooseModel } from '../llm/selection-storage';
 import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
@@ -139,6 +142,30 @@ export function GameStartLobby({
   const uiError = mode === 'host' ? llmError : remote.error;
 
   const isActiveLoading = !uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus));
+
+  // Ensure an active model preset exists on host; default to gemma3-1b (CPU/ONNX) if none was chosen yet.
+  useEffect(() => {
+    if (mode !== 'host') return;
+    const preset = getActiveModelPreset();
+    if (!preset) {
+      chooseModel('gemma3-1b');
+    }
+  }, [mode]);
+
+  // Broadcast active LLM config (model/backend) from host once per session; guests subscribe and set their local preset.
+  const activePreset = getActiveModelPreset();
+  useBroadcastLlmConfig({
+    enabled: mode === 'host' && Boolean(activePreset),
+    payload: activePreset ? { modelId: activePreset.id, backend: activePreset.backend } : { modelId: 'gemma3-1b', backend: 'cpu' },
+    publish: publishLobbyMessage
+  });
+  const receivedCfg = useReceiveLlmConfig({ register: registerLobbyHandler });
+  useEffect(() => {
+    if (mode === 'host') return;
+    if (!receivedCfg) return;
+    // Set local preset based on host announcement
+    chooseModel(receivedCfg.modelId);
+  }, [mode, receivedCfg]);
 
   const mapLlmUiText = (text: string | null | undefined, percent: number | null) => {
     const fallback = t('common.loading');
