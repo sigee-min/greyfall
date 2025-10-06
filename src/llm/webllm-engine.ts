@@ -121,29 +121,10 @@ export async function loadEngineByManager(
     throw new Error('이 브라우저는 WebGPU를 지원하지 않습니다. Chrome 113+ (chrome://flags/#enable-unsafe-webgpu) 또는 최신 Edge에서 시도해 주세요.');
   }
 
-  // Prevent racy double-initialisation under StrictMode/HMR by
-  // setting a single shared promise that all callers await.
-  if (getEnginePromise()) {
-    const eng = await getEnginePromise()!;
-    try { eng.setInitProgressCallback?.((r) => wrappedProgress(r)); } catch {}
-    return eng;
-  }
-  if (getInitialising()) {
-    // Busy-wait with micro-sleeps until the shared promise is set
-    // (should only be a few ms window)
-    while (!getEnginePromise()) {
-      // eslint-disable-next-line no-await-in-loop
-      await sleep(5);
-    }
-    const eng = await getEnginePromise()!;
-    try { eng.setInitProgressCallback?.((r) => wrappedProgress(r)); } catch {}
-    return eng;
-  }
-  setInitialising(true);
-  const attempts = resolveProfiles(manager);
+  // Build a wrapped progress reporter up-front so we can bind it
+  // even when engine is already initialised or initialising.
   const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
   let lastP = 0;
-  try { onProgress?.({ text: '모델 초기화를 시작합니다', progress: 0.02 }); } catch {}
   const wrappedProgress = (report: WebLLMProgress) => {
     try {
       const base = report.text || '엔진 초기화 중';
@@ -173,6 +154,28 @@ export async function loadEngineByManager(
       if (debug) console.debug('[webllm] progress', { phase, text: uiText, p, raw: report });
     } catch {}
   };
+
+  // Prevent racy double-initialisation under StrictMode/HMR by
+  // setting a single shared promise that all callers await.
+  if (getEnginePromise()) {
+    const eng = await getEnginePromise()!;
+    try { eng.setInitProgressCallback?.(wrappedProgress); } catch {}
+    return eng;
+  }
+  if (getInitialising()) {
+    // Busy-wait with micro-sleeps until the shared promise is set
+    // (should only be a few ms window)
+    while (!getEnginePromise()) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(5);
+    }
+    const eng = await getEnginePromise()!;
+    try { eng.setInitProgressCallback?.(wrappedProgress); } catch {}
+    return eng;
+  }
+  setInitialising(true);
+  const attempts = resolveProfiles(manager);
+  try { onProgress?.({ text: '모델 초기화를 시작합니다', progress: 0.02 }); } catch {}
 
   setEnginePromise((async () => {
     let lastError: unknown;
