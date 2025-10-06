@@ -42,22 +42,34 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
     const sysCmd = buildTwoPhaseCmdPrompt(allowedCmdsText, capabilitiesDoc);
     const attempts = Math.max(1, Math.min(3, (typeof (params as any)?.maxAttempts === 'number' ? (params as any).maxAttempts : 2)));
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      const rawCmd = await generateWithTimeout(user, {
-        systemPrompt: sysCmd,
-        temperature: 0,
-        maxTokens: 24,
-        timeoutMs: Math.min(10_000, Math.max(2_000, (timeoutMs ?? effectiveTimeout) / 3))
-      });
+      let rawCmd = '';
+      try {
+        rawCmd = await generateWithTimeout(user, {
+          systemPrompt: sysCmd,
+          temperature: 0,
+          maxTokens: 24,
+          timeoutMs: Math.min(10_000, Math.max(2_000, (timeoutMs ?? effectiveTimeout) / 3))
+        });
+      } catch (err) {
+        // timeout/abort or transient error → try next attempt
+        continue;
+      }
       const chosen = parseAICommand(rawCmd);
       if (!chosen || !allowedSet.has(chosen.cmd)) continue;
 
       const sysBody = buildTwoPhaseBodyPrompt(chosen.cmd);
-      const rawBody = await generateWithTimeout(user, {
-        systemPrompt: sysBody,
-        temperature,
-        maxTokens: maxTok,
-        timeoutMs: Math.min(14_000, Math.max(3_000, (timeoutMs ?? effectiveTimeout) / 2))
-      });
+      let rawBody = '';
+      try {
+        rawBody = await generateWithTimeout(user, {
+          systemPrompt: sysBody,
+          temperature,
+          maxTokens: maxTok,
+          timeoutMs: Math.min(14_000, Math.max(3_000, (timeoutMs ?? effectiveTimeout) / 2))
+        });
+      } catch (err) {
+        // timeout/abort or transient error → try next attempt
+        continue;
+      }
       const out = parseAICommand(rawBody);
       if (!out || !allowedSet.has(out.cmd)) continue;
 
