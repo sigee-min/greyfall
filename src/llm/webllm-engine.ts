@@ -3,12 +3,8 @@ import { MODEL_OVERRIDES, type ModelRegistryConfig } from './model-config';
 
 export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
 type ModelProfile = { id: string; appConfig?: Record<string, unknown> };
-// Curated models (Qwen removed):
-// - High tier: Llama 3.1 8B Instruct (q4f16_1)
-// - Mid tier: Llama 3.2 3B Instruct (q4f16_1)
-// - Low tier: SmolLM2 1.7B Instruct (q4f16_1)
+// Curated defaults kept minimal (single per manager when no override is provided)
 const LLAMA31_8B_Q4F16_1: ModelProfile = { id: 'Llama-3.1-8B-Instruct-q4f16_1-MLC' };
-const LLAMA32_3B_Q4F16_1: ModelProfile = { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC' };
 const SMOLLM2_1_7B_Q4F16_1: ModelProfile = { id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC' };
 function envOverride(kind: LlmManagerKind): string | null {
   const env = (import.meta as any).env || {};
@@ -32,15 +28,15 @@ function resolveProfiles(kind: LlmManagerKind): ModelProfile[] {
   const override = envOverride(kind);
   if (override) return [{ id: override }];
   if (kind === 'hasty') {
-    // Low → Mid → High
-    return [SMOLLM2_1_7B_Q4F16_1, LLAMA32_3B_Q4F16_1, LLAMA31_8B_Q4F16_1];
+    // Low-cost default only
+    return [SMOLLM2_1_7B_Q4F16_1];
   }
   if (kind === 'fast') {
-    // Mid → Low → High
-    return [LLAMA32_3B_Q4F16_1, SMOLLM2_1_7B_Q4F16_1, LLAMA31_8B_Q4F16_1];
+    // Should be overridden by code/env; fallback kept minimal to high-quality
+    return [LLAMA31_8B_Q4F16_1];
   }
-  // High → Mid → Low
-  return [LLAMA31_8B_Q4F16_1, LLAMA32_3B_Q4F16_1, SMOLLM2_1_7B_Q4F16_1];
+  // smart default: high-quality single choice
+  return [LLAMA31_8B_Q4F16_1];
 }
 
 export type ChatOptions = {

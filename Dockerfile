@@ -17,12 +17,18 @@ COPY index.html ./
 
 RUN npm ci
 
-# Build-time configurable signal server public URL
+# Build-time configurable signal server public URL (optional)
 # Example override: --build-arg VITE_SIGNAL_SERVER_URL=https://your-domain
-ARG VITE_SIGNAL_SERVER_URL="http://localhost"
-ENV VITE_SIGNAL_SERVER_URL=${VITE_SIGNAL_SERVER_URL}
+ARG VITE_SIGNAL_SERVER_URL
 
-RUN npm run build
+# If provided, expose it only for the build step; otherwise build with same-origin defaults
+RUN if [ -n "$VITE_SIGNAL_SERVER_URL" ]; then \
+      echo "[build] using VITE_SIGNAL_SERVER_URL=$VITE_SIGNAL_SERVER_URL"; \
+      VITE_SIGNAL_SERVER_URL="$VITE_SIGNAL_SERVER_URL" npm run build; \
+    else \
+      echo "[build] using same-origin signal server"; \
+      npm run build; \
+    fi
 
 # -------- Signal server build --------
 FROM node:20-alpine AS signal-builder
@@ -67,4 +73,3 @@ EXPOSE 80 443
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/entrypoint.sh"]
-
