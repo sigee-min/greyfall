@@ -3,9 +3,8 @@ import { MODEL_OVERRIDES, type ModelRegistryConfig } from './model-config';
 
 export type LlmManagerKind = 'fast' | 'smart';
 type ModelProfile = { id: string; appConfig?: Record<string, unknown> };
-// Curated defaults kept minimal (single per manager when no override is provided)
-const LLAMA31_8B_Q4F16_1: ModelProfile = { id: 'Llama-3.1-8B-Instruct-q4f16_1-MLC' };
-const SMOLLM2_1_7B_Q4F16_1: ModelProfile = { id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC' };
+// Curated defaults (used only when no code/env override provided)
+// fast → Gemma 2 2B IT, smart → Gemma 2 9B IT
 function envOverride(kind: LlmManagerKind): string | null {
   const env = (import.meta as any).env || {};
   const key = kind === 'fast' ? 'VITE_LLM_MODEL_ID_FAST' : 'VITE_LLM_MODEL_ID_SMART';
@@ -28,11 +27,10 @@ function resolveProfiles(kind: LlmManagerKind): ModelProfile[] {
   const override = envOverride(kind);
   if (override) return [{ id: override }];
   if (kind === 'fast') {
-    // Should be overridden by code/env; fallback kept minimal to high-quality
-    return [LLAMA31_8B_Q4F16_1];
+    return [{ id: 'gemma-2-2b-it-q4f16_1-MLC' }];
   }
-  // smart default: high-quality single choice
-  return [LLAMA31_8B_Q4F16_1];
+  // smart default
+  return [{ id: 'gemma-2-9b-it-q4f16_1-MLC' }];
 }
 
 export type ChatOptions = {

@@ -179,4 +179,13 @@ export class HostNetController {
     // record last acknowledged rev per peer/object
     if (peerId) this.ackedRevPerPeer.set(`${peerId}:${id}`, rev);
   }
+
+  // Ingest a locally-originated lobby message (host-initiated requests)
+  ingest(payload: LobbyMessage) {
+    try {
+      this.router.handle(payload);
+    } catch (err) {
+      console.error('[host-controller] ingest failed', err);
+    }
+  }
 }

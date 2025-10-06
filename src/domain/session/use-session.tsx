@@ -235,6 +235,21 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
       // 호스트: 멀티 피어 매니저가 있으면 브로드캐스트
       if (modeRef.current === 'host' && hostPeersRef.current) {
+        // Host-initiated requests should be ingested locally (router handles and broadcasts authoritative updates)
+        const hostHandledKinds = new Set<string>([
+          'chat:append:request',
+          'field:move:request',
+          'map:travel:propose',
+          'map:travel:vote',
+          'map:travel:cancel',
+          'interact:invite',
+          'interact:accept',
+          'interact:cancel'
+        ]);
+        if (hostHandledKinds.has(kind as string)) {
+          hostControllerRef.current?.ingest(envelope);
+          return true;
+        }
         hostPeersRef.current.sendAll(envelope);
         if (kind === 'llm:progress' || context === 'llm-progress') {
           console.debug('[lobby] broadcast', { context, kind });
