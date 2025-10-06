@@ -19,7 +19,6 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
   const startedRef = useRef(false);
   const [seq, setSeq] = useState(0);
   const lastUpdateAtRef = useRef<number | null>(null);
-  const attemptsRef = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -57,22 +56,15 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
           }
           lastUpdateAtRef.current = Date.now();
         });
-        // Active probe to avoid proxy timing race
+        // Active probe to avoid proxy timing race (single check; no auto-retries)
         if (!(await probeChatApiActive(1200))) {
           setStatus('헬스 체크 중…');
-          // Try a few short retries with slight progress bumps to keep UI lively
-          for (let i = 0; i < 5; i++) {
-            await new Promise((r) => setTimeout(r, 300));
-            setProgress((prev) => Math.min(0.985, (prev ?? 0) + 0.005));
-            if (await probeChatApiActive(750)) break;
-          }
         }
 
         if (cancelled) return;
         setReady(true);
         setProgress(null); // 완료 시 바 숨김
         setStatus(null);
-        attemptsRef.current = 0;
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -89,35 +81,6 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
     };
   }, [enabled, manager, seq]);
 
-  // Watchdog: 진행 업데이트가 오래 없으면 자동 재시도(최대 2회)
-  useEffect(() => {
-    if (!enabled) return;
-    if (ready || error) return;
-    const id = window.setInterval(() => {
-      const last = lastUpdateAtRef.current;
-      if (!startedRef.current) return;
-      if (last == null) return;
-      const elapsed = Date.now() - last;
-      if (elapsed > 30000 && attemptsRef.current < 2) {
-        // 30초 이상 진전이 없으면 재시도
-        attemptsRef.current += 1;
-        setStatus('진행이 지연되어 재시도합니다…');
-        // 동적 임포트 스코프 바깥이므로 비동기로 호출
-        void (async () => {
-          try {
-            const mod = await import('../../llm/webllm-engine');
-            mod.resetEngine();
-          } catch {
-            // ignore
-          }
-        })();
-        startedRef.current = false;
-        setProgress(0);
-        setSeq((n) => n + 1);
-      }
-    }, 5000);
-    return () => window.clearInterval(id);
-  }, [enabled, ready, error]);
-
+  
   return { ready, progress, status, error };
 }

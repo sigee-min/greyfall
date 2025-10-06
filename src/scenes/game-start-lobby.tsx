@@ -111,10 +111,7 @@ export function GameStartLobby({
     return () => window.clearInterval(id);
   }, [llmProgress, llmReady, llmError]);
 
-  const secondsSinceUpdate = useMemo(() => {
-    if (lastLlmUpdateAt == null) return null;
-    return Math.floor((Date.now() - lastLlmUpdateAt) / 1000);
-  }, [lastLlmUpdateAt, tick]);
+  // elapsed time tracking no longer used for auto-stall warnings/retries
 
   // Host broadcasts progress; guests subscribe and display
   const remote = useReceiveLlmProgress({ register: registerLobbyHandler });
@@ -139,7 +136,6 @@ export function GameStartLobby({
   const uiError = mode === 'host' ? llmError : remote.error;
 
   const isActiveLoading = !uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus));
-  const isStalled = isActiveLoading && (secondsSinceUpdate ?? 0) > 20;
 
   const mapLlmUiText = (text: string | null | undefined) => {
     // 엔진에서 제공하는 원문(progress.text)을 그대로 표시합니다.
@@ -448,29 +444,25 @@ export function GameStartLobby({
       </div>
 
       {(isActiveLoading || uiError) && (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 w-[min(320px,90vw)] -translate-x-1/2 rounded-lg border border-border/60 bg-card/80 px-4 py-3 text-xs text-muted-foreground shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 w-[min(360px,92vw)] -translate-x-1/2 rounded-lg border border-border/60 bg-card/80 px-4 py-3 text-xs text-muted-foreground shadow-lg backdrop-blur text-center">
           <p className="font-semibold text-foreground">
             {displayStatus}
           </p>
           {uiError ? (
             <p className="mt-1 text-[11px] text-destructive">{uiError}</p>
           ) : (
-            <div className="mt-2 flex items-center gap-2">
-              <div className="h-1.5 w-full flex-1 overflow-hidden rounded-full bg-border/50">
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <div className="h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-border/50">
                 <div
                   className="h-full rounded-full bg-primary transition-[width] duration-300"
                   style={{ width: `${uiProgressPercent ?? 0}%` }}
                 />
               </div>
-              <span className="min-w-[2.5rem] text-right text-[11px] tabular-nums">{uiProgressPercent ?? 0}%</span>
+              <span className="min-w-[2.5rem] text-center text-[11px] tabular-nums">{uiProgressPercent ?? 0}%</span>
             </div>
           )}
           
-          {isStalled && (
-            <div className="mt-2 flex items-center justify-between">
-              <p className="text-[11px]">작업이 오래 걸릴 수 있습니다…</p>
-            </div>
-          )}
+          {/* Stalled warning removed per requirements */}
 
         </div>
       )}
