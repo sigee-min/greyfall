@@ -140,18 +140,35 @@ export function GameStartLobby({
 
   const isActiveLoading = !uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus));
 
-  const mapLlmUiText = (text: string | null | undefined) => {
-    // 엔진에서 제공하는 원문(progress.text)을 그대로 표시합니다.
-    // 값이 없을 때만 간단한 기본 문구로 대체합니다.
-    if (!text || !String(text).trim()) return t('common.loading');
+  const mapLlmUiText = (text: string | null | undefined, percent: number | null) => {
+    const fallback = t('common.loading');
+    const raw = (text ?? '').toLowerCase();
+    const pct = percent == null ? null : Math.max(0, Math.min(100, percent));
+    const withPct = (label: string) => (pct == null ? `${label}…` : `${label} ${pct}%`);
+    if (!raw.trim()) return fallback;
+    if (raw.includes('다운로드')) return withPct('모델 다운로드 중');
+    if (raw.includes('라이브러리 로드') || /model lib|library|wasm/.test(raw)) return withPct('모델 라이브러리 로딩 중');
+    if (raw.includes('컴파일') || /compile|kernel|graph/.test(raw)) return withPct('그래프 컴파일 중');
+    if (raw.includes('채팅 api 준비 완료')) return '채팅 API 준비 완료';
+    if (raw.includes('채팅 api 준비')) return '채팅 API 준비 중…';
+    if (raw.includes('엔진 초기화 완료')) return '엔진 초기화 완료';
+    if (raw.includes('헬스 체크')) return '헬스 체크 중…';
+    // Fallback to engine-provided text (위 라벨에 매칭되지 않는 경우)
     return String(text);
   };
 
   const displayStatus = useMemo(() => {
     if (uiError) return uiError;
-    const base = mapLlmUiText(uiStatus);
+    // uiProgressPercent is defined below; compute here via local snapshot to avoid TDZ
+    const currentPercent = (() => {
+      if (!(!uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus)))) return null;
+      if (mode === 'host') return progressPercent;
+      if (uiProgress == null) return null;
+      return Math.round(Math.min(1, Math.max(0, uiProgress)) * 100);
+    })();
+    const base = mapLlmUiText(uiStatus, currentPercent);
     return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
-  }, [uiError, uiStatus, isActiveLoading, tick]);
+  }, [uiError, uiStatus, isActiveLoading, tick, uiProgress, uiReady, mode, progressPercent]);
 
   const uiProgressPercent = useMemo(() => {
     if (!isActiveLoading) return null;
