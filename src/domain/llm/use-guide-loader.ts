@@ -79,7 +79,14 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         });
         // Active probe to avoid proxy timing race (single check; no auto-retries)
         if (!(await probeChatApiActive(1200))) {
-          setStatus('헬스 체크 중…');
+          const note = '헬스 체크 중…';
+          setHistory((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (note !== last) next.push(note);
+            return next.slice(-8);
+          });
+          // Keep last meaningful status text; do not override status to avoid UI appearing stuck
         }
 
         if (cancelled) return;

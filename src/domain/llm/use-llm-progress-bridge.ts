@@ -19,14 +19,16 @@ export function useBroadcastLlmProgress(options: {
   const lastSentRef = useRef<LlmProgressPayload>({});
   const lastAtRef = useRef(0);
 
-  // Only emit when values actually change (shallow compare) and throttle bursts
+  // Only emit when values actually change (shallow compare) and throttle bursts,
+  // but always send immediately on status/ready/error changes to avoid UI stuck.
   useEffect(() => {
     if (!enabled) return;
     const now = Date.now();
 
     const changed = hasDiff(lastSentRef.current, payload);
     const elapsed = now - lastAtRef.current;
-    const mustSend = changed && (elapsed >= throttleMs || Boolean(payload.ready) || Boolean(payload.error));
+    const statusChanged = lastSentRef.current.status !== payload.status;
+    const mustSend = changed && (elapsed >= throttleMs || Boolean(payload.ready) || Boolean(payload.error) || statusChanged);
     if (!mustSend) return;
 
     const ok = publish('llm:progress', normalizePayload(payload), 'llm-progress');
