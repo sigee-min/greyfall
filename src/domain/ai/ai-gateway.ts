@@ -6,6 +6,7 @@ import { summariseAllowed, buildTwoPhaseCmdPrompt, buildTwoPhaseBodyPrompt, buil
 import { ensureRuntimeReady, generateWithTimeout } from './gateway/llm-exec';
 import { markFirstGenDone } from './gateway/state';
 import type { AIGatewayParams } from './gateway/types';
+import { normaliseCmdAlias } from './gateway/aliases';
 
 export async function requestAICommand(params: AIGatewayParams): Promise<AICommand> {
   const {
@@ -50,9 +51,11 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
         timeoutMs: Math.min(10_000, Math.max(2_000, (timeoutMs ?? effectiveTimeout) / 3))
       });
       const chosen = parseAICommand(rawCmd);
-      if (!chosen || !allowedSet.has(chosen.cmd)) continue;
+      if (!chosen) continue;
+      const selectedCmd = normaliseCmdAlias(chosen.cmd, allowedSet);
+      if (!allowedSet.has(selectedCmd)) continue;
 
-      const sysBody = buildTwoPhaseBodyPrompt(chosen.cmd);
+      const sysBody = buildTwoPhaseBodyPrompt(selectedCmd);
       const rawBody = await generateWithTimeout(user, {
         systemPrompt: sysBody,
         temperature,
@@ -60,7 +63,13 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
         timeoutMs: Math.min(14_000, Math.max(3_000, (timeoutMs ?? effectiveTimeout) / 2))
       });
       const out = parseAICommand(rawBody);
-      if (!out || !allowedSet.has(out.cmd)) continue;
+      if (!out) continue;
+      const outCmd = normaliseCmdAlias(out.cmd, allowedSet);
+      if (!allowedSet.has(outCmd)) continue;
+      // If cmd was normalised, preserve corrected cmd for scoring/return
+      if (outCmd !== out.cmd) {
+        out.cmd = outCmd;
+      }
 
       const { sys: sysScore, user: userScore } = buildScorePrompts(allowedCmdsText, user, JSON.stringify(out));
       const scoredRaw = await generateWithTimeout(userScore, {
