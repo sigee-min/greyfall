@@ -1,5 +1,14 @@
 import { CreateWebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { MODEL_OVERRIDES, type ModelRegistryConfig } from './model-config';
+import { getActiveModelPreset } from './engine-selection';
+import {
+  loadCpuEngineByManager,
+  ensureCpuReady,
+  generateCpuChat,
+  probeCpuActive,
+  resetCpuEngine,
+  isCpuInitialised
+} from './cpu/cpu-engine';
 
 export type LlmManagerKind = 'fast' | 'smart';
 type ModelProfile = { id: string; appConfig?: Record<string, unknown> };
@@ -104,10 +113,23 @@ function setEnginePromise(p: Promise<WebLLMEngine> | null) { getState().enginePr
 function getInitialising() { return getState().initialising; }
 function setInitialising(v: boolean) { getState().initialising = v; }
 
+// Backend selection based on active model preset
+export type EngineBackend = 'gpu' | 'cpu';
+function getActiveBackend(): EngineBackend {
+  const preset = getActiveModelPreset();
+  if (preset?.backend === 'cpu') return 'cpu';
+  return 'gpu';
+}
+
 export async function loadEngineByManager(
   manager: LlmManagerKind,
   onProgress?: (report: WebLLMProgress) => void
 ): Promise<WebLLMEngine> {
+  if (getActiveBackend() === 'cpu') {
+    await loadCpuEngineByManager(manager, onProgress as any);
+    // CPU engine does not expose WebLLM API; return a dummy value for typing only.
+    return undefined as unknown as WebLLMEngine;
+  }
   if (typeof window === 'undefined') {
     throw new Error('WebLLM WebGPU runtime is only available in the browser environment.');
   }
@@ -219,9 +241,18 @@ export async function loadEngineByManager(
 }
 
 // Allow UI to force a fresh initialisation attempt if previous one got stuck
-export function resetEngine() { setEnginePromise(null); }
+export function resetEngine() {
+  if (getActiveBackend() === 'cpu') {
+    resetCpuEngine();
+    return;
+  }
+  setEnginePromise(null);
+}
 
 export async function generateChat(prompt: string, options: ChatOptions = {}) {
+  if (getActiveBackend() === 'cpu') {
+    return generateCpuChat(prompt, options);
+  }
   const {
     systemPrompt = 'You are a seasoned guide who offers concise, practical suggestions.',
     temperature = 0.7,
@@ -385,6 +416,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function ensureChatApiReady(timeoutMs = 8000, onProgress?: (report: WebLLMProgress) => void): Promise<void> {
+  if (getActiveBackend() === 'cpu') {
+    await ensureCpuReady(timeoutMs, onProgress as any);
+    return;
+  }
   const eng = await (getEnginePromise() ?? loadEngineByManager('smart'));
   try { onProgress?.({ text: '채팅 API 준비 중', progress: 0.94 }); } catch {}
   try { /* optional emit to shared bus later if needed */ } catch {}
@@ -395,6 +430,9 @@ export async function ensureChatApiReady(timeoutMs = 8000, onProgress?: (report:
 // Actively exercise chat API with a minimal request. Does not trigger initialisation
 // if engine/model haven't been started (returns false instead).
 export async function probeChatApiActive(timeoutMs = 800): Promise<boolean> {
+  if (getActiveBackend() === 'cpu') {
+    return probeCpuActive(timeoutMs);
+  }
   const pending = getEnginePromise();
   if (!pending) return false;
   try {
@@ -445,6 +483,10 @@ async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T
 }
 // Non-intrusive probe that will NOT trigger engine/model initialisation.
 export async function probeChatApiReady(timeoutMs = 500): Promise<{ initialised: boolean; chatApiReady: boolean }> {
+  if (getActiveBackend() === 'cpu') {
+    const ready = isCpuInitialised();
+    return { initialised: ready, chatApiReady: ready };
+  }
   const pending = getEnginePromise();
   if (!pending) return { initialised: false, chatApiReady: false };
   const race = await Promise.race<
