@@ -5,6 +5,7 @@ import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/cha
 import { useGlobalBus } from '../../bus/global-bus';
 import type { SessionParticipant } from '../../domain/session/types';
 import type { LobbyMessage } from '../../protocol';
+import { useI18n } from '../../i18n';
 
 type Props = {
   localParticipantId: string | null;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function MapMini({ localParticipantId, participants, publish, register }: Props) {
+  const { t } = useI18n();
   const bus = useGlobalBus();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
@@ -40,7 +42,7 @@ export function MapMini({ localParticipantId, participants, publish, register }:
       }
       if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
         const mapName = WORLD_STATIC.maps.find((m) => m.id === b.targetMapId)?.name ?? b.targetMapId;
-        const statusTitle = b.status === 'approved' ? 'Travel Approved' : b.status === 'rejected' ? 'Travel Rejected' : 'Travel Cancelled';
+        const statusTitle = b.status === 'approved' ? t('map.travel.approved') : b.status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
         const statusKind = b.status === 'approved' ? 'success' : b.status === 'rejected' ? 'warning' : 'info';
         bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind as any, durationMs: 2500 });
         setTimeout(() => {
@@ -90,35 +92,35 @@ export function MapMini({ localParticipantId, participants, publish, register }:
   return (
     <div className="rounded-xl border border-border/60 bg-background/70 p-4">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Journey</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{t('map.journey')}</p>
         <div className="flex gap-2">
           {localRole === 'host' && (
             <select
               value={policy}
               onChange={(e) => setPolicy(e.target.value as any)}
               className="rounded-md border border-border/60 bg-background/80 px-2 py-1 text-[11px]"
-              title="Vote policy"
+              title={t('map.vote.policy')}
             >
-              <option value="majority">Majority</option>
-              <option value="all">All</option>
+              <option value="majority">{t('map.vote.majority')}</option>
+              <option value="all">{t('map.vote.all')}</option>
             </select>
           )}
-          <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('prev')}>Prev</button>
-          <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('next')}>Next</button>
+          <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('prev')}>{t('common.prev')}</button>
+          <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('next')}>{t('common.next')}</button>
         </div>
       </div>
       {vote && (
         <div className="mb-3 rounded-md border border-primary/60 bg-primary/10 px-3 py-2 text-xs">
           <div className="flex items-center justify-between">
-            <span>Travel vote → {WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId}</span>
-            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} yes{deadlineAt ? ` · ${Math.max(0, Math.ceil((deadlineAt - now) / 1000))}s` : ''}</span>
+            <span>{t('map.travel.vote')} → {WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId}</span>
+            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} {t('common.yes')}{deadlineAt ? ` · ${Math.max(0, Math.ceil((deadlineAt - now) / 1000))}s` : ''}</span>
           </div>
           {vote.status === 'proposed' && (
             <div className="mt-2 flex gap-2">
-              <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteYes}>Yes</button>
-              <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteNo}>No</button>
+              <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteYes}>{t('common.yes')}</button>
+              <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteNo}>{t('common.no')}</button>
               {localRole === 'host' && (
-                <button className="ml-auto rounded-md border border-destructive/60 px-2 py-1 text-[11px] text-destructive hover:border-destructive hover:bg-destructive/10" onClick={cancelTravel}>Cancel</button>
+                <button className="ml-auto rounded-md border border-destructive/60 px-2 py-1 text-[11px] text-destructive hover:border-destructive hover:bg-destructive/10" onClick={cancelTravel}>{t('common.cancel')}</button>
               )}
             </div>
           )}

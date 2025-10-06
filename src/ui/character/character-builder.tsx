@@ -3,6 +3,7 @@ import { useCharacterStore, type TraitSpec } from '../../store/character';
 import { useGlobalBus } from '../../bus/global-bus';
 import { TRAITS } from '../../domain/character/traits';
 import { cn } from '../../lib/utils';
+import { useI18n } from '../../i18n';
 
 function rollD6(): number { return Math.floor(Math.random() * 6) + 1; }
 
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish }: Props) {
+  const { t: tt } = useI18n();
   const bus = useGlobalBus();
   const built = useCharacterStore((s) => s.built);
   const roll = useCharacterStore((s) => s.roll);
@@ -57,18 +59,18 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
       <div className="w-[min(1080px,96vw)] max-h-[90vh] overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl">
         <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-primary/80">Character Creation</p>
-            <h3 className="text-xl font-semibold">특성 선택</h3>
+            <p className="text-xs uppercase tracking-[0.35em] text-primary/80">{tt('char.subtitle')}</p>
+            <h3 className="text-xl font-semibold">{tt('char.title')}</h3>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="rounded-md border border-border/60 px-2 py-1">주사위: {roll ? roll.join(' / ') : '—'}</span>
-            <span className="rounded-md border border-border/60 px-2 py-1">예산: {budget}</span>
-            <span className={cn('rounded-md border px-2 py-1', remaining >= 0 ? 'border-primary text-primary' : 'border-destructive text-destructive')}>남은 포인트: {remaining}</span>
+            <span className="rounded-md border border-border/60 px-2 py-1">{tt('char.roll')}: {roll ? roll.join(' / ') : '—'}</span>
+            <span className="rounded-md border border-border/60 px-2 py-1">{tt('char.budget')}: {budget}</span>
+            <span className={cn('rounded-md border px-2 py-1', remaining >= 0 ? 'border-primary text-primary' : 'border-destructive text-destructive')}>{tt('char.remaining')}: {remaining}</span>
           </div>
         </div>
         <div className="grid max-h-[70vh] grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-3">
           <section className="space-y-3">
-            <h4 className="text-sm font-semibold">스탯</h4>
+            <h4 className="text-sm font-semibold">{tt('char.stats')}</h4>
             <ul className="space-y-2 text-sm">
               {Object.entries(stats).map(([k, v]) => (
                 <li key={k} className="flex items-center justify-between rounded-md border border-border/60 bg-background/60 px-3 py-2">
@@ -77,7 +79,7 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                 </li>
               ))}
             </ul>
-            <h4 className="mt-4 text-sm font-semibold">패시브</h4>
+            <h4 className="mt-4 text-sm font-semibold">{tt('char.passives')}</h4>
             <ul className="space-y-2 text-xs text-muted-foreground">
               {passives.length === 0 && <li className="rounded-md border border-border/60 bg-background/50 px-3 py-2">—</li>}
               {passives.map((p) => (
@@ -90,13 +92,13 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
           </section>
           <section className="col-span-2">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold">특성</h4>
+              <h4 className="text-sm font-semibold">{tt('char.traits')}</h4>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="검색(이름/설명)"
+                  placeholder={tt('char.searchPlaceholder')}
                   className="w-44 rounded-md border border-border/60 bg-background/60 px-2 py-1 text-xs"
                 />
                 <select
@@ -104,9 +106,9 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                   onChange={(e) => setTypeFilter(e.target.value as any)}
                   className="rounded-md border border-border/60 bg-background/60 px-2 py-1 text-xs"
                 >
-                  <option value="all">전체</option>
-                  <option value="positive">보너스</option>
-                  <option value="negative">패널티</option>
+                  <option value="all">{tt('char.filter.all')}</option>
+                  <option value="positive">{tt('char.filter.positive')}</option>
+                  <option value="negative">{tt('char.filter.negative')}</option>
                 </select>
               </div>
             </div>
@@ -118,7 +120,7 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                   <div key={t.id} className={cn('rounded-xl border px-4 py-3', picked ? 'border-primary bg-primary/10' : willExceed ? 'border-border/60 opacity-60' : 'border-border/60 bg-background/60')}>
                     <div className="mb-1 flex items-center justify-between">
                       <div className="text-sm font-semibold">{t.name}</div>
-                      <div className={cn('text-xs', t.cost >= 0 ? 'text-primary' : 'text-emerald-400')}>{t.cost >= 0 ? `- ${t.cost}` : `+ ${Math.abs(t.cost)}`} pts</div>
+                      <div className={cn('text-xs', t.cost >= 0 ? 'text-primary' : 'text-emerald-400')}>{t.cost >= 0 ? `- ${t.cost}` : `+ ${Math.abs(t.cost)}`} {tt('char.pts')}</div>
                     </div>
                     <p className="text-xs text-muted-foreground">{t.description}</p>
                     {t.statMods && (
@@ -126,9 +128,9 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                     )}
                     <div className="mt-2 flex justify-end">
                       {picked ? (
-                        <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-destructive hover:text-destructive" onClick={() => remove(t.id)}>Remove</button>
+                        <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-destructive hover:text-destructive" onClick={() => remove(t.id)}>{tt('common.remove')}</button>
                       ) : (
-                        <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" disabled={willExceed} onClick={() => add(t)}>Add</button>
+                        <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" disabled={willExceed} onClick={() => add(t)}>{tt('common.add')}</button>
                       )}
                     </div>
                   </div>
@@ -138,9 +140,9 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
           </section>
         </div>
         <div className="flex items-center justify-between border-t border-border/60 px-6 py-4">
-          <div className="text-xs text-muted-foreground">특성은 세션 중 일부 교체 기회가 생길 수 있습니다.</div>
+          <div className="text-xs text-muted-foreground">{tt('char.note')}</div>
           <div className="flex items-center gap-3">
-            <button className="rounded-md border border-border/60 px-3 py-2 text-xs hover:border-destructive hover:text-destructive" onClick={onClose}>나중에</button>
+            <button className="rounded-md border border-border/60 px-3 py-2 text-xs hover:border-destructive hover:text-destructive" onClick={onClose}>{tt('common.later')}</button>
             <button
               disabled={!canFinalize}
               className={cn('rounded-md border px-3 py-2 text-xs', canFinalize ? 'border-primary text-primary hover:bg-primary/10' : 'cursor-not-allowed opacity-50')}
@@ -151,14 +153,14 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                   const s = Object.entries(stats).map(([k, v]) => `${k}:${v}`).join(', ');
                   const traitNames = selected.map((t) => t.name).join(', ') || '—';
                   const passiveNames = passives.map((p) => p.name).join(', ') || '—';
-                  const body = `캐릭터 확정 — ${playerName}\n스탯: ${s}\n특성: ${traitNames}\n패시브: ${passiveNames}`;
+                  const body = tt('char.broadcast', { playerName, stats: s, traits: traitNames, passives: passiveNames });
                   if (localParticipantId) publish('chat:append:request' as any, { body, authorId: localParticipantId } as any, 'character:finalized');
-                  bus.publish('toast:show', { title: 'Character Ready', message: playerName, status: 'success', durationMs: 2500 });
+                  bus.publish('toast:show', { title: tt('char.ready'), message: playerName, status: 'success', durationMs: 2500 });
                 } catch {}
                 onClose();
               }}
             >
-              확정
+              {tt('common.confirm')}
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { WORLD_STATIC } from '../../domain/world/data';
+import { useI18n } from '../../i18n';
 import { worldPositionsClient } from '../../domain/net-objects/world-positions-client';
 import type { PublishLobbyMessage } from '../../domain/chat/use-lobby-chat';
 import type { SessionParticipant } from '../../domain/session/types';
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function FieldGraph({ localParticipantId, participants, publish }: Props) {
+  const { t } = useI18n();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
 
@@ -39,7 +41,7 @@ export function FieldGraph({ localParticipantId, participants, publish }: Props)
   return (
     <div className="rounded-xl border border-border/60 bg-background/70 p-4">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Map</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{t('map.title')}</p>
         <span className="text-sm font-semibold">{map.name}</span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -64,10 +66,7 @@ export function FieldGraph({ localParticipantId, participants, publish }: Props)
           );
         })}
       </div>
-      <div className="mt-3 text-[11px] text-muted-foreground">
-        같은 필드에 있는 플레이어만 상호작용 가능합니다.
-      </div>
+      <div className="mt-3 text-[11px] text-muted-foreground">{t('interact.note')}</div>
     </div>
   );
 }
-

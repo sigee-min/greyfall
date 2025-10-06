@@ -6,8 +6,10 @@ import { computeModifiers, type CheckKind } from '../../domain/character/checks'
 import { useGlobalBus } from '../../bus/global-bus';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 import { useGreyfallStore } from '../../store';
+import { useI18n } from '../../i18n';
 
 export function CommandConsole({ publish, localParticipantId }: { publish: <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean; localParticipantId: string | null }) {
+  const { t } = useI18n();
   const appendLog = useGreyfallStore((state) => state.appendLog);
   const [intent, setIntent] = useState('');
   const [choices, setChoices] = useState<CardPrompt & { id: string } | null>(null);
@@ -68,7 +70,7 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
       const summary = `${dieIcon} /roll ${parsed.label} → [${d}] ${parsed.mod >= 0 ? '+' : ''}${parsed.mod} = ${total} ${critIcon}`;
       appendLog({ id: nanoid(6), body: summary });
       if (localParticipantId) publish('chat:append:request' as any, { body: summary, authorId: localParticipantId } as any, 'roll');
-      bus.publish('toast:show', { title: 'Roll', message: summary, status: isCrit ? 'success' : isFail ? 'warning' : 'info', durationMs: 2200, icon: '🎲' });
+      bus.publish('toast:show', { title: t('console.roll'), message: summary, status: isCrit ? 'success' : isFail ? 'warning' : 'info', durationMs: 2200, icon: '🎲' });
       setIntent('');
       return;
     }
@@ -84,9 +86,9 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
     try {
       const response = await requestChoices(prompt);
       setChoices({ ...prompt, id: response.promptId });
-      appendLog({ id: nanoid(6), body: `LLM narrative queued: ${response.narrative}` });
+      appendLog({ id: nanoid(6), body: t('console.queued', { narrative: response.narrative }) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reach local LLM');
+      setError(err instanceof Error ? err.message : t('console.llmFailed'));
     } finally {
       setLoading(false);
     }
@@ -96,11 +98,11 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
     <section className="rounded-xl border border-border bg-card/50">
       <form onSubmit={handleSubmit} className="space-y-3 p-4">
         <header>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.35em] text-muted-foreground">Choice Prompt</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.35em] text-muted-foreground">{t('console.title')}</h2>
         </header>
         <textarea
           className="h-24 w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-          placeholder="Briefly describe the next beat you want the LLM to elaborate."
+          placeholder={t('console.placeholder')}
           value={intent}
           onChange={(event) => setIntent(event.target.value)}
           autoComplete="off"
@@ -113,12 +115,12 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
           className="w-full rounded-md border border-primary bg-primary/90 px-3 py-2 text-sm font-semibold uppercase tracking-[0.3em] text-primary-foreground transition hover:bg-primary"
           disabled={loading}
         >
-          {loading ? 'Aligning...' : 'Request Choices'}
+          {loading ? t('console.aligning') : t('console.request')}
         </button>
         {error && <p className="text-xs text-destructive">{error}</p>}
         {choices && (
           <div className="rounded-md border border-border/50 bg-background/70 p-3 text-xs text-muted-foreground">
-            <p className="font-semibold">Prompt {choices.id}</p>
+            <p className="font-semibold">{t('console.promptId', { id: choices.id })}</p>
             <p>{choices.intent}</p>
           </div>
         )}

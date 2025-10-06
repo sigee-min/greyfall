@@ -291,7 +291,7 @@ export function GameStartLobby({
                             isReady ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
                           )}
                         >
-                          {isReady ? 'Ready' : 'Standby'}
+                          {isReady ? t('ready.status.ready') : t('ready.status.standby')}
                         </span>
                       </li>
                     );
@@ -389,7 +389,7 @@ export function GameStartLobby({
                         });
                       }}
                     >
-                      Copy Answer Code
+                      {t('ready.copyAnswer')}
                     </button>
                   )}
                 </article>

@@ -86,6 +86,7 @@ type WebLLMChatCompat = {
 
 type WebLLMEngine = {
   chat: WebLLMChatCompat;
+  setInitProgressCallback?: (cb?: (report: WebLLMProgress) => void) => void;
 };
 
 // Runtime is provided by the web worker engine; no explicit runtime type/import needed.
@@ -122,7 +123,11 @@ export async function loadEngineByManager(
 
   // Prevent racy double-initialisation under StrictMode/HMR by
   // setting a single shared promise that all callers await.
-  if (getEnginePromise()) return getEnginePromise()!;
+  if (getEnginePromise()) {
+    const eng = await getEnginePromise()!;
+    try { eng.setInitProgressCallback?.((r) => wrappedProgress(r)); } catch {}
+    return eng;
+  }
   if (getInitialising()) {
     // Busy-wait with micro-sleeps until the shared promise is set
     // (should only be a few ms window)
@@ -130,7 +135,9 @@ export async function loadEngineByManager(
       // eslint-disable-next-line no-await-in-loop
       await sleep(5);
     }
-    return getEnginePromise()!;
+    const eng = await getEnginePromise()!;
+    try { eng.setInitProgressCallback?.((r) => wrappedProgress(r)); } catch {}
+    return eng;
   }
   setInitialising(true);
   const attempts = resolveProfiles(manager);

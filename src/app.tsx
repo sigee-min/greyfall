@@ -359,13 +359,13 @@ function App() {
           </div>
           <div className="pointer-events-auto mx-6 mt-6 flex items-center justify-between rounded-2xl border border-border/60 bg-card/70 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/50">
             <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Greyfall Stage</p>
-              <h1 className="text-2xl font-semibold">Lantern Circle Operations Console</h1>
+              <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">{t('stage.brand')}</p>
+              <h1 className="text-2xl font-semibold">{t('lobby.title.line1')} {t('lobby.title.line2')}</h1>
             </div>
             <div className="flex items-center gap-6">
               <div className="flex gap-4 text-sm font-semibold">
-                <span className="text-primary">Glow {resources.glow}</span>
-                <span className="text-destructive">Corruption {resources.corruption}</span>
+                <span className="text-primary">{t('resources.glow')} {resources.glow}</span>
+                <span className="text-destructive">{t('resources.corruption')} {resources.corruption}</span>
               </div>
               <button
                 type="button"

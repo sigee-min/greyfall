@@ -12,6 +12,7 @@ import {
 } from '../../store/preferences';
 import { useI18n } from '../../i18n';
 import type { LocaleKey } from '../../i18n/config';
+import { LanguagePicker } from '../common/language-picker';
 
 const TABS = [
   { key: 'music', label: '음악' },
@@ -135,59 +136,57 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
   if (activeTab === 'controls') {
     tabContent = (
       <div className="space-y-3 rounded-xl border border-dashed border-border/60 bg-card/60 p-6 text-xs text-muted-foreground">
-        <p className="font-semibold text-foreground">컨트롤 설정</p>
-        <p>커스텀 키 바인딩과 단축 키 설정 기능을 준비 중입니다. 곧 조작 키를 원하는 방식으로 변경할 수 있게 됩니다.</p>
+        <p className="font-semibold text-foreground">{t('controls.wip.title')}</p>
+        <p>{t('controls.wip.body')}</p>
       </div>
     );
   } else if (activeTab === 'display') {
     tabContent = (
       <div className="flex flex-col gap-4">
         <OptionToggle
-          label={t('tabs.display') + ' · ' + '전체 화면'}
-          description={"로비, 준비실, 게임 화면을 모두 전체 화면으로 표시합니다."}
+          label={t('display.fullscreen')}
+          description={t('display.fullscreen.desc')}
           checked={fullscreenEnabled}
           onChange={(value) => void applyFullscreen(value)}
         />
-        <OptionSelect
+        <LanguagePicker
           label={t('options.language')}
           description={t('options.language.desc')}
           value={locale}
-          onChange={(value) => setLocale(value as LocaleKey)}
+          onChange={(value: string) => setLocale(value as LocaleKey)}
           options={[
-            { value: 'en', label: t('locale.en') },
-            { value: 'ko', label: t('locale.ko') }
+            { value: 'en', label: 'english' },
+            { value: 'ko', label: '한국어' }
           ]}
         />
-        <p className="rounded-lg border border-border/60 bg-card/50 px-4 py-3 text-xs text-muted-foreground">
-          브라우저에서 Esc 키로 직접 전체 화면을 종료하거나 다시 진입하면 이 설정이 자동으로 동기화됩니다.
-        </p>
+        <p className="rounded-lg border border-border/60 bg-card/50 px-4 py-3 text-xs text-muted-foreground">{t('display.fullscreen.note')}</p>
       </div>
     );
   } else {
     tabContent = (
       <div className="flex flex-col gap-4">
         <OptionToggle
-          label={t('tabs.music') + ' · ' + '배경 음악'}
-          description={'로비와 임무 중 ambience 음악을 재생합니다.'}
+          label={t('music.bgm')}
+          description={t('music.bgm.desc')}
           checked={musicEnabled}
           onChange={handleMusicToggle}
         />
         <OptionSlider
-          label={'배경 음악 음량'}
-          description={'0%로 설정하면 음악이 들리지 않습니다.'}
+          label={t('music.bgm.volume')}
+          description={t('music.bgm.volume.desc')}
           value={Math.round(musicVolumeDraft * 100)}
           onChange={handleMusicVolumeChange}
           disabled={!musicEnabled}
         />
         <OptionToggle
-          label={'효과음'}
-          description={'버튼 클릭과 알림 등 UI 효과음을 재생합니다.'}
+          label={t('sfx.title')}
+          description={t('sfx.desc')}
           checked={sfxEnabled}
           onChange={(value) => setPreference('sfxEnabled', value)}
         />
         <OptionSlider
-          label={'효과음 음량'}
-          description={'UI 효과음 및 상호작용 사운드의 크기를 조절합니다.'}
+          label={t('sfx.volume')}
+          description={t('sfx.volume.desc')}
           value={Math.round(sfxVolume * 100)}
           onChange={(value) => setPreference('sfxVolume', value / 100)}
           disabled={!sfxEnabled}
@@ -204,7 +203,7 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
             <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">{t('options.subtitle')}</p>
             <h2 className="text-2xl font-semibold">{t('options.title')}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              현재 씬: {scene === 'mainLobby' ? '로비' : scene === 'startLobby' ? '게임 준비실' : '작전 현장'}
+              {t('options.scene.current')}: {scene === 'mainLobby' ? t('scene.mainLobby') : scene === 'startLobby' ? t('scene.startLobby') : t('scene.game')}
             </p>
           </div>
           <button
