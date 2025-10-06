@@ -154,6 +154,13 @@ export function GameStartLobby({
     return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
   }, [uiError, uiStatus, isActiveLoading, tick]);
 
+  const uiProgressPercent = useMemo(() => {
+    if (!isActiveLoading) return null;
+    if (mode === 'host') return progressPercent;
+    if (uiProgress == null) return null;
+    return Math.round(Math.min(1, Math.max(0, uiProgress)) * 100);
+  }, [isActiveLoading, mode, progressPercent, uiProgress]);
+
   // 심판자 로드 완료 시, AI 명령(chat)으로 1회 합류 알림 전송 (폴링 제거)
   useEffect(() => {
     if (mode !== 'host') return;
@@ -448,11 +455,14 @@ export function GameStartLobby({
           {uiError ? (
             <p className="mt-1 text-[11px] text-destructive">{uiError}</p>
           ) : (
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border/50">
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-300"
-                style={{ width: `${(mode === 'host' ? progressPercent : uiProgress == null ? 0 : Math.round(Math.min(1, Math.max(0, uiProgress)) * 100)) ?? 0}%` }}
-              />
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1.5 w-full flex-1 overflow-hidden rounded-full bg-border/50">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-300"
+                  style={{ width: `${uiProgressPercent ?? 0}%` }}
+                />
+              </div>
+              <span className="min-w-[2.5rem] text-right text-[11px] tabular-nums">{uiProgressPercent ?? 0}%</span>
             </div>
           )}
           
