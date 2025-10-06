@@ -3,7 +3,7 @@ import React from 'react';
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSelect: (manager: 'hasty' | 'fast' | 'smart') => void;
+  onSelect: (manager: 'fast' | 'smart') => void;
 };
 
 export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
@@ -25,22 +25,7 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
           </button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          <button
-            type="button"
-            className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
-            onClick={() => onSelect('hasty')}
-          >
-            <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:-rotate-3 group-hover:scale-110">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                <path fill="currentColor" d="M12 2l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"/>
-              </svg>
-            </span>
-            <span>
-              <p className="text-sm font-semibold text-foreground">Hasty</p>
-              <p className="mt-1 text-xs text-muted-foreground">가벼운 모델(즉시 응답)</p>
-            </span>
-          </button>
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
           <button
             type="button"
             className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"

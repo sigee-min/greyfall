@@ -13,7 +13,6 @@ export function resolveGatewayConfig(
   const envTimeout = Number(env?.VITE_LLM_TIMEOUT_MS);
   const defaultTimeout = (() => {
     if (Number.isFinite(envTimeout) && envTimeout! > 0) return Math.min(120_000, Math.max(5_000, envTimeout!));
-    if (manager === 'hasty') return 35_000;
     if (manager === 'fast') return 45_000;
     return 60_000;
   })();
@@ -30,4 +29,3 @@ export function resolveGatewayConfig(
 
   return { maxTokens, effectiveTimeout, coldStartTimeout, useTwoPhase };
 }
-

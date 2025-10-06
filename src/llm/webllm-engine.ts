@@ -1,14 +1,14 @@
 import { CreateWebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { MODEL_OVERRIDES, type ModelRegistryConfig } from './model-config';
 
-export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
+export type LlmManagerKind = 'fast' | 'smart';
 type ModelProfile = { id: string; appConfig?: Record<string, unknown> };
 // Curated defaults kept minimal (single per manager when no override is provided)
 const LLAMA31_8B_Q4F16_1: ModelProfile = { id: 'Llama-3.1-8B-Instruct-q4f16_1-MLC' };
 const SMOLLM2_1_7B_Q4F16_1: ModelProfile = { id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC' };
 function envOverride(kind: LlmManagerKind): string | null {
   const env = (import.meta as any).env || {};
-  const key = kind === 'hasty' ? 'VITE_LLM_MODEL_ID_HASTY' : kind === 'fast' ? 'VITE_LLM_MODEL_ID_FAST' : 'VITE_LLM_MODEL_ID_SMART';
+  const key = kind === 'fast' ? 'VITE_LLM_MODEL_ID_FAST' : 'VITE_LLM_MODEL_ID_SMART';
   const id = env?.[key];
   return typeof id === 'string' && id.trim() ? id.trim() : null;
 }
@@ -27,10 +27,6 @@ function resolveProfiles(kind: LlmManagerKind): ModelProfile[] {
   // 2) Env override (still supported)
   const override = envOverride(kind);
   if (override) return [{ id: override }];
-  if (kind === 'hasty') {
-    // Low-cost default only
-    return [SMOLLM2_1_7B_Q4F16_1];
-  }
   if (kind === 'fast') {
     // Should be overridden by code/env; fallback kept minimal to high-quality
     return [LLAMA31_8B_Q4F16_1];

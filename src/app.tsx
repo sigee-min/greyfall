@@ -50,7 +50,7 @@ function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [developerOpen, setDeveloperOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
-  const [selectedManager, setSelectedManager] = useState<'hasty' | 'fast' | 'smart'>('smart');
+  const [selectedManager, setSelectedManager] = useState<'fast' | 'smart'>('smart');
   const [playerName, setPlayerName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const preferencesLoaded = usePreferencesStore(selectPreferencesLoaded);
@@ -201,7 +201,7 @@ function App() {
   );
 
   const handleManagerSelect = useCallback(
-    async (manager: 'hasty' | 'fast' | 'smart') => {
+    async (manager: 'fast' | 'smart') => {
       setSelectedManager(manager);
       setManagerOpen(false);
       try {
