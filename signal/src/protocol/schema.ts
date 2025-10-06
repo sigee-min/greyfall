@@ -192,7 +192,8 @@ const lobbyLlmProgressSchema = lobbyEnvelopeSchema.extend({
       ready: z.boolean().optional(),
       progress: z.number().min(0).max(1).nullable().optional(),
       status: z.string().min(1).nullable().optional(),
-      error: z.string().min(1).nullable().optional()
+      error: z.string().min(1).nullable().optional(),
+      history: z.array(z.string().min(1)).max(16).optional()
     })
     .strict()
 });

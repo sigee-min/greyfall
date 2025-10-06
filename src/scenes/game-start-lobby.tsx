@@ -449,7 +449,7 @@ export function GameStartLobby({
           displayText={displayStatus}
           error={uiError}
           progressPercent={uiProgressPercent}
-          history={mode === 'host' ? llmHistory : undefined}
+          history={mode === 'host' ? llmHistory : remote.history}
         />
       )}
 

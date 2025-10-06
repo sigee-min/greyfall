@@ -6,6 +6,7 @@ export type LlmProgressPayload = {
   progress?: number | null;
   status?: string | null;
   error?: string | null;
+  history?: string[];
 };
 
 export function useBroadcastLlmProgress(options: {
@@ -38,11 +39,12 @@ export function useBroadcastLlmProgress(options: {
 
 export function useReceiveLlmProgress(options: { register: RegisterLobbyHandler }) {
   const { register } = options;
-  const [state, setState] = useState<Required<LlmProgressPayload>>({
+  const [state, setState] = useState<Required<Omit<LlmProgressPayload, 'history'>> & { history: string[] }>({
     ready: false,
     progress: null,
     status: null,
-    error: null
+    error: null,
+    history: []
   });
 
   useEffect(() => {
@@ -52,7 +54,8 @@ export function useReceiveLlmProgress(options: { register: RegisterLobbyHandler 
         ready: body.ready ?? prev.ready,
         progress: typeof body.progress === 'number' || body.progress === null ? body.progress : prev.progress,
         status: typeof body.status === 'string' || body.status === null ? body.status : prev.status,
-        error: typeof body.error === 'string' || body.error === null ? body.error : prev.error
+        error: typeof body.error === 'string' || body.error === null ? body.error : prev.error,
+        history: Array.isArray(body.history) ? body.history : prev.history
       }));
     });
   }, [register]);
@@ -72,4 +75,3 @@ function normalizePayload(p: LlmProgressPayload): LlmProgressPayload {
   if ('error' in p) out.error = p.error ?? null;
   return out;
 }
-
