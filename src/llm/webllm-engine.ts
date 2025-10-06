@@ -1,7 +1,8 @@
 import { CreateWebWorkerMLCEngine } from '@mlc-ai/web-llm';
+import { MODEL_OVERRIDES, type ModelRegistryConfig } from './model-config';
 
 export type LlmManagerKind = 'hasty' | 'fast' | 'smart';
-type ModelProfile = { id: string };
+type ModelProfile = { id: string; appConfig?: Record<string, unknown> };
 // Curated models (Qwen removed):
 // - High tier: Llama 3.1 8B Instruct (q4f16_1)
 // - Mid tier: Llama 3.2 3B Instruct (q4f16_1)
@@ -16,7 +17,18 @@ function envOverride(kind: LlmManagerKind): string | null {
   return typeof id === 'string' && id.trim() ? id.trim() : null;
 }
 
+function codeOverride(kind: LlmManagerKind): ModelProfile[] | null {
+  const cfg: ModelRegistryConfig | undefined = MODEL_OVERRIDES[kind];
+  if (!cfg || !cfg.ids || cfg.ids.length === 0) return null;
+  const appConfig = cfg.appConfig;
+  return cfg.ids.map((id) => ({ id, appConfig }));
+}
+
 function resolveProfiles(kind: LlmManagerKind): ModelProfile[] {
+  // 1) Code-level override wins
+  const code = codeOverride(kind);
+  if (code && code.length > 0) return code;
+  // 2) Env override (still supported)
   const override = envOverride(kind);
   if (override) return [{ id: override }];
   if (kind === 'hasty') {
@@ -175,10 +187,15 @@ export async function loadEngineByManager(
         worker.addEventListener('messageerror', (ev) => {
           console.error('[webllm] worker messageerror', ev);
         });
+        const options: Record<string, unknown> = { initProgressCallback: wrappedProgress };
+        if (profile.appConfig) {
+          options.appConfig = profile.appConfig;
+          if (debug) console.info('[webllm] using custom appConfig');
+        }
         const eng = (await (CreateWebWorkerMLCEngine(
           worker as unknown as Worker,
           profile.id,
-          { initProgressCallback: wrappedProgress }
+          options as any
         ) as any)) as WebLLMEngine;
         console.info('[webllm] model initialised', { id: profile.id });
         try { onProgress?.({ text: '엔진 초기화 완료', progress: Math.max(0.92, (lastP || 0)) }); } catch {}

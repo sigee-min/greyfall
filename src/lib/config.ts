@@ -1,15 +1,24 @@
-const rawSignalUrl = (import.meta.env.VITE_SIGNAL_SERVER_URL as string | undefined) ?? 'http://localhost:8787';
+// If VITE_SIGNAL_SERVER_URL is provided, use that absolute origin.
+// Otherwise, default to same-origin with HTTP under /api and WS under /ws.
+const explicitSignalOrigin = (import.meta.env.VITE_SIGNAL_SERVER_URL as string | undefined)?.replace(/\/$/, '') ?? null;
 
-const normalisedSignalUrl = rawSignalUrl.replace(/\/$/, '');
+export const SIGNAL_SERVER_HTTP_URL = explicitSignalOrigin; // may be null when using same-origin proxy
+export const SIGNAL_SERVER_ENABLED = true; // same-origin proxy is available by default
 
-export const SIGNAL_SERVER_HTTP_URL = normalisedSignalUrl;
-export const SIGNAL_SERVER_ENABLED = Boolean(normalisedSignalUrl);
+export function buildSignalHttpUrl(path: string) {
+  const suffix = path.startsWith('/') ? path : `/${path}`;
+  if (explicitSignalOrigin) return `${explicitSignalOrigin}${suffix}`;
+  return `/api${suffix}`;
+}
 
 export function buildSignalWsUrl(sessionId: string, role: 'host' | 'guest') {
-  if (!SIGNAL_SERVER_HTTP_URL) {
-    throw new Error('Signal server URL is not configured');
+  let base: URL;
+  if (explicitSignalOrigin) {
+    base = new URL(explicitSignalOrigin);
+  } else {
+    // same-origin
+    base = new URL(window.location.origin);
   }
-  const base = new URL(SIGNAL_SERVER_HTTP_URL);
   base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
   base.pathname = '/ws';
   base.searchParams.set('session', sessionId);

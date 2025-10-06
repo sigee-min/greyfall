@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { SIGNAL_SERVER_ENABLED, SIGNAL_SERVER_HTTP_URL, buildSignalWsUrl } from '../../lib/config';
+import { SIGNAL_SERVER_ENABLED, buildSignalWsUrl, buildSignalHttpUrl } from '../../lib/config';
 import { createSignalClientMessage, parseSignalServerMessage, type SignalClientBodies } from '../../protocol';
 import type { SessionMode } from './types';
 
@@ -195,15 +195,11 @@ export function isLikelySignalCode(code: string) {
 }
 
 export async function requestSignalSessionId() {
-  if (!SIGNAL_SERVER_HTTP_URL) {
-    throw new Error('Signal server unavailable');
-  }
-  const response = await fetch(`${SIGNAL_SERVER_HTTP_URL}/sessions`, { method: 'POST' });
+  const response = await fetch(buildSignalHttpUrl('/sessions'), { method: 'POST' });
   if (!response.ok) {
     throw new Error(`Failed to create signal session (${response.status})`);
   }
   const json = (await response.json()) as { sessionId: string };
   return json.sessionId.toUpperCase();
 }
-
-export const SIGNAL_SERVER_AVAILABLE = SIGNAL_SERVER_ENABLED && Boolean(SIGNAL_SERVER_HTTP_URL);
+export const SIGNAL_SERVER_AVAILABLE = SIGNAL_SERVER_ENABLED;
