@@ -18,25 +18,34 @@ export type ModelRegistryConfig = {
 };
 
 export const MODEL_OVERRIDES: Partial<Record<LlmManagerKind, ModelRegistryConfig>> = {
-  // Pin the 'fast' manager to Gemma 3 4B IT (q4bf16_1) hosted on Hugging Face
-  // Ref: https://huggingface.co/mlc-ai/gemma-3-4b-it-q4bf16_1-MLC
+  // fast → Gemma 2 2B Instruct (q4f16_1)
   fast: {
-    ids: ['gemma-3-4b-it-q4bf16_1-MLC'],
+    ids: ['gemma-2-2b-it-q4f16_1-MLC'],
     appConfig: {
       useIndexedDBCache: false,
       model_list: [
         {
-          // Hugging Face repository for the model artifacts
-          model: 'https://huggingface.co/mlc-ai/gemma-3-4b-it-q4bf16_1-MLC',
-          // The model id WebLLM will use
-          model_id: 'gemma-3-4b-it-q4bf16_1-MLC',
-          // Prebuilt model library (WASM) compatible with current WebLLM version
+          model: 'https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC',
+          model_id: 'gemma-2-2b-it-q4f16_1-MLC',
           model_lib:
-            'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/gemma-3-4b-it-q4bf16_1-ctx4k_cs1k-webgpu.wasm',
-          // Optional runtime overrides mirrored from mlc-chat-config.json
-          overrides: {
-            context_window_size: 4096
-          }
+            'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+          overrides: { context_window_size: 4096 }
+        }
+      ]
+    }
+  },
+  // smart → Gemma 2 9B Instruct (q4f16_1)
+  smart: {
+    ids: ['gemma-2-9b-it-q4f16_1-MLC'],
+    appConfig: {
+      useIndexedDBCache: false,
+      model_list: [
+        {
+          model: 'https://huggingface.co/mlc-ai/gemma-2-9b-it-q4f16_1-MLC',
+          model_id: 'gemma-2-9b-it-q4f16_1-MLC',
+          model_lib:
+            'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/gemma-2-9b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+          overrides: { context_window_size: 4096 }
         }
       ]
     }
