@@ -198,6 +198,17 @@ const lobbyLlmProgressSchema = lobbyEnvelopeSchema.extend({
     .strict()
 });
 
+// LLM config broadcast (host -> all guests, once per session)
+const lobbyLlmConfigSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('llm:config'),
+  body: z
+    .object({
+      modelId: z.string().min(1),
+      backend: z.enum(['gpu', 'cpu'])
+    })
+    .strict()
+});
+
 // Network object sync (host-authoritative)
 const patchOpSchema = z.object({
   op: z.enum(['set', 'merge', 'insert', 'remove']),
@@ -328,6 +339,7 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyLeaveSchema,
   lobbyChatSchema,
   lobbyLlmProgressSchema,
+  lobbyLlmConfigSchema,
   lobbyObjectPatchSchema,
   lobbyObjectReplaceSchema,
   lobbyObjectRequestSchema,
@@ -355,6 +367,7 @@ export type LobbyMessageBodies = {
   leave: { participantId: string };
   chat: { entry: LobbyChatMessage };
   'llm:progress': { ready?: boolean; progress?: number | null; status?: string | null; error?: string | null };
+  'llm:config': { modelId: string; backend: 'gpu' | 'cpu' };
   'object:patch': { id: string; rev: number; ops: { op: 'set' | 'merge' | 'insert' | 'remove'; path?: string; value?: unknown }[] };
   'object:replace': { id: string; rev: number; value: unknown };
   'object:request': { id: string; sinceRev?: number };
