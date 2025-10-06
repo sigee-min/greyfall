@@ -23,10 +23,20 @@ export const MODEL_OVERRIDES: Partial<Record<LlmManagerKind, ModelRegistryConfig
   fast: {
     ids: ['gemma-3-4b-it-q4bf16_1-MLC'],
     appConfig: {
+      useIndexedDBCache: false,
       model_list: [
         {
+          // Hugging Face repository for the model artifacts
+          model: 'https://huggingface.co/mlc-ai/gemma-3-4b-it-q4bf16_1-MLC',
+          // The model id WebLLM will use
           model_id: 'gemma-3-4b-it-q4bf16_1-MLC',
-          model_url: 'https://huggingface.co/mlc-ai/gemma-3-4b-it-q4bf16_1-MLC/resolve/main/'
+          // Prebuilt model library (WASM) compatible with current WebLLM version
+          model_lib:
+            'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/gemma-3-4b-it-q4bf16_1-ctx4k_cs1k-webgpu.wasm',
+          // Optional runtime overrides mirrored from mlc-chat-config.json
+          overrides: {
+            context_window_size: 4096
+          }
         }
       ]
     }
