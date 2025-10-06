@@ -458,7 +458,7 @@ export function GameStartLobby({
           
           {isStalled && (
             <div className="mt-2 flex items-center justify-between">
-              <p className="text-[11px]">진행이 지연되고 있습니다…</p>
+              <p className="text-[11px]">작업이 오래 걸릴 수 있습니다…</p>
             </div>
           )}
 
