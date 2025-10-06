@@ -48,6 +48,7 @@ type WebLLMProgress = { text?: string; progress?: number };
 type Phase = 'prepare' | 'download' | 'load-lib' | 'compile' | 'engine-ready' | 'chat-ready';
 
 function clamp01(n: number) { return Math.max(0, Math.min(1, n)); }
+function pct(p: number) { return `${Math.round(Math.max(0, Math.min(1, p)) * 100)}%`; }
 function segment(progress: number | undefined, start: number, end: number, last: number): number {
   if (typeof progress === 'number' && !Number.isNaN(progress)) {
     const p = start + clamp01(progress) * (end - start);
@@ -137,6 +138,7 @@ export async function loadEngineByManager(
   const attempts = resolveProfiles(manager);
   const debug = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
   let lastP = 0;
+  try { onProgress?.({ text: '모델 초기화를 시작합니다', progress: 0.02 }); } catch {}
   const wrappedProgress = (report: WebLLMProgress) => {
     try {
       const t = (report.text || '').toLowerCase();
@@ -161,8 +163,13 @@ export async function loadEngineByManager(
         p = segment(report.progress, 0.05, 0.9, lastP);
       }
       lastP = p;
-      onProgress?.({ text, progress: p });
-      if (debug) console.debug('[webllm] progress', { phase, text, p, raw: report });
+      const label =
+        phase === 'download' ? `다운로드 ${pct(p)}` :
+        phase === 'load-lib' ? `라이브러리 로드 ${pct(p)}` :
+        phase === 'compile' ? `컴파일 ${pct(p)}` : `준비 ${pct(p)}`;
+      const uiText = `${text} (${label})`;
+      onProgress?.({ text: uiText, progress: p });
+      if (debug) console.debug('[webllm] progress', { phase, text: uiText, p, raw: report });
     } catch {}
   };
 
