@@ -22,7 +22,7 @@ async function loadOps(): Promise<LlmOps> {
 export async function ensureRuntimeReady(manager: LlmManagerKind): Promise<void> {
   const { loadEngineByManager, ensureChatApiReady, probeChatApiActive } = await loadOps();
   await loadEngineByManager(manager);
-  await ensureChatApiReady(10_000);
+  await ensureChatApiReady(1_800_000);
   // Actively probe minimal call path to avoid racy readiness under worker boundary
   if (!(await probeChatApiActive(1_000))) {
     for (let i = 0; i < 6; i += 1) {
@@ -77,4 +77,3 @@ export async function transientRetryGenerate(
     return await generateWithTimeout(user, { ...opts, timeoutMs: Math.min(12_000, Math.max(1_000, Math.floor(opts.timeoutMs / 2))) });
   }
 }
-

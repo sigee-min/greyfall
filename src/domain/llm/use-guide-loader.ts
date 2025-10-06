@@ -60,7 +60,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
           lastUpdateAtRef.current = Date.now();
         });
         // Ensure chat API is actually callable before reporting ready
-        await ensureChatApiReady(8000, (report: { text?: string; progress?: number }) => {
+        await ensureChatApiReady(1_800_000, (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
           if (report.text) {
             const txt = report.text as string;
