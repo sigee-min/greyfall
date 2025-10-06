@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { cn } from '../lib/utils';
+import { useI18n } from '../i18n';
 import { FallbackBackground } from '../ui/common/fallback-bg';
 import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
@@ -63,10 +64,11 @@ export function GameStartLobby({
   registerLobbyHandler,
   probeChannel
 }: GameStartLobbyProps) {
+  const { t } = useI18n();
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
-  const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError } = useGuideLoader({
+  const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError, history: llmHistory } = useGuideLoader({
     manager: llmManager,
     enabled: mode === 'host'
   });
@@ -140,7 +142,7 @@ export function GameStartLobby({
   const mapLlmUiText = (text: string | null | undefined) => {
     // 엔진에서 제공하는 원문(progress.text)을 그대로 표시합니다.
     // 값이 없을 때만 간단한 기본 문구로 대체합니다.
-    if (!text || !String(text).trim()) return 'Loading…';
+    if (!text || !String(text).trim()) return t('common.loading');
     return String(text);
   };
 
@@ -207,7 +209,7 @@ export function GameStartLobby({
     submitChat();
   };
 
-  const chatPlaceholder = useMemo(() => '메시지를 입력하세요 (Shift+Enter로 줄바꿈)', []);
+  const chatPlaceholder = useMemo(() => t('ready.chat.placeholder'), [t]);
 
   return (
     <div className="relative min-h-screen w-screen overflow-hidden bg-slate-950 text-foreground">
@@ -219,11 +221,9 @@ export function GameStartLobby({
           <div className="mx-auto flex h-full w-full max-w-7xl flex-col gap-10 px-5 sm:px-7 lg:px-12">
             <header className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2 lg:max-w-3xl">
-                <p className="text-xs uppercase tracking-[0.35em] text-primary/80">Greyfall Ready Room</p>
-                <h2 className="text-3xl font-semibold lg:text-4xl xl:text-5xl">{mode === 'host' ? '호스트 대기실' : '접속 대기실'}</h2>
-                <p className="max-w-prose text-sm text-muted-foreground lg:text-base">
-                  모든 플레이어가 준비되면 작전을 시작할 수 있습니다. 팀원 현황과 연결 정보를 확인하고, 오른쪽 버튼으로 채팅을 열어 합류 절차를 안내하세요.
-                </p>
+                <p className="text-xs uppercase tracking-[0.35em] text-primary/80">{t('ready.brand')}</p>
+                <h2 className="text-3xl font-semibold lg:text-4xl xl:text-5xl">{mode === 'host' ? t('ready.header.host') : t('ready.header.guest')}</h2>
+                <p className="max-w-prose text-sm text-muted-foreground lg:text-base">{t('ready.description')}</p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
               <button
@@ -241,15 +241,15 @@ export function GameStartLobby({
                 }}
                 className="rounded-md border border-primary/60 px-3 py-2 text-primary transition hover:bg-primary/10"
               >
-                Lobby Chat
+                {t('ready.chat.open')}
               </button>
                 {onOptions && (
                   <button type="button" onClick={onOptions} className="rounded-md border border-border/60 px-3 py-2 transition hover:border-primary hover:text-primary">
-                    Options
+                    {t('common.options')}
                   </button>
                 )}
                 <button type="button" onClick={onLeave} className="rounded-md border border-border/60 px-3 py-2 transition hover:border-destructive hover:text-destructive">
-                  Leave Lobby
+                  {t('ready.leave')}
                 </button>
               </div>
             </header>
@@ -258,7 +258,7 @@ export function GameStartLobby({
             <section className="grid gap-8 lg:grid-cols-[minmax(0,1.25fr),minmax(380px,460px)]">
               <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">Crew Status</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">{t('ready.crewStatus')}</h3>
                   <span className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">{participants.length}명 연결</span>
                 </div>
                 <ul className="mt-5 space-y-4 text-sm">
@@ -299,7 +299,7 @@ export function GameStartLobby({
                 </ul>
                 {participants.length === 0 && (
                   <p className="mt-6 rounded-lg border border-dashed border-border/70 bg-background/60 px-4 py-5 text-center text-sm text-muted-foreground">
-                    아직 참가자가 없습니다. 합류 코드를 공유해 팀원을 초대해 보세요.
+                    {t('ready.noParticipants')}
                   </p>
                 )}
               </article>
@@ -308,7 +308,7 @@ export function GameStartLobby({
                 <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
                   <header className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                      {mode === 'host' ? 'Share Join Code' : autoConnect ? 'Connection Status' : 'Return Answer Code'}
+                      {mode === 'host' ? t('ready.card.shareJoin') : autoConnect ? t('ready.card.connection') : t('ready.card.returnAnswer')}
                     </h3>
                     {mode === 'host' && (
                       <button
@@ -321,7 +321,7 @@ export function GameStartLobby({
                           );
                         }}
                       >
-                        Copy Code
+                        {t('ready.copyCode')}
                       </button>
                     )}
                   </header>
@@ -331,17 +331,17 @@ export function GameStartLobby({
                       {mode === 'host'
                         ? lobbyCode
                         : autoConnect
-                          ? '호스트가 자동 연결을 처리할 때까지 잠시만 기다려 주세요…'
-                          : answerCode ?? '응답 코드를 생성하는 중입니다.'}
+                          ? t('ready.autoConnect.wait')
+                          : answerCode ?? t('ready.answer.generating')}
                     </div>
                     <p className="text-xs leading-relaxed text-muted-foreground">
                       {mode === 'host'
                         ? autoConnect
-                          ? '이 코드를 공유하면 플레이어가 자동으로 세션에 합류합니다. 제외해야 할 경우에는 즉시 Leave Lobby를 눌러 세션을 종료하세요.'
-                          : '이 코드를 플레이어에게 전달하고, 플레이어가 보내온 응답 코드를 아래에 붙여 넣어 채널을 확정하세요.'
+                          ? t('ready.host.help')
+                          : t('ready.guest.help')
                         : autoConnect
-                          ? '호스트의 자동 연결을 기다리는 중입니다. 준비 상태를 맞추고 임무를 시작할 때까지 채팅으로 소통하세요.'
-                          : '아래 응답 코드를 복사해 호스트에게 전달하세요. 호스트가 적용하면 연결이 확정됩니다.'}
+                          ? t('ready.guest.waitHost')
+                          : t('ready.guest.copyAnswerHelp')}
                     </p>
                   </div>
 
@@ -351,13 +351,13 @@ export function GameStartLobby({
                         htmlFor="answer-input"
                         className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground"
                       >
-                        Apply Answer Code
+                        {t('ready.applyAnswer')}
                       </label>
                       <textarea
                         id="answer-input"
                         value={answerInput}
                         onChange={(event) => setAnswerInput(event.target.value)}
-                        placeholder="플레이어가 전달한 응답 코드를 붙여넣으세요"
+                        placeholder={t('ready.answer.placeholder')}
                         className="h-28 w-full rounded-xl border border-border bg-background/80 px-3 py-3 font-mono text-xs leading-snug outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
                         autoComplete="off"
                         autoCorrect="off"
@@ -374,7 +374,7 @@ export function GameStartLobby({
                           setAnswerInput('');
                         }}
                       >
-                        Confirm Answer
+                        {t('ready.confirmAnswer')}
                       </button>
                     </div>
                   )}
@@ -395,7 +395,7 @@ export function GameStartLobby({
                 </article>
 
                 <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">Ready Check</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">{t('ready.check')}</h3>
                   <div className="mt-4 space-y-3">
                     {localParticipant && (
                       <button
@@ -408,7 +408,7 @@ export function GameStartLobby({
                         )}
                         onClick={() => onToggleReady(localParticipant.id)}
                       >
-                        {localParticipant.ready ? 'Cancel Ready' : 'Set Ready'}
+                        {localParticipant.ready ? t('ready.cancel') : t('ready.set')}
                       </button>
                     )}
 
@@ -427,7 +427,7 @@ export function GameStartLobby({
                           onStartGame();
                         }}
                       >
-                        Start Mission
+                        {t('ready.startMission')}
                       </button>
                     )}
 
@@ -461,7 +461,14 @@ export function GameStartLobby({
               <span className="min-w-[2.5rem] text-center text-[11px] tabular-nums">{uiProgressPercent ?? 0}%</span>
             </div>
           )}
-          
+          {mode === 'host' && (llmHistory?.length ?? 0) > 0 && (
+            <div className="mt-2 max-h-24 overflow-y-auto rounded bg-background/40 p-2 text-left text-[11px] leading-snug">
+              {llmHistory.slice(-5).map((line, idx) => (
+                <div key={idx} className="truncate text-muted-foreground">{line}</div>
+              ))}
+            </div>
+          )}
+
           {/* Stalled warning removed per requirements */}
 
         </div>
@@ -483,17 +490,17 @@ export function GameStartLobby({
             className="relative z-10 flex h-full w-full max-w-full flex-col border-l border-border/60 bg-card/95 shadow-2xl transition-transform sm:w-[26rem] sm:rounded-l-2xl lg:w-[30rem]"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className="absolute right-4 top-4 rounded-md border border-border/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground transition hover:border-primary hover:text-primary"
-              onClick={() => setChatOpen(false)}
-            >
-              Close
-            </button>
+              <button
+                type="button"
+                className="absolute right-4 top-4 rounded-md border border-border/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground transition hover:border-primary hover:text-primary"
+                onClick={() => setChatOpen(false)}
+              >
+              {t('common.close')}
+              </button>
 
             <header className="border-b border-border/60 px-5 pb-5 pt-6 pr-16">
-              <p className="text-[11px] uppercase tracking-[0.35em] text-primary/70">Lobby Chat</p>
-              <h3 className="text-xl font-semibold text-foreground">Greyfall Ready Room Comms</h3>
+              <p className="text-[11px] uppercase tracking-[0.35em] text-primary/70">{t('ready.chat.title')}</p>
+              <h3 className="text-xl font-semibold text-foreground">{t('ready.chat.subtitle')}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 합류 코드와 준비 상황을 공유하세요. 모든 메시지는 데이터 채널을 통해 실시간 전송됩니다.
               </p>
@@ -524,7 +531,7 @@ export function GameStartLobby({
                               : 'bg-muted text-muted-foreground'
                           )}
                         >
-                          {message.authorRole === 'host' ? 'HOST' : 'GUEST'}
+                          {message.authorRole === 'host' ? t('ready.chat.host') : t('ready.chat.guest')}
                         </span>
                         <span className="text-xs font-semibold tracking-[0.2em] text-foreground">
                           {message.authorName}{' '}
@@ -567,9 +574,9 @@ export function GameStartLobby({
                 autoCapitalize="off"
               />
               <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                <span>Enter 키로 전송 · Shift+Enter로 줄바꿈</span>
+                <span>{t('ready.chat.hint')}</span>
                 <div className="flex items-center gap-2">
-                  <span>Lobby Chat</span>
+                  <span>{t('ready.chat.title')}</span>
                   <button
                     type="submit"
                     className={cn(
@@ -580,7 +587,7 @@ export function GameStartLobby({
                     )}
                     disabled={!chatInput.trim()}
                   >
-                    Send
+                    {t('common.send')}
                   </button>
                 </div>
               </div>

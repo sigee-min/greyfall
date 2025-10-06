@@ -1,0 +1,14 @@
+{
+  "common.options": "Options",
+  "common.close": "Close",
+  "options.subtitle": "Operations Preferences",
+  "options.title": "Options",
+  "tabs.music": "Music",
+  "tabs.controls": "Controls",
+  "tabs.display": "Display",
+  "options.language": "Language",
+  "options.language.desc": "Change the interface language.",
+  "locale.en": "English",
+  "locale.ko": "Korean"
+}
+

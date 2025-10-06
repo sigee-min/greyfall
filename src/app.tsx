@@ -36,10 +36,12 @@ import { InteractionPanel } from './ui/world/interaction-panel';
 import { CharacterBuilder } from './ui/character/character-builder';
 import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
+import { useI18n } from './i18n';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
 function App() {
+  const { t } = useI18n();
   useUiSfx();
   useCustomCursor();
   useDisableAutofill();
@@ -370,7 +372,7 @@ function App() {
                 className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground transition hover:border-primary hover:text-primary"
                 onClick={() => setOptionsOpen(true)}
               >
-                Options
+                {t('common.options')}
               </button>
               <ControlDock />
             </div>

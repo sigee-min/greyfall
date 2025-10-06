@@ -10,6 +10,8 @@ import {
   selectSfxVolume,
   usePreferencesStore
 } from '../../store/preferences';
+import { useI18n } from '../../i18n';
+import type { LocaleKey } from '../../i18n/config';
 
 const TABS = [
   { key: 'music', label: '음악' },
@@ -28,6 +30,7 @@ type OptionsDialogProps = {
 };
 
 export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMusicVolume }: OptionsDialogProps) {
+  const { t, locale, setLocale } = useI18n();
   const [activeTab, setActiveTab] = useState<TabKey>('music');
   const preferencesLoaded = usePreferencesStore(selectPreferencesLoaded);
   const musicEnabled = usePreferencesStore(selectMusicEnabled);
@@ -140,10 +143,20 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
     tabContent = (
       <div className="flex flex-col gap-4">
         <OptionToggle
-          label="전체 화면"
-          description="로비, 준비실, 게임 화면을 모두 전체 화면으로 표시합니다."
+          label={t('tabs.display') + ' · ' + '전체 화면'}
+          description={"로비, 준비실, 게임 화면을 모두 전체 화면으로 표시합니다."}
           checked={fullscreenEnabled}
           onChange={(value) => void applyFullscreen(value)}
+        />
+        <OptionSelect
+          label={t('options.language')}
+          description={t('options.language.desc')}
+          value={locale}
+          onChange={(value) => setLocale(value as LocaleKey)}
+          options={[
+            { value: 'en', label: t('locale.en') },
+            { value: 'ko', label: t('locale.ko') }
+          ]}
         />
         <p className="rounded-lg border border-border/60 bg-card/50 px-4 py-3 text-xs text-muted-foreground">
           브라우저에서 Esc 키로 직접 전체 화면을 종료하거나 다시 진입하면 이 설정이 자동으로 동기화됩니다.
@@ -154,27 +167,27 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
     tabContent = (
       <div className="flex flex-col gap-4">
         <OptionToggle
-          label="배경 음악"
-          description="로비와 임무 중 ambience 음악을 재생합니다."
+          label={t('tabs.music') + ' · ' + '배경 음악'}
+          description={'로비와 임무 중 ambience 음악을 재생합니다.'}
           checked={musicEnabled}
           onChange={handleMusicToggle}
         />
         <OptionSlider
-          label="배경 음악 음량"
-          description="0%로 설정하면 음악이 들리지 않습니다."
+          label={'배경 음악 음량'}
+          description={'0%로 설정하면 음악이 들리지 않습니다.'}
           value={Math.round(musicVolumeDraft * 100)}
           onChange={handleMusicVolumeChange}
           disabled={!musicEnabled}
         />
         <OptionToggle
-          label="효과음"
-          description="버튼 클릭과 알림 등 UI 효과음을 재생합니다."
+          label={'효과음'}
+          description={'버튼 클릭과 알림 등 UI 효과음을 재생합니다.'}
           checked={sfxEnabled}
           onChange={(value) => setPreference('sfxEnabled', value)}
         />
         <OptionSlider
-          label="효과음 음량"
-          description="UI 효과음 및 상호작용 사운드의 크기를 조절합니다."
+          label={'효과음 음량'}
+          description={'UI 효과음 및 상호작용 사운드의 크기를 조절합니다.'}
           value={Math.round(sfxVolume * 100)}
           onChange={(value) => setPreference('sfxVolume', value / 100)}
           disabled={!sfxEnabled}
@@ -188,8 +201,8 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
       <div className="flex h-[520px] w-full max-w-3xl flex-col gap-6 rounded-2xl border border-border/60 bg-background/95 p-6 shadow-2xl sm:h-[560px]">
         <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Operations Preferences</p>
-            <h2 className="text-2xl font-semibold">Options</h2>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">{t('options.subtitle')}</p>
+            <h2 className="text-2xl font-semibold">{t('options.title')}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               현재 씬: {scene === 'mainLobby' ? '로비' : scene === 'startLobby' ? '게임 준비실' : '작전 현장'}
             </p>
@@ -199,7 +212,7 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
             className="self-start rounded-md border border-border bg-background/80 px-3 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground transition hover:border-primary hover:text-primary"
             onClick={onClose}
           >
-            Close
+            {t('common.close')}
           </button>
         </header>
 
@@ -217,7 +230,7 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
                   )}
                   onClick={() => setActiveTab(tab.key)}
                 >
-                  {tab.label}
+                  {tab.key === 'music' ? t('tabs.music') : tab.key === 'controls' ? t('tabs.controls') : t('tabs.display')}
                 </button>
               ))}
             </nav>
@@ -300,6 +313,39 @@ function OptionSlider({ label, description, value, onChange, disabled }: OptionS
         className="w-full cursor-pointer accent-primary"
         onChange={(event) => onChange(Number(event.target.value))}
       />
+    </div>
+  );
+}
+
+type OptionSelectProps = {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+};
+
+function OptionSelect({ label, description, value, onChange, options, disabled }: OptionSelectProps) {
+  return (
+    <div className={cn('space-y-3 rounded-xl border border-border/60 bg-card/70 p-4', disabled ? 'opacity-60' : undefined)}>
+      <div className="flex items-center justify-between text-sm">
+        <div>
+          <p className="font-semibold text-foreground">{label}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <select
+          data-cursor="pointer"
+          className="rounded-md border border-border bg-background/70 px-2 py-1 text-xs"
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

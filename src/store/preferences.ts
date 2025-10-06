@@ -8,12 +8,13 @@ export type PreferencesState = {
   sfxEnabled: boolean;
   sfxVolume: number;
   fullscreenEnabled: boolean;
+  locale: string;
   loaded: boolean;
   load: () => void;
   setPreference: <K extends PreferenceKey>(key: K, value: PreferencesState[K]) => void;
 };
 
-type PreferenceKey = 'musicEnabled' | 'musicVolume' | 'sfxEnabled' | 'sfxVolume' | 'fullscreenEnabled';
+type PreferenceKey = 'musicEnabled' | 'musicVolume' | 'sfxEnabled' | 'sfxVolume' | 'fullscreenEnabled' | 'locale';
 
 type StoredPreferences = Pick<PreferencesState, PreferenceKey>;
 
@@ -38,12 +39,23 @@ function writeStoredPreferences(preferences: StoredPreferences) {
   }
 }
 
+function detectDefaultLocale(): string {
+  try {
+    const nav = (typeof navigator !== 'undefined' ? navigator.language : 'en').toLowerCase();
+    if (nav.startsWith('ko')) return 'ko';
+    return 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 const defaultPreferences: StoredPreferences = {
   musicEnabled: true,
   sfxEnabled: true,
   musicVolume: 0.45,
   sfxVolume: 0.7,
-  fullscreenEnabled: true
+  fullscreenEnabled: true,
+  locale: detectDefaultLocale()
 };
 
 export const usePreferencesStore = create<PreferencesState>((set, get) => ({
@@ -76,7 +88,8 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
         musicVolume: next.musicVolume,
         sfxEnabled: next.sfxEnabled,
         sfxVolume: next.sfxVolume,
-        fullscreenEnabled: next.fullscreenEnabled
+        fullscreenEnabled: next.fullscreenEnabled,
+        locale: next.locale
       };
       writeStoredPreferences(toStore);
       return next;
@@ -89,4 +102,5 @@ export const selectMusicVolume = (state: PreferencesState) => state.musicVolume;
 export const selectSfxEnabled = (state: PreferencesState) => state.sfxEnabled;
 export const selectSfxVolume = (state: PreferencesState) => state.sfxVolume;
 export const selectFullscreenEnabled = (state: PreferencesState) => state.fullscreenEnabled;
+export const selectLocale = (state: PreferencesState) => state.locale;
 export const selectPreferencesLoaded = (state: PreferencesState) => state.loaded;

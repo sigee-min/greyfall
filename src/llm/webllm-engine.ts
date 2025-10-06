@@ -139,25 +139,21 @@ export async function loadEngineByManager(
   try { onProgress?.({ text: '모델 초기화를 시작합니다', progress: 0.02 }); } catch {}
   const wrappedProgress = (report: WebLLMProgress) => {
     try {
-      const t = (report.text || '').toLowerCase();
+      const base = report.text || '엔진 초기화 중';
+      const t = base.toLowerCase();
       let phase: Phase = 'prepare';
       let p = lastP;
-      let text = report.text ?? '엔진 초기화 중';
       if (/download|fetch|cache|artifact|weight/.test(t)) {
         phase = 'download';
-        text = '모델 파일 내려받는 중';
         p = segment(report.progress, 0.05, 0.55, lastP);
       } else if (/wasm|model lib|library|load lib|load model/.test(t)) {
         phase = 'load-lib';
-        text = '모델 라이브러리 로드 중';
         p = segment(report.progress, 0.55, 0.7, lastP);
       } else if (/compile|build|graph|kernel/.test(t)) {
         phase = 'compile';
-        text = '그래프 컴파일 중';
         p = segment(report.progress, 0.7, 0.9, lastP);
       } else {
         // Fallback: map overall progress into 0.05..0.9 window
-        text = report.text || '엔진 초기화 중';
         p = segment(report.progress, 0.05, 0.9, lastP);
       }
       lastP = p;
@@ -165,7 +161,7 @@ export async function loadEngineByManager(
         phase === 'download' ? `다운로드 ${pct(p)}` :
         phase === 'load-lib' ? `라이브러리 로드 ${pct(p)}` :
         phase === 'compile' ? `컴파일 ${pct(p)}` : `준비 ${pct(p)}`;
-      const uiText = `${text} (${label})`;
+      const uiText = `${base} (${label})`;
       onProgress?.({ text: uiText, progress: p });
       if (debug) console.debug('[webllm] progress', { phase, text: uiText, p, raw: report });
     } catch {}

@@ -7,6 +7,7 @@ export type GuideLoaderState = {
   progress: number | null;
   status: string | null;
   error: string | null;
+  history: string[];
 };
 
 export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boolean }): GuideLoaderState {
@@ -16,6 +17,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
   const [progress, setProgress] = useState<number | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
   const startedRef = useRef(false);
   const [seq, setSeq] = useState(0);
   const lastUpdateAtRef = useRef<number | null>(null);
@@ -33,6 +35,7 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         setError(null);
         setProgress(0);
         setStatus(null);
+        setHistory([]);
         lastUpdateAtRef.current = Date.now();
 
         const { loadEngineByManager, ensureChatApiReady, probeChatApiActive, resetEngine } = await import('../../llm/webllm-engine');
@@ -44,13 +47,31 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
             const clamped = Math.min(1, Math.max(0, p));
             return Math.max(prev ?? 0, clamped);
           });
-          if (report.text) setStatus(report.text);
+          if (report.text) {
+            const txt = report.text as string;
+            setStatus(txt);
+            setHistory((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (txt !== last) next.push(txt);
+              return next.slice(-8);
+            });
+          }
           lastUpdateAtRef.current = Date.now();
         });
         // Ensure chat API is actually callable before reporting ready
         await ensureChatApiReady(8000, (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
-          if (report.text) setStatus(report.text);
+          if (report.text) {
+            const txt = report.text as string;
+            setStatus(txt);
+            setHistory((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (txt !== last) next.push(txt);
+              return next.slice(-8);
+            });
+          }
           if (typeof report.progress === 'number') {
             setProgress((prev) => Math.max(prev ?? 0, Math.min(1, Math.max(0, report.progress!))));
           }
@@ -82,5 +103,5 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
   }, [enabled, manager, seq]);
 
   
-  return { ready, progress, status, error };
+  return { ready, progress, status, error, history };
 }

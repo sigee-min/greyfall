@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../i18n';
 
 type Props = {
   open: boolean;
@@ -8,20 +9,21 @@ type Props = {
 
 export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
   if (!open) return null;
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
       <div className="hud-card w-[min(640px,92vw)] rounded-2xl border border-border/60 p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-accent/80">LLM Model</p>
-            <h3 className="text-xl font-semibold text-foreground">모델 설정을 선택하세요.</h3>
+            <p className="text-xs uppercase tracking-[0.35em] text-accent/80">{t('manager.subtitle')}</p>
+            <h3 className="text-xl font-semibold text-foreground">{t('manager.title')}</h3>
           </div>
           <button
             type="button"
             className="hud-button rounded-md border border-border/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground hover:border-primary hover:text-primary"
             onClick={onClose}
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
 
@@ -37,8 +39,8 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
               </svg>
             </span>
             <span>
-              <p className="text-sm font-semibold text-foreground">Fast</p>
-              <p className="mt-1 text-xs text-muted-foreground">균형형</p>
+              <p className="text-sm font-semibold text-foreground">{t('manager.fast')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('manager.fast.desc')}</p>
             </span>
           </button>
 
@@ -53,21 +55,19 @@ export function ManagerSelectDialog({ open, onClose, onSelect }: Props) {
               </svg>
             </span>
             <span>
-              <p className="text-sm font-semibold text-foreground">Smart</p>
-              <p className="mt-1 text-xs text-muted-foreground">정밀형</p>
+              <p className="text-sm font-semibold text-foreground">{t('manager.smart')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('manager.smart.desc')}</p>
             </span>
           </button>
         </div>
         <div className="mt-5 rounded-xl border border-border/60 bg-background/60 p-4 text-xs text-muted-foreground">
-          <p className="font-semibold text-foreground">
-            <span className="text-primary">채용 전</span> 유의사항
-          </p>
+          <p className="font-semibold text-foreground">{t('manager.notesTitle', { highlight: t('manager.notesPre') })}</p>
           <ul className="mt-2 list-disc space-y-1 pl-4">
-            <li>최신 Chrome/Edge + <span className="text-primary">HTTPS</span></li>
-            <li><span className="text-primary">WebGPU</span> 지원 브라우저</li>
-            <li>민첩: <span className="text-primary">2GB+</span> VRAM 권장</li>
-            <li>심사숙고: <span className="text-primary">4GB+</span> VRAM 권장</li>
-            <li>첫 배치 시 자료 다운로드 시간 발생</li>
+            <li>{t('manager.requirements.https')}</li>
+            <li>{t('manager.requirements.webgpu')}</li>
+            <li>{t('manager.requirements.fast')}</li>
+            <li>{t('manager.requirements.smart')}</li>
+            <li>{t('manager.requirements.download')}</li>
           </ul>
         </div>
       </div>
