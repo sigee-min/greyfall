@@ -97,20 +97,7 @@
   "ready.status.ready": "Ready",
   "ready.status.standby": "Standby",
 
-  "manager.subtitle": "LLM Model",
-  "manager.title": "Choose a model configuration",
-  "manager.fast": "Fast",
-  "manager.fast.desc": "Balanced",
-  "manager.smart": "Smart",
-  "manager.smart.desc": "Deliberate",
-  "manager.unimplemented": "Not implemented",
-  "manager.notesPre": "Before Hiring",
-  "manager.notesTitle": "{highlight} Notes",
-  "manager.requirements.https": "Latest Chrome/Edge + HTTPS",
-  "manager.requirements.webgpu": "Browser with WebGPU support",
-  "manager.requirements.fast": "Fast: 2GB+ VRAM recommended",
-  "manager.requirements.smart": "Smart: 4GB+ VRAM recommended",
-  "manager.requirements.download": "Initial model download on first deploy",
+  
 
   "chatdock.title": "Mission Log",
   "chatdock.empty": "Awaiting transmissions…",

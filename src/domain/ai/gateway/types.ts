@@ -1,4 +1,4 @@
-import type { LlmManagerKind } from '../../../llm/webllm-engine';
+import type { LlmManagerKind } from '../../../llm/llm-engine';
 
 export type AIGatewayParams = {
   manager: LlmManagerKind;
@@ -17,4 +17,3 @@ export type GatewayResolvedConfig = {
   coldStartTimeout: number;
   useTwoPhase: boolean;
 };
-

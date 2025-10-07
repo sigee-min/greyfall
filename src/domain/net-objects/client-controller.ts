@@ -13,7 +13,7 @@ import './participants-host.js';
 import './chat-host.js';
 import './world-positions-host.js';
 import './party-host.js';
-import './llm-progress-host.js';
+// LLM progress net-object removed
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,

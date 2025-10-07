@@ -308,7 +308,6 @@ function App() {
     if (scene === 'startLobby' && sessionMeta) {
       const signalSessionId = (sessionMeta as { signalSessionId?: string | null }).signalSessionId ?? null;
       const autoConnect = Boolean(signalSessionId);
-      const sessionReady = Boolean(signalSessionId);
       const answerCode = sessionMeta.mode === 'guest' && !autoConnect ? sessionMeta.answerCode : undefined;
       const acceptAnswer =
         sessionMeta.mode === 'host' && !autoConnect ? handleManualAnswer : undefined;
@@ -323,7 +322,6 @@ function App() {
           localParticipantId={localParticipantId}
           canSendChat={canSendChat}
           channelReady={channelOpen}
-          sessionReady={sessionReady}
           chatMessages={chatMessages}
           onToggleReady={toggleReady}
           onStartGame={startMission}
@@ -334,7 +332,7 @@ function App() {
           onSendChat={sendChatMessage}
           // 매니저는 컴포넌트 내부 기본값 사용 (기본: 'smart')
           publishLobbyMessage={publishLobbyMessage}
-          registerLobbyHandler={registerLobbyHandler}
+          
           probeChannel={probeChannel}
         />
       );

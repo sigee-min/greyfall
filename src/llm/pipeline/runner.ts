@@ -1,4 +1,5 @@
-import { emitProgress } from '../progress-bus';
+// Progress bus removed; no-op shims
+const emitProgress = (_r: any) => {};
 import type { ChatMessage } from '../../domain/ai/gateway/llm-exec';
 import { renderTemplate, withTimeoutRetry } from './utils';
 import type { MessageExecutor, NodeRegistry, PipelineCtx, Step } from './types';

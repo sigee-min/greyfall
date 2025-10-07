@@ -1,4 +1,4 @@
-import type { LlmManagerKind } from '../../../llm/webllm-engine';
+import type { LlmManagerKind } from '../../../llm/llm-engine';
 
 const firstGenDoneByManager = new Map<LlmManagerKind, boolean>();
 
@@ -9,4 +9,3 @@ export function isFirstGen(manager: LlmManagerKind): boolean {
 export function markFirstGenDone(manager: LlmManagerKind): void {
   firstGenDoneByManager.set(manager, true);
 }
-

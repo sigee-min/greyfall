@@ -1,4 +1,4 @@
-import type { LlmManagerKind } from '../../../llm/webllm-engine';
+import type { LlmManagerKind } from '../../../llm/llm-engine';
 
 // Per-manager FIFO lock to prevent concurrent generations on the same engine
 const inflightByManager = new Map<LlmManagerKind, Promise<void>>();
@@ -27,4 +27,3 @@ export async function runWithManagerLock<T>(manager: LlmManagerKind, task: () =>
     throw err;
   }
 }
-

@@ -13,6 +13,7 @@ import {
 import { useI18n } from '../../i18n';
 import type { LocaleKey } from '../../i18n/config';
 import { LanguagePicker } from '../common/language-picker';
+import { purgeLocalModels, type WebLLMProgress } from '../../llm/llm-engine';
 
 const TABS = [
   { key: 'music', label: '음악' },
@@ -136,8 +137,9 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
   if (activeTab === 'controls') {
     tabContent = (
       <div className="space-y-3 rounded-xl border border-dashed border-border/60 bg-card/60 p-6 text-xs text-muted-foreground">
-        <p className="font-semibold text-foreground">{t('controls.wip.title')}</p>
-        <p>{t('controls.wip.body')}</p>
+        <p className="font-semibold text-foreground">도구</p>
+        <p className="mb-2">로컬 LLM 아티팩트(Transformers.js 캐시)를 정리할 수 있어요.</p>
+        <PurgeModelsPanel />
       </div>
     );
   } else if (activeTab === 'display') {
@@ -345,6 +347,41 @@ function OptionSelect({ label, description, value, onChange, options, disabled }
           ))}
         </select>
       </div>
+    </div>
+  );
+}
+
+function PurgeModelsPanel() {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const handlePurge = async () => {
+    setBusy(true);
+    setStatus('초기화 중…');
+    const ok = await purgeLocalModels((r: WebLLMProgress) => {
+      if (r?.text) setStatus(r.text!);
+    });
+    setBusy(false);
+    setStatus(ok ? '정리 완료' : '정리 실패');
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/60 bg-card/70 p-4">
+      <div className="flex items-center justify-between text-sm">
+        <div>
+          <p className="font-semibold text-foreground">로컬 LLM 캐시 삭제</p>
+          <p className="text-xs text-muted-foreground">다운로드된 모델/토크나이저 캐시와 저장소를 정리합니다.</p>
+        </div>
+        <button
+          type="button"
+          className={cn('rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.28em] transition', busy ? 'opacity-70 cursor-not-allowed' : 'border-destructive text-destructive hover:bg-destructive/10')}
+          onClick={handlePurge}
+          disabled={busy}
+        >
+          {busy ? '삭제 중…' : '삭제'}
+        </button>
+      </div>
+      {status && <p className="text-[11px] text-muted-foreground">{status}</p>}
     </div>
   );
 }

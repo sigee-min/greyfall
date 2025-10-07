@@ -5,7 +5,7 @@ import { HostParticipantsObject } from './participants-host.js';
 import { HostChatObject } from './chat-host.js';
 import { CHAT_OBJECT_ID } from './chat.js';
 import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
-import { HostLlmProgressObject, LLM_PROGRESS_OBJECT_ID } from './llm-progress-host.js';
+// LLM progress net-object removed
 import { requestAICommand } from '../ai/ai-gateway';
 import { executeAICommand } from '../ai/ai-router';
 import { HostPartyObject, PARTY_OBJECT_ID } from './party-host.js';
@@ -30,7 +30,7 @@ export class HostRouter {
   private readonly chat: HostChatObject;
   private readonly world: HostWorldPositionsObject;
   private readonly party: HostPartyObject;
-  private readonly llm: HostLlmProgressObject;
+  // private readonly llm: HostLlmProgressObject;
   private readonly limiter: SlidingWindowLimiter;
   private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   private readonly map = new PeerParticipantMap();
@@ -66,7 +66,7 @@ export class HostRouter {
     }
     this.participants = this.require<HostParticipantsObject>(PARTICIPANTS_OBJECT_ID);
     this.chat = this.require<HostChatObject>(CHAT_OBJECT_ID);
-    this.llm = this.require<HostLlmProgressObject>(LLM_PROGRESS_OBJECT_ID);
+    // LLM progress removed
     this.world = this.require<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
     this.party = this.require<HostPartyObject>(PARTY_OBJECT_ID);
   }
@@ -132,11 +132,7 @@ export class HostRouter {
           this.party.addMember(p.id);
           break;
         }
-        case 'llm:progress': {
-          // Host ingests its own progress events to keep a net-object snapshot for late joiners
-          this.llm.update(message.body as any);
-          break;
-        }
+        // case 'llm:progress': { /* removed */ break; }
         case 'ready': {
           const { participantId, ready } = message.body;
           if (!this.limiter.allow(`ready:${participantId}`)) {

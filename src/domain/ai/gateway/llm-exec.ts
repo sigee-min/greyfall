@@ -1,6 +1,6 @@
 // Keep runtime deps lazily loaded to minimize initial bundle size.
-import type { ChatOptions } from '../../../llm/webllm-engine';
-import type { LlmManagerKind } from '../../../llm/webllm-engine';
+import type { ChatOptions } from '../../../llm/llm-engine';
+import type { LlmManagerKind } from '../../../llm/llm-engine';
 
 type LlmOps = {
   generateChat: (prompt: string, options?: ChatOptions) => Promise<string>;
@@ -11,7 +11,7 @@ type LlmOps = {
 };
 
 async function loadOps(): Promise<LlmOps> {
-  const mod = await import('../../../llm/webllm-engine');
+  const mod = await import('../../../llm/llm-engine');
   return {
     generateChat: mod.generateChat,
     ensureChatApiReady: mod.ensureChatApiReady,

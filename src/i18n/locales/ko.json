@@ -97,20 +97,7 @@
   "ready.status.ready": "준비됨",
   "ready.status.standby": "대기",
 
-  "manager.subtitle": "LLM 모델",
-  "manager.title": "모델 설정을 선택하세요.",
-  "manager.fast": "Fast",
-  "manager.fast.desc": "균형형",
-  "manager.smart": "Smart",
-  "manager.smart.desc": "정밀형",
-  "manager.unimplemented": "미구현",
-  "manager.notesPre": "채용 전",
-  "manager.notesTitle": "{highlight} 유의사항",
-  "manager.requirements.https": "최신 Chrome/Edge + HTTPS",
-  "manager.requirements.webgpu": "WebGPU 지원 브라우저",
-  "manager.requirements.fast": "민첩: 2GB+ VRAM 권장",
-  "manager.requirements.smart": "심사숙고: 4GB+ VRAM 권장",
-  "manager.requirements.download": "첫 배치 시 자료 다운로드 시간 발생",
+  
 
   "chatdock.title": "작전 로그",
   "chatdock.empty": "전파 대기 중…",

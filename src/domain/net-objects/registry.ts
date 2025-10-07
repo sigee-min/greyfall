@@ -53,9 +53,13 @@ const clientInstanceListeners = new Map<string, Set<(object: ClientObject) => vo
 
 export function registerNetObject(descriptor: NetObjectDescriptor) {
   if (descriptors.has(descriptor.id)) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[net-object] duplicate registration ignored', descriptor.id);
-    }
+    try {
+      // Use Vite's import.meta.env when available to avoid Node typings
+      const isProd = (import.meta as any)?.env?.MODE === 'production';
+      if (!isProd) {
+        console.warn('[net-object] duplicate registration ignored', descriptor.id);
+      }
+    } catch {}
     return descriptors.get(descriptor.id)!;
   }
   descriptors.set(descriptor.id, descriptor);

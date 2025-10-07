@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { nanoid } from 'nanoid';
-import { requestChoices, type CardPrompt } from '../../llm/webgpu';
+type CardPrompt = { scene: string; intent: string; constraints?: string[] };
 import { useCharacterStore, type StatKey } from '../../store/character';
 import { computeModifiers, type CheckKind } from '../../domain/character/checks';
 import { useGlobalBus } from '../../bus/global-bus';
@@ -84,7 +84,17 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
     setError(null);
 
     try {
-      const response = await requestChoices(prompt);
+      const response = await (async function requestChoicesOffline(p: CardPrompt) {
+        const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `offline-${Date.now()}`;
+        return {
+          promptId: id,
+          narrative: 'The model is offline. Use manual narration.',
+          choices: [
+            { id: 'fallback-1', label: 'Maintain position and observe', risk: 'time', target: 10 },
+            { id: 'fallback-2', label: 'Advance cautiously', risk: 'noise', target: 13 }
+          ]
+        } as const;
+      })(prompt);
       setChoices({ ...prompt, id: response.promptId });
       appendLog({ id: nanoid(6), body: t('console.queued', { narrative: response.narrative }) });
     } catch (err) {

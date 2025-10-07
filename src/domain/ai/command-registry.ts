@@ -6,7 +6,7 @@ export type PublishLobbyMessage = <K extends LobbyMessageKind>(
   context?: string
 ) => boolean;
 import type { SessionParticipant } from '../session/types';
-import type { LlmManagerKind } from '../../llm/webllm-engine';
+import type { LlmManagerKind } from '../../llm/llm-engine';
 
 export type CommandContext = {
   manager: LlmManagerKind;

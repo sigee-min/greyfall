@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { LlmManagerKind } from '../../llm/webllm-engine';
+import type { LlmManagerKind } from '../../llm/llm-engine';
 // LLM 호출은 ai-gateway 단일 창구를 사용합니다.
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../chat/use-lobby-chat';
 import type { SessionParticipant } from '../session/types';

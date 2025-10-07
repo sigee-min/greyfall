@@ -1,4 +1,4 @@
-import type { LlmManagerKind } from '../../../llm/webllm-engine';
+import type { LlmManagerKind } from '../../../llm/llm-engine';
 import type { AIGatewayParams, GatewayResolvedConfig } from './types';
 
 export function resolveGatewayConfig(

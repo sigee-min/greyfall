@@ -3,20 +3,15 @@ import type { FormEvent } from 'react';
 import { cn } from '../lib/utils';
 import { useI18n } from '../i18n';
 import { FallbackBackground } from '../ui/common/fallback-bg';
-import { LlmProgressOverlay } from '../ui/common/llm-progress';
-import { subscribeProgress, getLastProgress } from '../llm/progress-bus';
 import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
-import type { LlmManagerKind } from '../llm/webllm-engine';
+import type { LlmManagerKind } from '../llm/llm-engine';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
-import { useBroadcastLlmProgress, useReceiveLlmProgress } from '../domain/llm/use-llm-progress-bridge';
-import { useBroadcastLlmConfig, useReceiveLlmConfig } from '../domain/llm/use-llm-config-bridge';
-import { getActiveModelPreset } from '../llm/engine-selection';
-import { chooseModel } from '../llm/selection-storage';
+// LLM progress UI/bridge removed
+// LLM config broadcast removed
 import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
-import type { RegisterLobbyHandler } from '../domain/chat/use-lobby-chat';
 
 type GameStartLobbyProps = {
   background: string;
@@ -27,7 +22,6 @@ type GameStartLobbyProps = {
   localParticipantId: string | null;
   chatMessages: SessionChatLogEntry[];
   channelReady?: boolean;
-  sessionReady?: boolean;
   canSendChat: boolean;
   onToggleReady: (participantId: string) => void;
   onStartGame: () => void;
@@ -42,7 +36,6 @@ type GameStartLobbyProps = {
     body: LobbyMessageBodies[K],
     context?: string
   ) => boolean;
-  registerLobbyHandler: RegisterLobbyHandler;
   probeChannel: () => boolean;
 };
 
@@ -56,7 +49,6 @@ export function GameStartLobby({
   chatMessages,
   canSendChat,
   channelReady = false,
-  sessionReady = false,
   onToggleReady,
   onStartGame,
   onLeave,
@@ -66,21 +58,12 @@ export function GameStartLobby({
   onSendChat,
   llmManager = 'smart',
   publishLobbyMessage,
-  registerLobbyHandler,
   probeChannel
 }: GameStartLobbyProps) {
   const { t } = useI18n();
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
-  // Ensure an active model preset exists BEFORE loading the engine, so the worker uses the intended model
-  const presetBefore = getActiveModelPreset();
-  useEffect(() => {
-    if (mode !== 'host') return;
-    if (!presetBefore) {
-      chooseModel('gemma3-1b');
-    }
-  }, [mode, presetBefore]);
 
   const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError, history: llmHistory } = useGuideLoader({
     manager: llmManager,
@@ -89,13 +72,9 @@ export function GameStartLobby({
   const everyoneReady = participants.length > 0 && participants.every((participant) => participant.ready);
   const localParticipant = participants.find((participant) => participant.id === localParticipantId);
   const chatListRef = useRef<HTMLDivElement | null>(null);
-  const progressPercent = llmProgress === null ? null : Math.round(Math.min(1, Math.max(0, llmProgress)) * 100);
+  // 진행률 UI 제거됨
+  const progressPercent = null as number | null;
   const guideAnnouncedRef = useRef(false);
-  // Guest-side UI stall tracking (currently not used elsewhere)
-  const [lastLlmUpdateAt, setLastLlmUpdateAt] = useState<number | null>(null);
-  // Host progress (single source via ProgressBus)
-  const [hostProgressText, setHostProgressText] = useState<string | null>(null);
-  const [hostProgressPct, setHostProgressPct] = useState<number | null>(null);
 
   const submitChat = useCallback(() => {
     if (!canSendChat) return false;
@@ -115,93 +94,25 @@ export function GameStartLobby({
 
   // 자동 채팅 오픈 기능 제거됨 (사용자 수동으로 열도록 유지)
 
-  // Subscribe host progress bus for simple UI sync
-  useEffect(() => {
-    if (mode !== 'host') return;
-    const last = getLastProgress();
-    if (last) {
-      setHostProgressText((last.text ?? null) as string | null);
-      setHostProgressPct(
-        typeof last.progress === 'number' ? Math.round(Math.max(0, Math.min(1, last.progress)) * 100) : null
-      );
-    }
-    const unsub = subscribeProgress((rep) => {
-      setHostProgressText((rep.text ?? null) as string | null);
-      setHostProgressPct(
-        typeof rep.progress === 'number' ? Math.round(Math.max(0, Math.min(1, rep.progress)) * 100) : null
-      );
-    });
-    return () => unsub();
-  }, [mode]);
+  // Host progress bus removed
 
   // elapsed time tracking no longer used for auto-stall warnings/retries
 
   // Host broadcasts progress; guests subscribe and display
-  const remote = useReceiveLlmProgress({ register: registerLobbyHandler });
-  // Force progress percent on guests directly from broadcast events to avoid any sync lag.
-  const [guestProgressPct, setGuestProgressPct] = useState<number | null>(null);
-  useEffect(() => {
-    if (mode !== 'guest') return;
-    const unsub = registerLobbyHandler('llm:progress', (message) => {
-      const p = (message.body as any)?.progress;
-      if (typeof p === 'number') {
-        const pct = Math.round(Math.max(0, Math.min(1, p)) * 100);
-        setGuestProgressPct(pct);
-      } else if (p === null || (message.body as any)?.ready === true) {
-        setGuestProgressPct(null);
-      }
-    });
-    return unsub;
-  }, [mode, registerLobbyHandler]);
-  useEffect(() => {
-    // For guests, tick last update when remote changes so stalled UI works
-    if (mode !== 'host') {
-      if (remote.progress !== undefined || remote.status !== undefined) {
-        setLastLlmUpdateAt(Date.now());
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remote.progress, remote.status, mode]);
-  useBroadcastLlmProgress({
-    enabled: mode === 'host',
-    payload: { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError },
-    publish: publishLobbyMessage
-  });
+  // LLM progress broadcast removed
 
-  const uiReady = mode === 'host' ? llmReady : remote.ready;
-  const uiError = mode === 'host' ? llmError : remote.error;
-  const simpleUiStatus = mode === 'host' ? (hostProgressText ?? llmStatus) : (remote.status ?? null);
-  const simpleUiProgressPercent = mode === 'host'
-    ? (hostProgressPct ?? progressPercent)
-    : (guestProgressPct ?? (remote.progress == null ? null : Math.round(Math.max(0, Math.min(1, remote.progress)) * 100)));
+  const uiReady = llmReady;
+  const uiError = llmError;
+  // 간소화: 상태/진행률 텍스트 비노출
+  const simpleUiStatus = llmStatus;
+  const simpleUiProgressPercent = progressPercent;
   const isActiveLoading = !uiReady && !uiError && (simpleUiProgressPercent !== null || Boolean(simpleUiStatus));
 
   // (moved earlier) Preset defaulting now runs before engine load
 
-  // Broadcast active LLM config (model/backend) from host once per session; guests subscribe and set their local preset.
-  const activePreset = getActiveModelPreset();
-  useBroadcastLlmConfig({
-    enabled: mode === 'host' && Boolean(activePreset),
-    payload: activePreset ? { modelId: activePreset.id, backend: activePreset.backend } : { modelId: 'gemma3-1b', backend: 'cpu' },
-    publish: publishLobbyMessage
-  });
-  const receivedCfg = useReceiveLlmConfig({ register: registerLobbyHandler });
-  useEffect(() => {
-    if (mode === 'host') return;
-    if (!receivedCfg) return;
-    // Set local preset based on host announcement
-    chooseModel(receivedCfg.modelId);
-  }, [mode, receivedCfg]);
+  // LLM config broadcast removed
 
-  const displayStatus = useMemo(() => {
-    if (uiError) return uiError;
-    return simpleUiStatus || t('common.loading');
-  }, [uiError, simpleUiStatus, t]);
-
-  const uiProgressPercent = useMemo(() => {
-    if (!isActiveLoading) return null;
-    return simpleUiProgressPercent;
-  }, [isActiveLoading, simpleUiProgressPercent]);
+  // displayStatus/uiProgressPercent 사용 제거
 
   // 심판자 로드 완료 시, AI 명령(chat)으로 1회 합류 알림 전송 (폴링 제거)
   useEffect(() => {
@@ -487,14 +398,7 @@ export function GameStartLobby({
 
       </div>
 
-      {(isActiveLoading || uiError) && (
-        <LlmProgressOverlay
-          displayText={displayStatus}
-          error={uiError}
-          progressPercent={uiProgressPercent}
-          history={mode === 'host' ? llmHistory : remote.history}
-        />
-      )}
+      {/* LLM progress overlay removed */}
 
       {chatOpen && (
         <div
