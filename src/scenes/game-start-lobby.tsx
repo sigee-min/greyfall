@@ -12,6 +12,8 @@ import { useGuideLoader } from '../domain/llm/use-guide-loader';
 import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
+import { useResponsive } from '../ui/responsive/use-responsive';
+import { ActionBar } from '../ui/responsive/action-bar';
 
 type GameStartLobbyProps = {
   background: string;
@@ -61,6 +63,7 @@ export function GameStartLobby({
   probeChannel
 }: GameStartLobbyProps) {
   const { t } = useI18n();
+  const { isMobile } = useResponsive();
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
@@ -398,7 +401,8 @@ export function GameStartLobby({
 
       </div>
 
-      {/* LLM progress overlay removed */}
+      {/* LLM progress overlay removed */
+      }
 
       {chatOpen && (
         <div
@@ -524,6 +528,46 @@ export function GameStartLobby({
             </form>
           </div>
         </div>
+      )}
+
+      {/* 모바일 하단 액션바 */}
+      {isMobile && (
+        <ActionBar
+          left={[
+            {
+              key: 'leave',
+              label: t('ready.leave'),
+              onClick: onLeave,
+              variant: 'destructive'
+            }
+          ]}
+          right={[
+            ...(mode === 'host'
+              ? [
+                  {
+                    key: 'start',
+                    label: t('ready.start'),
+                    onClick: onStartGame,
+                    variant: 'primary',
+                    disabled: !canStartMission
+                  } as const
+                ]
+              : []),
+            {
+              key: 'ready',
+              label: localParticipant?.ready ? t('ready.status.ready') : t('ready.action.ready'),
+              onClick: () => {
+                if (!localParticipantId) return;
+                onToggleReady(localParticipantId);
+              }
+            },
+            {
+              key: 'options',
+              label: t('common.options'),
+              onClick: () => onOptions?.()
+            }
+          ]}
+        />
       )}
     </div>
   );
