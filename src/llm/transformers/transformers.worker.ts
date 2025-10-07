@@ -18,7 +18,16 @@ let initialised = false;
 let inflight: { id: string; ctl: AbortController } | null = null;
 let hfGenerator: any | null = null;
 
-import { pipeline, TextStreamer } from '@huggingface/transformers';
+import { pipeline, TextStreamer, env } from '@huggingface/transformers';
+// transformers가 기본으로 설정하는 CDN( jsDelivr ) wasmPaths를 비활성화하여
+// onnxruntime-web의 번들된 MJS 경로(import.meta.url 기반)를 사용하게 합니다.
+try {
+  (env as any).backends = (env as any).backends || {};
+  (env as any).backends.onnx = (env as any).backends.onnx || {};
+  (env as any).backends.onnx.wasm = (env as any).backends.onnx.wasm || {};
+  // undefined/null로 두면 onnxruntime-web이 자체 내장 모듈 경로를 사용합니다.
+  delete (env as any).backends.onnx.wasm.wasmPaths;
+} catch {}
 
 function emitProgress(text: string, progress?: number) {
   (self as any).postMessage({ type: 'progress', text, progress });
