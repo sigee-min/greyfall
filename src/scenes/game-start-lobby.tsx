@@ -11,6 +11,7 @@ import { useGuideLoader } from '../domain/llm/use-guide-loader';
 // LLM config broadcast removed
 import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
+import { loadEngineByManager, ensureChatApiReady } from '../llm/llm-engine';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 import { useResponsive } from '../ui/responsive/use-responsive';
 import { ActionBar } from '../ui/responsive/action-bar';
@@ -75,9 +76,13 @@ export function GameStartLobby({
   const everyoneReady = participants.length > 0 && participants.every((participant) => participant.ready);
   const localParticipant = participants.find((participant) => participant.id === localParticipantId);
   const chatListRef = useRef<HTMLDivElement | null>(null);
+  // LLM prewarm local progress for Start Mission button area
+  const [llmPrewarmText, setLlmPrewarmText] = useState<string | null>(null);
+  const [llmPrewarmPct, setLlmPrewarmPct] = useState<number | null>(null);
   // 진행률 UI 제거됨
   const progressPercent = null as number | null;
   const guideAnnouncedRef = useRef(false);
+  const prewarmedRef = useRef(false);
 
   const submitChat = useCallback(() => {
     if (!canSendChat) return false;
@@ -144,6 +149,31 @@ export function GameStartLobby({
       });
     })();
   }, [llmReady, llmManager, localParticipantId, mode, participants, publishLobbyMessage]);
+
+  // Host-only prewarm: proactively load/prepare local LLM on lobby entry
+  useEffect(() => {
+    if (mode !== 'host') return;
+    if (prewarmedRef.current) return;
+    prewarmedRef.current = true;
+    void (async () => {
+      try {
+        const onProgress = (report: { text?: string; progress?: number }) => {
+          if (typeof report.progress === 'number') {
+            const pct = Math.round(Math.max(0, Math.min(1, report.progress)) * 100);
+            setLlmPrewarmPct(pct >= 100 ? null : pct);
+          }
+          if (report.text) setLlmPrewarmText(report.text || null);
+        };
+        await loadEngineByManager(llmManager, onProgress as any);
+        await ensureChatApiReady(llmManager, 180_000, onProgress as any);
+        setLlmPrewarmPct(null);
+        setLlmPrewarmText(null);
+      } catch (e) {
+        console.warn('[llm] prewarm failed', e);
+        setLlmPrewarmText('로컬 LLM 준비에 실패했어요. 나중에 다시 시도해 주세요.');
+      }
+    })();
+  }, [mode, llmManager]);
 
   // 모든 인원 준비 + (호스트인 경우) 심판자까지 준비되어야 시작 가능
   const canStartMission = useMemo(
@@ -385,8 +415,20 @@ export function GameStartLobby({
                           onStartGame();
                         }}
                       >
-                        {t('ready.startMission')}
+                        <span className="inline-flex items-center gap-2">
+                          {t('ready.startMission')}
+                          {llmPrewarmPct != null && (
+                            <span className="flex items-center gap-1 text-[11px] font-normal text-emerald-950/80">
+                              <span className="inline-block h-3 w-3 animate-spin rounded-full border border-emerald-900/60 border-b-transparent" />
+                              {llmPrewarmPct}%
+                            </span>
+                          )}
+                        </span>
                       </button>
+                    )}
+
+                    {mode === 'host' && llmPrewarmText && (
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">{llmPrewarmText}</p>
                     )}
 
                     <p className="text-xs leading-relaxed text-muted-foreground">

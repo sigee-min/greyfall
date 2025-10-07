@@ -41,6 +41,7 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
   const sfxEnabled = usePreferencesStore(selectSfxEnabled);
   const sfxVolume = usePreferencesStore(selectSfxVolume);
   const fullscreenEnabled = usePreferencesStore(selectFullscreenEnabled);
+  const debugPageEnabled = usePreferencesStore((s) => s.debugPageEnabled);
   const setPreference = usePreferencesStore((state) => state.setPreference);
   const load = usePreferencesStore((state) => state.load);
   const debouncedVolumeRef = useRef<number | null>(null);
@@ -136,10 +137,22 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
   let tabContent: JSX.Element;
   if (activeTab === 'controls') {
     tabContent = (
-      <div className="space-y-3 rounded-xl border border-dashed border-border/60 bg-card/60 p-6 text-xs text-muted-foreground">
-        <p className="font-semibold text-foreground">도구</p>
-        <p className="mb-2">로컬 LLM 아티팩트(Transformers.js 캐시)를 정리할 수 있어요.</p>
-        <PurgeModelsPanel />
+      <div className="space-y-4">
+        <div className="space-y-3 rounded-xl border border-dashed border-border/60 bg-card/60 p-6 text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">도구</p>
+          <p className="mb-2">로컬 LLM 아티팩트(Transformers.js 캐시)를 정리할 수 있어요.</p>
+          <PurgeModelsPanel />
+        </div>
+
+        <OptionToggle
+          label={t('debug.enable')}
+          description={t('debug.enable.desc')}
+          checked={Boolean(debugPageEnabled)}
+          onChange={(value) => setPreference('debugPageEnabled', value)}
+        />
+        <p className="rounded-lg border border-border/60 bg-card/50 px-4 py-3 text-[11px] text-muted-foreground">
+          {t('debug.enable.note')}
+        </p>
       </div>
     );
   } else if (activeTab === 'display') {

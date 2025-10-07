@@ -8,13 +8,21 @@ export type PreferencesState = {
   sfxEnabled: boolean;
   sfxVolume: number;
   fullscreenEnabled: boolean;
+  debugPageEnabled: boolean;
   locale: string;
   loaded: boolean;
   load: () => void;
   setPreference: <K extends PreferenceKey>(key: K, value: PreferencesState[K]) => void;
 };
 
-type PreferenceKey = 'musicEnabled' | 'musicVolume' | 'sfxEnabled' | 'sfxVolume' | 'fullscreenEnabled' | 'locale';
+type PreferenceKey =
+  | 'musicEnabled'
+  | 'musicVolume'
+  | 'sfxEnabled'
+  | 'sfxVolume'
+  | 'fullscreenEnabled'
+  | 'debugPageEnabled'
+  | 'locale';
 
 type StoredPreferences = Pick<PreferencesState, PreferenceKey>;
 
@@ -55,6 +63,7 @@ const defaultPreferences: StoredPreferences = {
   musicVolume: 0.45,
   sfxVolume: 0.7,
   fullscreenEnabled: true,
+  debugPageEnabled: false,
   locale: detectDefaultLocale()
 };
 
@@ -89,6 +98,7 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
         sfxEnabled: next.sfxEnabled,
         sfxVolume: next.sfxVolume,
         fullscreenEnabled: next.fullscreenEnabled,
+        debugPageEnabled: next.debugPageEnabled,
         locale: next.locale
       };
       writeStoredPreferences(toStore);
@@ -102,5 +112,6 @@ export const selectMusicVolume = (state: PreferencesState) => state.musicVolume;
 export const selectSfxEnabled = (state: PreferencesState) => state.sfxEnabled;
 export const selectSfxVolume = (state: PreferencesState) => state.sfxVolume;
 export const selectFullscreenEnabled = (state: PreferencesState) => state.fullscreenEnabled;
+export const selectDebugPageEnabled = (state: PreferencesState) => state.debugPageEnabled;
 export const selectLocale = (state: PreferencesState) => state.locale;
 export const selectPreferencesLoaded = (state: PreferencesState) => state.loaded;

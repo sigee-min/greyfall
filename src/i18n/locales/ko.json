@@ -45,6 +45,10 @@
   "sfx.volume": "효과음 음량",
   "sfx.volume.desc": "UI 효과음 및 상호작용 사운드의 크기를 조절합니다.",
 
+  "debug.enable": "디버그 페이지 허용",
+  "debug.enable.desc": "옵션이 켜져 있으면 ` 키로 개발자 디버그 페이지를 열 수 있습니다.",
+  "debug.enable.note": "기본은 꺼져 있습니다. 활성화 시 단축키(`)로 열립니다.",
+
   "lobby.brand": "Greyfall Initiative",
   "lobby.title.line1": "Lantern Circle",
   "lobby.title.line2": "Operations Console",

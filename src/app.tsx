@@ -56,6 +56,7 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const preferencesLoaded = usePreferencesStore(selectPreferencesLoaded);
   const fullscreenEnabled = usePreferencesStore(selectFullscreenEnabled);
+  const debugPageEnabled = usePreferencesStore((s) => s.debugPageEnabled);
   const musicEnabled = usePreferencesStore(selectMusicEnabled);
   const musicVolume = usePreferencesStore(selectMusicVolume);
   const loadPreferences = usePreferencesStore((state) => state.load);
@@ -187,6 +188,17 @@ function App() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [scene]);
+
+  // Backquote(`)로 개발자 디버그 페이지 토글 (옵션에서 허용 시)
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code === 'Backquote' || event.key === '`') {
+        if (debugPageEnabled) setDeveloperOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [debugPageEnabled]);
 
   const handleCreateGame = useCallback(
     async (name: string) => {

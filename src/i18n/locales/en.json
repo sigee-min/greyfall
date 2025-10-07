@@ -45,6 +45,10 @@
   "sfx.volume": "SFX Volume",
   "sfx.volume.desc": "Adjust the loudness of UI/interaction sounds.",
 
+  "debug.enable": "Enable Debug Page",
+  "debug.enable.desc": "When enabled, press the ` key to open the developer debug page.",
+  "debug.enable.note": "Disabled by default. Use backquote (`) to open when enabled.",
+
   "lobby.brand": "Greyfall Initiative",
   "lobby.title.line1": "Lantern Circle",
   "lobby.title.line2": "Operations Console",
