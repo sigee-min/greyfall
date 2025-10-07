@@ -6,9 +6,10 @@ type TransformersState = {
   worker: Worker | null;
   initialised: boolean;
   progressCb?: (report: { text?: string; progress?: number }) => void;
+  spawnId: string | null;
 };
 
-const state: TransformersState = { worker: null, initialised: false };
+const state: TransformersState = { worker: null, initialised: false, spawnId: null };
 let lastProgressAt = 0;
 let didLogFirstProgress = false;
 
@@ -16,6 +17,7 @@ function ensureWorker(): Worker {
   if (state.worker) return state.worker;
   const w = new Worker(new URL('./transformers.worker.ts', import.meta.url), { type: 'module' });
   try { console.info('[transformers] worker spawned'); } catch {}
+  try { state.spawnId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; } catch { state.spawnId = 'spawn'; }
   w.addEventListener('error', (ev: any) => {
     const msg = String(ev?.message || ev?.error || 'Transformers worker error');
     const report = { text: `Transformers 워커 오류: ${msg}` };
@@ -174,9 +176,19 @@ export async function generateTransformersChat(
   options: ChatOptions
 ): Promise<string> {
   const w = ensureWorker();
+  // Guard: if a caller reaches here before init, block until ready using active preset's manager.
+  if (!state.initialised) {
+    try {
+      const active = getActiveModelPreset();
+      const mgr = (active?.manager ?? 'smart') as 'fast' | 'smart';
+      await ensureTransformersReady(mgr, 5000, state.progressCb);
+    } catch {
+      // fall through; worker will return a descriptive error if still not initialised
+    }
+  }
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const { systemPrompt, temperature, topP, maxTokens, signal, onToken } = options;
-  try { console.info(`[transformers] run start id=${id} maxTokens=${maxTokens ?? 'n/a'}`); } catch {}
+  try { console.info(`[transformers] run start id=${id} maxTokens=${maxTokens ?? 'n/a'} spawn=${state.spawnId ?? 'n/a'} init=${state.initialised}`); } catch {}
 
   const listeners = new Set<(e: MessageEvent<any>) => void>();
 
