@@ -26,6 +26,8 @@ coverage
 !docs/
 !docs/*.md
 *.py
+.Zone.Identifier
+*:Zone.Identifier
 .venv
 out
 
