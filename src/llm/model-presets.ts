@@ -22,7 +22,8 @@ const PRESETS: ModelPreset[] = [
     appConfig: {
       // Transformers.js (HF) quick path
       hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
-      dtype: 'q8'
+      // q8은 브라우저 메모리 한계로 ORT가 중단(Aborted)될 수 있어 q4로 낮춥니다.
+      dtype: 'q4'
     }
   },
   {

@@ -104,10 +104,7 @@ export async function loadTransformersEngineByManager(
   try { emitProgress(startReport); } catch {}
   onProgress?.(startReport);
   const preset = getActiveModelPreset();
-  if (!(preset && preset.backend === 'cpu' && preset.packaging === 'onnx' && typeof (preset.appConfig as any)?.hfModelId === 'string')) {
-    throw new Error('Invalid or missing transformers model preset (hfModelId required)');
-  }
-  const appConfig = (preset!.appConfig || {}) as Record<string, unknown>;
+  const appConfig = (preset?.appConfig || {}) as Record<string, unknown>;
   try {
     const meta = { hfModelId: (appConfig as any)?.hfModelId, dtype: (appConfig as any)?.dtype, device: (appConfig as any)?.device };
     console.info(`[transformers] init post preset=${preset?.id ?? 'unknown'} manager=${manager} hfModelId=${String(meta.hfModelId ?? 'n/a')} dtype=${String(meta.dtype ?? 'n/a')} device=${String(meta.device ?? 'n/a')}`);
