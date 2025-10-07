@@ -4,6 +4,9 @@ import type { HostObject } from './types';
 import { HostParticipantsObject } from './participants-host.js';
 import { HostChatObject } from './chat-host.js';
 import { HostWorldPositionsObject } from './world-positions-host.js';
+import { HostLlmProgressObject, LLM_PROGRESS_OBJECT_ID } from './llm-progress-host.js';
+import { requestAICommand } from '../ai/ai-gateway';
+import { executeAICommand } from '../ai/ai-router';
 import { HostPartyObject } from './party-host.js';
 import { WORLD_STATIC } from '../world/data';
 import { getEntryField, getMap } from '../world/nav';
@@ -21,6 +24,7 @@ export class HostRouter {
   private readonly chat: HostChatObject;
   private readonly world: HostWorldPositionsObject;
   private readonly party: HostPartyObject;
+  private readonly llm: HostLlmProgressObject;
   private readonly limiter: SlidingWindowLimiter;
   private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   private readonly map = new PeerParticipantMap();
@@ -51,6 +55,8 @@ export class HostRouter {
     this.onAck = args.onAck;
     this.register(this.participants);
     this.register(this.chat);
+    this.llm = new HostLlmProgressObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore });
+    this.register(this.llm);
     this.world = new HostWorldPositionsObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore });
     this.register(this.world);
     this.party = new HostPartyObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore }, this.world);
@@ -63,6 +69,9 @@ export class HostRouter {
 
   onPeerConnected(_peerId: string) {
     this.participants.broadcast('peer-connected');
+    // Proactively push initial snapshots so early patches don't trigger fallback loops on guests.
+    this.chat.onRequest(undefined);
+    this.llm.onRequest(undefined);
   }
 
   onPeerDisconnected(peerId: string) {
@@ -92,6 +101,11 @@ export class HostRouter {
           // Ensure world position at map head's entry field
           this.world.ensureParticipant(p.id, 'LUMENFORD');
           this.party.addMember(p.id);
+          break;
+        }
+        case 'llm:progress': {
+          // Host ingests its own progress events to keep a net-object snapshot for late joiners
+          this.llm.update(message.body as any);
           break;
         }
         case 'ready': {
@@ -126,12 +140,71 @@ export class HostRouter {
           const authorId = String((message.body as any).authorId ?? this.lobbyStore.localParticipantIdRef.current ?? 'host');
           const rawBody = String((message.body as any).body ?? '');
           const trimmed = rawBody.trim();
+          try { console.debug('[/llm] chat:append:request recv', { authorId, body: trimmed.slice(0, 120) }); } catch {}
           if (!trimmed) break;
           if (!this.limiter.allow(`chat:${authorId}`)) {
             console.warn('[chat] rate limited', { authorId });
             break;
           }
           const self = this.lobbyStore.participantsRef.current.find((p) => p.id === authorId);
+
+          // Slash command: /llm <prompt> → route to LLM and post assistant reply
+          const llmMatch = /^\s*\/llm\s+([\s\S]+)$/i.exec(trimmed);
+          if (llmMatch) {
+            const prompt = llmMatch[1].trim();
+            if (!prompt) break;
+            try { console.debug('[/llm] prompt parsed', { len: prompt.length, preview: prompt.slice(0, 120) }); } catch {}
+            // 1) Echo user's prompt (without the /llm prefix)
+            this.chat.append(
+              {
+                id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                authorId,
+                authorName: self?.name ?? 'Host',
+                authorTag: self?.tag ?? '#HOST',
+                authorRole: self?.role ?? 'guest',
+                body: prompt,
+                at: Date.now()
+              },
+              'chat-append'
+            );
+            try { console.debug('[/llm] prompt echoed'); } catch {}
+
+            // 2) Ask LLM asynchronously and publish its reply via AI command handler
+            void (async () => {
+              try {
+                try { console.debug('[/llm] gateway.request start'); } catch {}
+                const ai = await requestAICommand({
+                  manager: 'smart',
+                  userInstruction: prompt,
+                  temperature: 0.5,
+                  maxTokens: undefined,
+                  timeoutMs: 45_000,
+                  fallbackChatText: '답변을 생성하지 못했습니다.'
+                });
+                try { console.debug('[/llm] gateway.request done', { cmd: ai?.cmd }); } catch {}
+                try { console.debug('[/llm] execAI start'); } catch {}
+                await executeAICommand(ai, {
+                  manager: 'smart',
+                  publishLobbyMessage: (k: any, b: any, c?: string) => this.send(k, b, c),
+                  participants: this.lobbyStore.participantsRef.current,
+                  localParticipantId: this.lobbyStore.localParticipantIdRef.current
+                });
+                try { console.debug('[/llm] execAI done'); } catch {}
+              } catch (err) {
+                console.error('[chat]/llm failed', err);
+                // Surface as assistant chat so users know why it failed
+                await executeAICommand({ cmd: 'chat', body: '로컬 LLM이 준비되지 않았어요. 네트워크 또는 모델 설정을 확인해 주세요.' }, {
+                  manager: 'smart',
+                  publishLobbyMessage: (k: any, b: any, c?: string) => this.send(k, b, c),
+                  participants: this.lobbyStore.participantsRef.current,
+                  localParticipantId: this.lobbyStore.localParticipantIdRef.current
+                });
+              }
+            })();
+            break;
+          }
+
+          // Normal chat append
           this.chat.append(
             {
               id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,

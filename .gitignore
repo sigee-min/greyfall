@@ -31,3 +31,6 @@ out
 
 # Internal agent notes
 AGENTS.md
+
+# Local LLM test workspace (ignore everything except entry files)
+test-llm

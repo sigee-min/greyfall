@@ -25,13 +25,13 @@ function coerceToString(input: unknown): unknown {
 export const ChatCommand: CommandSpec<string> = {
   cmd: 'chat',
   schema: ChatBodySchema,
-  doc: 'chat — AI 이름으로 채팅 전송. body는 string 고정.',
+  doc: 'chat — 심판자 이름으로 채팅 전송. body는 string 고정.',
   policy: { role: 'host', cooldownMs: 2500 },
   coerce: coerceToString,
   handler: (text, ctx) => {
     const body = (text ?? '').toString().trim();
     if (!body) return false;
-    const guide = 'AI';
+    const guide = '심판자';
     const authorId = ctx.localParticipantId ? `ai:${ctx.localParticipantId}` : 'ai:host';
     const entry = {
       id: nanoid(12),

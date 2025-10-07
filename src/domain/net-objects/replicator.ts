@@ -15,8 +15,10 @@ export class HostReplicator {
   // Simple logs per id for future incremental patch (not used yet)
   private logs = new Map<string, { rev: number; ops: PatchOp[] }[]>();
   private readonly maxLog: number;
-  constructor(private publish: ReplicatorPublish, maxLog = 128) {
+  private readonly maxDeltaBurst: number;
+  constructor(private publish: ReplicatorPublish, maxLog = 128, maxDeltaBurst = 64) {
     this.maxLog = maxLog;
+    this.maxDeltaBurst = maxDeltaBurst;
   }
 
   get(id: string) {
@@ -48,7 +50,17 @@ export class HostReplicator {
   onRequest(id: string, sinceRev?: number, context = 'replicator:request') {
     const current = this.state.get(id);
     if (!current) return false;
-    // For now always send replace; incremental patch can be added later
+    const sr = typeof sinceRev === 'number' ? sinceRev : undefined;
+    if (sr != null && sr >= 0 && sr < current.rev) {
+      const deltas = this.getLogsSince(id, sr);
+      if (deltas.length > 0 && deltas.length <= this.maxDeltaBurst) {
+        for (const entry of deltas) {
+          this.publish('object:patch', { id, rev: entry.rev, ops: entry.ops } as any, `${context}:delta`);
+        }
+        return true;
+      }
+    }
+    // Fallback to full snapshot
     return this.publish('object:replace', { id, rev: current.rev, value: current.value }, context);
   }
 

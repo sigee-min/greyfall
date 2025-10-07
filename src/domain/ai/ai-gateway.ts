@@ -1,12 +1,20 @@
 import type { AICommand } from './ai-router';
-import { parseAICommand } from './ai-router';
 import { runWithManagerLock } from './gateway/lock';
 import { resolveGatewayConfig } from './gateway/config';
-import { summariseAllowed, buildTwoPhaseCmdPrompt, buildTwoPhaseBodyPrompt } from './gateway/prompts';
-import { ensureRuntimeReady, generateWithTimeout } from './gateway/llm-exec';
-import { markFirstGenDone } from './gateway/state';
+import { ensureRuntimeReady, generateMessagesWithTimeout, type ChatMessage } from './gateway/llm-exec';
+import { runPipeline } from '../../llm/pipeline/runner';
+import { InMemoryNodeRegistry } from '../../llm/pipeline/registry';
+import type { Step, PipelineCtx, MessageExecutor } from '../../llm/pipeline/types';
+import { summariseAllowed } from './gateway/prompts';
+import { makeDefaultToolsHost } from '../../llm/tools';
+import { getToolsProviders } from '../../llm/tools/providers';
 import type { AIGatewayParams } from './gateway/types';
-// alias normalisation removed: require exact cmd matches
+
+const DEBUG = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+
+// NOTE: Phase-based request flow removed.
+// This gateway now builds a single messages array (system + user) and calls the LLM once.
+// WebLLM branch can be added later with a TODO; current implementation targets Transformers.js pipeline.
 
 export async function requestAICommand(params: AIGatewayParams): Promise<AICommand> {
   const {
@@ -20,64 +28,88 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
   } = params;
 
   return runWithManagerLock(manager, async () => {
-    const { allowedSet, allowedCmdsText, capabilitiesDoc } = summariseAllowed();
-    // Inline user prompt formatting (replaces removed buildUserPrompt)
-    const user = [
-      userInstruction,
-      contextText ? '' : undefined,
-      contextText ? '맥락:' : undefined,
-      contextText ?? undefined
-    ]
-      .filter(Boolean)
-      .join('\n');
-
+    if (DEBUG) console.debug('[gw] start', { manager, hasContext: Boolean(contextText), temp: temperature, maxTokens, timeoutMs });
     const { maxTokens: maxTok, effectiveTimeout } = resolveGatewayConfig(manager, {
       maxTokens,
       timeoutMs,
-      twoPhase: true
+      twoPhase: false
     });
 
-    // Two-phase only: 1) choose cmd, 2) fill body, 3) score
+    if (DEBUG) console.debug('[gw] ensureRuntimeReady.begin');
     await ensureRuntimeReady(manager);
-    const sysCmd = buildTwoPhaseCmdPrompt(allowedCmdsText, capabilitiesDoc);
-    const attempts = Math.max(1, Math.min(3, (typeof (params as any)?.maxAttempts === 'number' ? (params as any).maxAttempts : 2)));
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      let rawCmd = '';
-      try {
-        rawCmd = await generateWithTimeout(user, {
-          systemPrompt: sysCmd,
-          temperature: 0,
-          maxTokens: 24,
-          timeoutMs: Math.min(10_000, Math.max(2_000, (timeoutMs ?? effectiveTimeout) / 3))
-        });
-      } catch (err) {
-        // timeout/abort or transient error → try next attempt
-        continue;
-      }
-      const chosen = parseAICommand(rawCmd);
-      if (!chosen || !allowedSet.has(chosen.cmd)) continue;
+    if (DEBUG) console.debug('[gw] ensureRuntimeReady.ok');
 
-      const sysBody = buildTwoPhaseBodyPrompt(chosen.cmd);
-      let rawBody = '';
-      try {
-        rawBody = await generateWithTimeout(user, {
-          systemPrompt: sysBody,
-          temperature,
-          maxTokens: maxTok,
-          timeoutMs: Math.min(14_000, Math.max(3_000, (timeoutMs ?? effectiveTimeout) / 2))
-        });
-      } catch (err) {
-        // timeout/abort or transient error → try next attempt
-        continue;
-      }
-      const out = parseAICommand(rawBody);
-      if (!out || !allowedSet.has(out.cmd)) continue;
+    // 1) Choose command
+    const { allowedCmdsText, capabilitiesDoc } = summariseAllowed();
+    const choose: Step = {
+      id: 'choose-cmd',
+      nodeId: 'cmd.choose',
+      params: () => ({ allowedCmdsText, capabilitiesDoc }),
+      next: null
+    };
 
-      markFirstGenDone(manager);
+    const ctx: PipelineCtx = {
+      user: userInstruction,
+      manager,
+      scratch: { overrides: { temperature, maxTokens: maxTok, timeoutMs: Math.min(60_000, Math.max(3_000, effectiveTimeout)) } },
+      tools: makeDefaultToolsHost({ manager, providers: getToolsProviders() })
+    };
+    const exec: MessageExecutor = async (msgs, opts) => {
+      if (DEBUG) console.debug('[gw.exec] run', { messages: msgs.length, opts });
+      const out = await generateMessagesWithTimeout(msgs as ChatMessage[], opts);
+      if (DEBUG) console.debug('[gw.exec] done', { chars: out.length });
       return out;
+    };
+    try {
+      // run choose node
+      if (DEBUG) console.debug('[gw] choose.begin');
+      await runPipeline({ start: choose, ctx, registry: InMemoryNodeRegistry, exec });
+      const cmd = String((ctx.scratch?.chosenCmd as any) || 'chat');
+      if (DEBUG) console.debug('[gw] choose.done', { cmd });
+      // 2) Build pipeline per command (for now, only chat.basic)
+      let start: Step;
+      if (cmd === 'chat') {
+        start = {
+          id: 'chat-step',
+          nodeId: 'chat.basic',
+          params: async (c) => {
+            // chat.history 도구 호출
+            let historyText = '';
+            try {
+              const res = await c.tools?.invoke('chat.history', { limit: 10 });
+              if (res && res.ok) {
+                const items = res.data.items || [];
+                historyText = items
+                  .map((it: any) => `- ${it.author}(${it.role}): ${String(it.body || '').slice(0, 140)}`)
+                  .join('\n');
+              }
+            } catch {}
+            const parts: string[] = [];
+            if (contextText && contextText.trim()) parts.push(`맥락:\n${contextText}`);
+            if (historyText) parts.push(`최근 채팅(최대 10개):\n${historyText}`);
+            if (DEBUG) console.debug('[gw] chat.params', { hasHistory: Boolean(historyText), hasContext: Boolean(contextText) });
+            return {
+              persona: '너는 TRPG 매니저이다. 한국어로만 말한다.',
+              userSuffix: parts.length ? `\n${parts.join('\n\n')}` : ''
+            };
+          },
+          next: null
+        };
+      } else {
+        // TODO: pipeline for other commands (mission.start, etc.)
+        start = {
+          id: 'chat-fallback', nodeId: 'chat.basic', params: () => ({ persona: '간결한 한국어 응답만 합니다.', userSuffix: '' }), next: null
+        };
+      }
+      if (DEBUG) console.debug('[gw] pipeline.begin', { node: start.nodeId });
+      const done = await runPipeline({ start, ctx, registry: InMemoryNodeRegistry, exec });
+      if (DEBUG) console.debug('[gw] pipeline.done');
+      const text = String((done.scratch?.last as any)?.text || '') || fallbackChatText;
+      if (DEBUG) console.debug('[gw] out', { chars: text.length });
+      return { cmd, body: text };
+    } catch (e) {
+      if (DEBUG) console.debug('[gw] error', String((e as any)?.message || e));
+      return { cmd: 'chat', body: fallbackChatText };
     }
-
-    // Hard fallback: safe chat with default text
-    return { cmd: 'chat', body: fallbackChatText };
   });
 }

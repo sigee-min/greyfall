@@ -4,6 +4,7 @@ import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
 import { ClientParticipantsObject } from './participants-client.js';
 import { worldPositionsClient, WORLD_POSITIONS_OBJECT_ID } from './world-positions-client';
+import { LLM_PROGRESS_OBJECT_ID } from './llm-progress-host';
 import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 
 export type Publish = <K extends LobbyMessageKind>(
@@ -59,6 +60,7 @@ export class ClientNetController {
     this.publish('object:request', { id: PARTICIPANTS_OBJECT_ID }, 'request participants');
     this.publish('object:request', { id: 'chatlog' }, 'request chatlog');
     this.publish('object:request', { id: WORLD_POSITIONS_OBJECT_ID }, 'request world positions');
+    this.publish('object:request', { id: LLM_PROGRESS_OBJECT_ID }, 'request llm progress');
   }
 
   private handlePayload(payload: unknown, _channel?: RTCDataChannel) {
@@ -81,7 +83,13 @@ export class ClientNetController {
         const ok = this.store.applyPatch(id, rev, ops);
         if (!ok) {
           // Fallback to request full snapshot if patch cannot be applied
-          this.publish('object:request', { id }, 'patch-fallback-request');
+          const cur = this.store.get(id);
+          const sinceRev = cur?.rev;
+          if (typeof sinceRev === 'number') {
+            this.publish('object:request', { id, sinceRev }, 'patch-fallback-request');
+          } else {
+            this.publish('object:request', { id }, 'patch-fallback-request');
+          }
         } else {
           const obj = this.registry.get(id);
           obj?.onPatch?.(rev, ops);

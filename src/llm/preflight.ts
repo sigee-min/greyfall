@@ -1,4 +1,4 @@
-import type { EngineBackend } from './webllm-engine';
+import type { ComputeBackend } from './model-presets';
 import { getPresetById } from './model-presets';
 
 export type PreflightResult = { ok: true } | { ok: false; reason: string };
@@ -10,7 +10,7 @@ export async function preflightForModel(modelId: string): Promise<PreflightResul
   return preflightCpu();
 }
 
-export async function preflightBackend(backend: EngineBackend): Promise<PreflightResult> {
+export async function preflightBackend(backend: ComputeBackend): Promise<PreflightResult> {
   return backend === 'gpu' ? preflightGpu() : preflightCpu();
 }
 
@@ -31,4 +31,3 @@ export async function preflightCpu(): Promise<PreflightResult> {
   }
   return { ok: true };
 }
-

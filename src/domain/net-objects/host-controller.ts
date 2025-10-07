@@ -42,11 +42,8 @@ export class HostNetController {
         const id = String(b.id);
         const rev = Number(b.rev);
         const peers = this.getPeerIds?.() ?? [];
-        if (peers.length === 0) {
-          // fallback: global timer (legacy)
-          this.lastSentPerPeer.set(`:global:${id}`, rev);
-          this.scheduleAck(undefined, id, rev);
-        } else {
+        // Schedule acks only when at least one peer exists.
+        if (peers.length > 0) {
           for (const peerId of peers) {
             this.lastSentPerPeer.set(`${peerId}:${id}`, rev);
             this.scheduleAck(peerId, id, rev);

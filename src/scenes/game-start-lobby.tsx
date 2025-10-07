@@ -4,6 +4,7 @@ import { cn } from '../lib/utils';
 import { useI18n } from '../i18n';
 import { FallbackBackground } from '../ui/common/fallback-bg';
 import { LlmProgressOverlay } from '../ui/common/llm-progress';
+import { subscribeProgress, getLastProgress } from '../llm/progress-bus';
 import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/webllm-engine';
@@ -72,6 +73,15 @@ export function GameStartLobby({
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
+  // Ensure an active model preset exists BEFORE loading the engine, so the worker uses the intended model
+  const presetBefore = getActiveModelPreset();
+  useEffect(() => {
+    if (mode !== 'host') return;
+    if (!presetBefore) {
+      chooseModel('gemma3-1b');
+    }
+  }, [mode, presetBefore]);
+
   const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError, history: llmHistory } = useGuideLoader({
     manager: llmManager,
     enabled: mode === 'host'
@@ -81,9 +91,11 @@ export function GameStartLobby({
   const chatListRef = useRef<HTMLDivElement | null>(null);
   const progressPercent = llmProgress === null ? null : Math.round(Math.min(1, Math.max(0, llmProgress)) * 100);
   const guideAnnouncedRef = useRef(false);
-  // 진행 상태 시각화를 위한 하트비트와 최신 업데이트 시각
-  const [tick, setTick] = useState(0);
+  // Guest-side UI stall tracking (currently not used elsewhere)
   const [lastLlmUpdateAt, setLastLlmUpdateAt] = useState<number | null>(null);
+  // Host progress (single source via ProgressBus)
+  const [hostProgressText, setHostProgressText] = useState<string | null>(null);
+  const [hostProgressPct, setHostProgressPct] = useState<number | null>(null);
 
   const submitChat = useCallback(() => {
     if (!canSendChat) return false;
@@ -103,24 +115,44 @@ export function GameStartLobby({
 
   // 자동 채팅 오픈 기능 제거됨 (사용자 수동으로 열도록 유지)
 
-  // LLM 진행 상태 갱신 시각 기록
+  // Subscribe host progress bus for simple UI sync
   useEffect(() => {
-    if (llmProgress !== null || llmStatus) {
-      setLastLlmUpdateAt(Date.now());
+    if (mode !== 'host') return;
+    const last = getLastProgress();
+    if (last) {
+      setHostProgressText((last.text ?? null) as string | null);
+      setHostProgressPct(
+        typeof last.progress === 'number' ? Math.round(Math.max(0, Math.min(1, last.progress)) * 100) : null
+      );
     }
-  }, [llmProgress, llmStatus]);
-
-  // 로딩 중 도트 애니메이션을 위한 하트비트
-  useEffect(() => {
-    if (llmProgress === null || llmReady || llmError) return;
-    const id = window.setInterval(() => setTick((t) => (t + 1) % 3), 600);
-    return () => window.clearInterval(id);
-  }, [llmProgress, llmReady, llmError]);
+    const unsub = subscribeProgress((rep) => {
+      setHostProgressText((rep.text ?? null) as string | null);
+      setHostProgressPct(
+        typeof rep.progress === 'number' ? Math.round(Math.max(0, Math.min(1, rep.progress)) * 100) : null
+      );
+    });
+    return () => unsub();
+  }, [mode]);
 
   // elapsed time tracking no longer used for auto-stall warnings/retries
 
   // Host broadcasts progress; guests subscribe and display
   const remote = useReceiveLlmProgress({ register: registerLobbyHandler });
+  // Force progress percent on guests directly from broadcast events to avoid any sync lag.
+  const [guestProgressPct, setGuestProgressPct] = useState<number | null>(null);
+  useEffect(() => {
+    if (mode !== 'guest') return;
+    const unsub = registerLobbyHandler('llm:progress', (message) => {
+      const p = (message.body as any)?.progress;
+      if (typeof p === 'number') {
+        const pct = Math.round(Math.max(0, Math.min(1, p)) * 100);
+        setGuestProgressPct(pct);
+      } else if (p === null || (message.body as any)?.ready === true) {
+        setGuestProgressPct(null);
+      }
+    });
+    return unsub;
+  }, [mode, registerLobbyHandler]);
   useEffect(() => {
     // For guests, tick last update when remote changes so stalled UI works
     if (mode !== 'host') {
@@ -137,20 +169,14 @@ export function GameStartLobby({
   });
 
   const uiReady = mode === 'host' ? llmReady : remote.ready;
-  const uiProgress = mode === 'host' ? llmProgress : remote.progress;
-  const uiStatus = mode === 'host' ? llmStatus : remote.status;
   const uiError = mode === 'host' ? llmError : remote.error;
+  const simpleUiStatus = mode === 'host' ? (hostProgressText ?? llmStatus) : (remote.status ?? null);
+  const simpleUiProgressPercent = mode === 'host'
+    ? (hostProgressPct ?? progressPercent)
+    : (guestProgressPct ?? (remote.progress == null ? null : Math.round(Math.max(0, Math.min(1, remote.progress)) * 100)));
+  const isActiveLoading = !uiReady && !uiError && (simpleUiProgressPercent !== null || Boolean(simpleUiStatus));
 
-  const isActiveLoading = !uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus));
-
-  // Ensure an active model preset exists on host; default to gemma3-1b (CPU/ONNX) if none was chosen yet.
-  useEffect(() => {
-    if (mode !== 'host') return;
-    const preset = getActiveModelPreset();
-    if (!preset) {
-      chooseModel('gemma3-1b');
-    }
-  }, [mode]);
+  // (moved earlier) Preset defaulting now runs before engine load
 
   // Broadcast active LLM config (model/backend) from host once per session; guests subscribe and set their local preset.
   const activePreset = getActiveModelPreset();
@@ -167,42 +193,15 @@ export function GameStartLobby({
     chooseModel(receivedCfg.modelId);
   }, [mode, receivedCfg]);
 
-  const mapLlmUiText = (text: string | null | undefined, percent: number | null) => {
-    const fallback = t('common.loading');
-    const raw = (text ?? '').toLowerCase();
-    const pct = percent == null ? null : Math.max(0, Math.min(100, percent));
-    const withPct = (label: string) => (pct == null ? `${label}…` : `${label} ${pct}%`);
-    if (!raw.trim()) return fallback;
-    if (raw.includes('다운로드')) return withPct('모델 다운로드 중');
-    if (raw.includes('라이브러리 로드') || /model lib|library|wasm/.test(raw)) return withPct('모델 라이브러리 로딩 중');
-    if (raw.includes('컴파일') || /compile|kernel|graph/.test(raw)) return withPct('그래프 컴파일 중');
-    if (raw.includes('채팅 api 준비 완료')) return '채팅 API 준비 완료';
-    if (raw.includes('채팅 api 준비')) return '채팅 API 준비 중…';
-    if (raw.includes('엔진 초기화 완료')) return '엔진 초기화 완료';
-    if (raw.includes('헬스 체크')) return '헬스 체크 중…';
-    // Fallback to engine-provided text (위 라벨에 매칭되지 않는 경우)
-    return String(text);
-  };
-
   const displayStatus = useMemo(() => {
     if (uiError) return uiError;
-    // uiProgressPercent is defined below; compute here via local snapshot to avoid TDZ
-    const currentPercent = (() => {
-      if (!(!uiReady && !uiError && (uiProgress !== null || Boolean(uiStatus)))) return null;
-      if (mode === 'host') return progressPercent;
-      if (uiProgress == null) return null;
-      return Math.round(Math.min(1, Math.max(0, uiProgress)) * 100);
-    })();
-    const base = mapLlmUiText(uiStatus, currentPercent);
-    return isActiveLoading ? `${base}${'.'.repeat((tick % 3) + 1)}` : base;
-  }, [uiError, uiStatus, isActiveLoading, tick, uiProgress, uiReady, mode, progressPercent]);
+    return simpleUiStatus || t('common.loading');
+  }, [uiError, simpleUiStatus, t]);
 
   const uiProgressPercent = useMemo(() => {
     if (!isActiveLoading) return null;
-    if (mode === 'host') return progressPercent;
-    if (uiProgress == null) return null;
-    return Math.round(Math.min(1, Math.max(0, uiProgress)) * 100);
-  }, [isActiveLoading, mode, progressPercent, uiProgress]);
+    return simpleUiProgressPercent;
+  }, [isActiveLoading, simpleUiProgressPercent]);
 
   // 심판자 로드 완료 시, AI 명령(chat)으로 1회 합류 알림 전송 (폴링 제거)
   useEffect(() => {

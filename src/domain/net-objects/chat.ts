@@ -27,15 +27,20 @@ export class ChatHostStore {
   append(entry: ChatEntry, context = 'chat-append') {
     this.log.push(entry);
     while (this.log.length > this.max) this.log.shift();
-    // increment revision and send incremental patch to append the entry
+    // If this is the very first append (no base snapshot yet), send a full snapshot instead of a patch
+    if (this.rev === 0) {
+      const nextRev = ++this.rev;
+      const snapshot = { entries: this.log };
+      // record as a 'set' op so incremental resend can reconstruct state
+      this.opsLog.push({ rev: nextRev, ops: [{ op: 'set', value: snapshot }] as any[] });
+      this.publish('object:replace', { id: CHAT_OBJECT_ID, rev: nextRev, value: snapshot } as any, context);
+      return;
+    }
+    // Otherwise, send an incremental append patch
     const nextRev = ++this.rev;
     const ops = [{ op: 'insert', path: 'entries', value: entry }] as any[];
     this.opsLog.push({ rev: nextRev, ops });
-    this.publish(
-      'object:patch',
-      { id: CHAT_OBJECT_ID, rev: nextRev, ops },
-      context
-    );
+    this.publish('object:patch', { id: CHAT_OBJECT_ID, rev: nextRev, ops }, context);
   }
 
   broadcastSnapshot(context = 'chat-snapshot') {
@@ -43,7 +48,18 @@ export class ChatHostStore {
     return this.publish('object:replace', { id: CHAT_OBJECT_ID, rev: this.rev, value: { entries: this.log } } as any, context);
   }
 
-  onRequest(_sinceRev?: number, context = 'chat-request') {
+  onRequest(sinceRev?: number, context = 'chat-request') {
+    const sr = typeof sinceRev === 'number' ? sinceRev : undefined;
+    if (sr != null && sr >= 0 && sr < this.rev) {
+      const logs = this.getLogsSince(sr);
+      if (logs.length > 0 && logs.length <= 50) {
+        for (const entry of logs) {
+          this.publish('object:patch', { id: CHAT_OBJECT_ID, rev: entry.rev, ops: entry.ops } as any, context);
+        }
+        return true;
+      }
+    }
+    // Fallback to full snapshot
     return this.broadcastSnapshot(context);
   }
 

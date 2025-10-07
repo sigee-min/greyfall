@@ -43,6 +43,7 @@ export async function generateWithTimeout(
   const ctl = new AbortController();
   const timerId = setTimeout(() => ctl.abort('ai-gateway-timeout'), opts.timeoutMs);
   try {
+    if (DEBUG) console.debug('[llm-exec] generateChat.begin', { temp: opts.temperature, maxTokens: opts.maxTokens });
     const raw = (
       await generateChat(user, {
         systemPrompt: opts.systemPrompt,
@@ -51,6 +52,7 @@ export async function generateWithTimeout(
         signal: ctl.signal
       })
     ).trim();
+    if (DEBUG) console.debug('[llm-exec] generateChat.done', { chars: raw.length });
     return raw;
   } finally {
     clearTimeout(timerId);
@@ -77,3 +79,26 @@ export async function transientRetryGenerate(
     return await generateWithTimeout(user, { ...opts, timeoutMs: Math.min(12_000, Math.max(1_000, Math.floor(opts.timeoutMs / 2))) });
   }
 }
+
+// Simple messages-based generation for Transformers.js branch.
+// NOTE: For WebLLM branch, implement a TODO using chat.completions.create-compatible path later.
+export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+
+export async function generateMessagesWithTimeout(
+  messages: ChatMessage[],
+  opts: { temperature: number; maxTokens: number; timeoutMs: number }
+): Promise<string> {
+  // Merge into (systemPrompt, user) pair for our current CPU (Transformers.js) adapter
+  const systems = messages.filter((m) => m.role === 'system').map((m) => m.content.trim());
+  const users = messages.filter((m) => m.role === 'user').map((m) => m.content.trim());
+  const systemPrompt = systems.join('\n').trim() || 'You are a helpful assistant.';
+  const user = users.join('\n\n').trim();
+  if (DEBUG) console.debug('[llm-exec] messages', { systems: systems.length, users: users.length, timeoutMs: opts.timeoutMs });
+  return generateWithTimeout(user, {
+    systemPrompt,
+    temperature: opts.temperature,
+    maxTokens: opts.maxTokens,
+    timeoutMs: opts.timeoutMs
+  });
+}
+const DEBUG = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);

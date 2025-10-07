@@ -39,6 +39,8 @@ export function useBroadcastLlmProgress(options: {
   }, [enabled, payload, publish, throttleMs]);
 }
 
+import { LLM_PROGRESS_OBJECT_ID } from '../net-objects/llm-progress-host';
+
 export function useReceiveLlmProgress(options: { register: RegisterLobbyHandler }) {
   const { register } = options;
   const [state, setState] = useState<Required<Omit<LlmProgressPayload, 'history'>> & { history: string[] }>({
@@ -50,7 +52,7 @@ export function useReceiveLlmProgress(options: { register: RegisterLobbyHandler 
   });
 
   useEffect(() => {
-    return register('llm:progress', (message) => {
+    const unsub1 = register('llm:progress', (message) => {
       const body = message.body;
       setState((prev) => ({
         ready: body.ready ?? prev.ready,
@@ -60,6 +62,45 @@ export function useReceiveLlmProgress(options: { register: RegisterLobbyHandler 
         history: Array.isArray(body.history) ? body.history : prev.history
       }));
     });
+    // Also accept a net-object snapshot for late joiners
+    const unsub2 = register('object:replace', (message) => {
+      const { id, value } = message.body as any;
+      if (id !== LLM_PROGRESS_OBJECT_ID) return;
+      const v = value as any;
+      setState((prev) => ({
+        ready: typeof v?.ready === 'boolean' ? v.ready : prev.ready,
+        progress: typeof v?.progress === 'number' || v?.progress === null ? (v?.progress ?? null) : prev.progress,
+        status: typeof v?.status === 'string' || v?.status === null ? (v?.status ?? null) : prev.status,
+        error: typeof v?.error === 'string' || v?.error === null ? (v?.error ?? null) : prev.error,
+        history: prev.history
+      }));
+    });
+    const unsub3 = register('object:patch', (message) => {
+      const { id, ops } = message.body as any;
+      if (id !== LLM_PROGRESS_OBJECT_ID) return;
+      if (!Array.isArray(ops)) return;
+      setState((prev) => {
+        let cur = prev;
+        for (const op of ops) {
+          if (!op || op.op !== 'merge') continue;
+          const v = op.value || {};
+          cur = {
+            ready: typeof v.ready === 'boolean' ? v.ready : cur.ready,
+            progress:
+              typeof v.progress === 'number' || v.progress === null ? (v.progress ?? null) : cur.progress,
+            status: typeof v.status === 'string' || v.status === null ? (v.status ?? null) : cur.status,
+            error: typeof v.error === 'string' || v.error === null ? (v.error ?? null) : cur.error,
+            history: cur.history
+          } as any;
+        }
+        return cur;
+      });
+    });
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+    };
   }, [register]);
 
   return useMemo(() => state, [state]);

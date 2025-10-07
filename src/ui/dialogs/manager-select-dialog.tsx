@@ -85,8 +85,9 @@ export function ManagerSelectDialog({ open, onClose, onSelect, onSelectCpuModel 
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
             <button
               type="button"
-              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
-              onClick={() => onSelect('fast')}
+              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left opacity-60"
+              disabled
+              aria-disabled="true"
             >
               <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -95,14 +96,15 @@ export function ManagerSelectDialog({ open, onClose, onSelect, onSelectCpuModel 
               </span>
               <span>
                 <p className="text-sm font-semibold text-foreground">{t('manager.fast')}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t('manager.fast.desc')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">고사양 — {t('manager.unimplemented')}</p>
               </span>
             </button>
 
             <button
               type="button"
-              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary hover:bg-primary/10"
-              onClick={() => onSelect('smart')}
+              className="hud-button group flex items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-4 text-left opacity-60"
+              disabled
+              aria-disabled="true"
             >
               <span className="glow-primary mr-1 grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow shadow-black/40 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -111,7 +113,7 @@ export function ManagerSelectDialog({ open, onClose, onSelect, onSelectCpuModel 
               </span>
               <span>
                 <p className="text-sm font-semibold text-foreground">{t('manager.smart')}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t('manager.smart.desc')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">고사양 — {t('manager.unimplemented')}</p>
               </span>
             </button>
           </div>

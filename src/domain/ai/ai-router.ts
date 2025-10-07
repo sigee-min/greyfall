@@ -2,7 +2,6 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { commandRegistry, type CommandContext, type AICommandEnvelope } from './command-registry.js';
 import { ChatCommand } from './commands/chat.js';
-import { MissionStartCommand } from './commands/mission-start.js';
 import { ReadyzCommand } from './commands/readyz.js';
 
 export type AICommand = { cmd: string; body?: unknown };
@@ -74,7 +73,7 @@ let initialised = false;
 function ensureRegistry() {
   if (initialised) return;
   commandRegistry.register(ChatCommand);
-  commandRegistry.register(MissionStartCommand);
+  // mission.start 제거
   commandRegistry.register(ReadyzCommand);
   initialised = true;
 }

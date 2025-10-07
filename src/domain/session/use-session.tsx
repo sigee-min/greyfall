@@ -246,7 +246,10 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
           'interact:accept',
           'interact:cancel'
         ]);
-        if (hostHandledKinds.has(kind as string)) {
+        if ((kind as string) === 'llm:progress') {
+          // Ingest to keep Net-Object snapshot updated, and also broadcast for immediate guest UI updates
+          hostControllerRef.current?.ingest(envelope);
+        } else if (hostHandledKinds.has(kind as string)) {
           hostControllerRef.current?.ingest(envelope);
           return true;
         }

@@ -17,23 +17,36 @@ const PRESETS: ModelPreset[] = [
     id: 'gemma3-1b',
     label: 'Gemma 3 1B (ONNX)',
     backend: 'cpu',
-    manager: 'smart',
+    manager: 'fast',
     packaging: 'onnx',
     appConfig: {
       // Transformers.js (HF) quick path
       hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
-      dtype: 'q4'
+      dtype: 'q8'
     }
   },
   {
     id: 'granite-micro',
-    label: 'Granite 4.0 Micro (ONNX)',
-    backend: 'cpu',
+    label: 'Gemma 3 1B (WebGPU Q4)',
+    backend: 'gpu',
     manager: 'smart',
     packaging: 'onnx',
     appConfig: {
-      hfModelId: 'onnx-community/granite-4.0-micro-ONNX-web',
+      hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
+      dtype: 'q4',
       device: 'webgpu'
+    }
+  },
+  {
+    id: 'cpu-test',
+    label: 'CPU Test (ONNX)',
+    backend: 'cpu',
+    manager: 'fast',
+    packaging: 'onnx',
+    appConfig: {
+      // Small CPU-friendly model for quick testing
+      hfModelId: 'onnx-community/gemma-3-270m-it-ONNX',
+      dtype: 'fp32'
     }
   }
 ];

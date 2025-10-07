@@ -14,15 +14,17 @@ export function LlmProgressOverlay({ displayText, error, progressPercent }: Prop
       {error ? (
         <p className="mt-1 text-[11px] text-destructive">{error}</p>
       ) : (
-        <div className="mt-2 flex items-center justify-center gap-2">
-          <div className="h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-border/50">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300"
-              style={{ width: `${progressPercent ?? 0}%` }}
-            />
+        progressPercent != null && progressPercent < 100 ? (
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <div className="h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-border/50">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="min-w-[2.5rem] text-center text-[11px] tabular-nums">{progressPercent}%</span>
           </div>
-          <span className="min-w-[2.5rem] text-center text-[11px] tabular-nums">{progressPercent ?? 0}%</span>
-        </div>
+        ) : null
       )}
       {/* History hidden to avoid duplicate texts; keep single status line only */}
     </div>

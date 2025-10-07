@@ -38,6 +38,7 @@ import { CharacterBuilder } from './ui/character/character-builder';
 import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
 import { useI18n } from './i18n';
+import { setToolsProviders } from './llm/tools/providers';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -225,6 +226,9 @@ function App() {
   const handleCpuModelSelect = useCallback(
     async (modelId: string) => {
       chooseModel(modelId);
+      // Align manager (fast/smart) with the chosen low-spec preset
+      if (modelId === 'granite-micro') setSelectedManager('smart');
+      else setSelectedManager('fast');
       setManagerOpen(false);
       try {
         await createGame(playerName);
@@ -476,6 +480,22 @@ function App() {
   useEffect(() => () => {
     leaveSessionRef.current();
   }, []);
+
+  // Wire tools providers (e.g., chat.history) with latest chat log
+  useEffect(() => {
+    setToolsProviders({
+      getChatHistory: async (limit: number, includeSystem?: boolean) => {
+        const lim = Math.max(1, Math.min(10, Number(limit) || 10));
+        const slice = chatMessages.slice(-lim);
+        return slice.map((m) => ({
+          author: m.authorName,
+          role: m.authorId?.startsWith('ai:') ? 'assistant' : 'user',
+          body: m.body,
+          at: m.at
+        }));
+      }
+    });
+  }, [chatMessages]);
 
   return (
     <>

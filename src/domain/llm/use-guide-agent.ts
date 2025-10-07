@@ -34,7 +34,7 @@ export function useGuideAgent({
   participants: _participants,
   policy
 }: UseGuideAgentOptions) {
-  const guideName = useMemo(() => 'AI', []);
+  const guideName = useMemo(() => '심판자', []);
   const authorId = useMemo(() => (localParticipantId ? `guide:${localParticipantId}` : 'guide:host'), [localParticipantId]);
   // Keep for potential future use: local participant snapshot
   // const self = useMemo(() => participants.find((p) => p.id === localParticipantId) ?? null, [participants, localParticipantId]);
@@ -83,7 +83,7 @@ export function useGuideAgent({
         try {
           const context = historyRef.current
             .slice(-fullPolicy.maxContext)
-            .map((m) => `- ${m.role === 'assistant' ? '(AI) ' : ''}${m.content}`)
+            .map((m) => `- ${m.role === 'assistant' ? '(심판자) ' : ''}${m.content}`)
             .join('\n');
           const parsed = await requestAICommand({
             manager,

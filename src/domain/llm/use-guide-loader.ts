@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getActiveModelPreset } from '../../llm/engine-selection';
 import type { LlmManagerKind } from '../../llm/webllm-engine';
 // LLM 모듈은 동적 import로 지연 로딩합니다.
 
@@ -39,7 +40,8 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         lastUpdateAtRef.current = Date.now();
 
         const { loadEngineByManager, ensureChatApiReady, probeChatApiActive, resetEngine } = await import('../../llm/webllm-engine');
-        await loadEngineByManager(manager, (report: { text?: string; progress?: number }) => {
+        const isCpu = (getActiveModelPreset()?.backend === 'cpu');
+        const onProgress = (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
           setProgress((prev) => {
             const p = typeof report.progress === 'number' ? report.progress : undefined;
@@ -58,9 +60,10 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
             });
           }
           lastUpdateAtRef.current = Date.now();
-        });
+        };
+        await loadEngineByManager(manager, onProgress as any);
         // Ensure chat API is actually callable before reporting ready
-        await ensureChatApiReady(1_800_000, (report: { text?: string; progress?: number }) => {
+        const onEnsure = (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
           if (report.text) {
             const txt = report.text as string;
@@ -76,23 +79,32 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
             setProgress((prev) => Math.max(prev ?? 0, Math.min(1, Math.max(0, report.progress!))));
           }
           lastUpdateAtRef.current = Date.now();
-        });
-        // Active probe to avoid proxy timing race (single check; no auto-retries)
-        if (!(await probeChatApiActive(1200))) {
-          const note = '헬스 체크 중…';
-          setHistory((prev) => {
-            const next = [...prev];
-            const last = next[next.length - 1];
-            if (note !== last) next.push(note);
-            return next.slice(-8);
-          });
-          // Keep last meaningful status text; do not override status to avoid UI appearing stuck
-        }
+        };
+        await ensureChatApiReady(1_800_000, onEnsure as any);
 
-        if (cancelled) return;
-        setReady(true);
-        setProgress(null); // 완료 시 바 숨김
-        setStatus(null);
+        if (isCpu) {
+          if (cancelled) return;
+          setReady(true);
+          setProgress(null);
+          setStatus(null);
+        } else {
+          // GPU: keep existing behaviour
+          // Active probe to avoid proxy timing race (single check; no auto-retries)
+          if (!(await probeChatApiActive(1200))) {
+            const note = '상태를 확인하는 중이에요…';
+            setHistory((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (note !== last) next.push(note);
+              return next.slice(-8);
+            });
+          }
+
+          if (cancelled) return;
+          setReady(true);
+          setProgress(null); // 완료 시 바 숨김
+          setStatus(null);
+        }
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
