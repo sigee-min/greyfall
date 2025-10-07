@@ -27,6 +27,35 @@
   } catch {}
 })();
 
+// Configure ONNX Runtime Web for multi-thread + SIMD, and map jsep → non-jsep at fetch level
+import * as ort from 'onnxruntime-web';
+try {
+  // Modest thread count to balance stability/perf
+  ort.env.wasm.numThreads = 2;
+  ort.env.wasm.proxy = true;
+  // Prefer SIMD path for CPU perf
+  // @ts-ignore
+  ort.env.wasm.simd = true;
+} catch {}
+
+// Rewrite any '*.jsep.wasm' requests to the corresponding non-jsep '*.wasm'
+try {
+  const origFetch = (self as any).fetch?.bind(self) as typeof fetch | undefined;
+  if (origFetch) {
+    (self as any).fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      let urlStr: string | null = null;
+      if (typeof input === 'string') urlStr = input;
+      else if (input instanceof URL) urlStr = input.toString();
+      else if (typeof Request !== 'undefined' && input instanceof Request) urlStr = input.url;
+      if (urlStr && /\.jsep\.wasm(\?|#|$)/.test(urlStr)) {
+        const replaced = urlStr.replace(/\.jsep\.wasm(?=[?#]|$)/, '.wasm');
+        return origFetch(replaced, init);
+      }
+      return origFetch(input as any, init);
+    }) as any;
+  }
+} catch {}
+
 type InitMsg = { type: 'init'; appConfig?: Record<string, unknown> };
 type RunMsg = {
   type: 'run';
