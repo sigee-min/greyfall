@@ -136,7 +136,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
               </button>
             ))}
           </div>
-          <div style={{ padding: 10, flex: 1, minHeight: 0 }}>
+          <div style={{ padding: 10, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             {current ? (
               <>
                 <div style={{ fontSize: 12, color: '#9ca3af', display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -161,7 +161,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                 <div
                   ref={tokenBoxRef}
                   onScroll={onTokenScroll}
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 10, paddingBottom: 16, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12, lineHeight: 1.5, height: '100%', overflowY: 'auto', whiteSpace: 'pre-wrap' }}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 10, paddingBottom: 24, boxSizing: 'border-box', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12, lineHeight: 1.5, flex: 1, minHeight: 0, overflowY: 'auto', whiteSpace: 'pre-wrap' }}
                 >
                   {/* System Section */}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
