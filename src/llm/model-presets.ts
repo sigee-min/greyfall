@@ -26,7 +26,7 @@ const PRESETS: ModelPreset[] = [
     }
   },
   {
-    id: 'gemma3-1b',
+    id: 'granite-micro',
     label: 'Gemma 3 1B (WebGPU Q4)',
     backend: 'gpu',
     manager: 'smart',
