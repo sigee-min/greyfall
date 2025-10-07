@@ -22,7 +22,9 @@ const PRESETS: ModelPreset[] = [
     appConfig: {
       // Transformers.js (HF) quick path
       hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
-      dtype: 'q8'
+      dtype: 'q8',
+      threads: 1, // safer default unless cross-origin isolation enabled
+      simd: true
     }
   },
   {

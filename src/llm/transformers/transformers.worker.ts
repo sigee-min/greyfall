@@ -18,7 +18,7 @@ let initialised = false;
 let inflight: { id: string; ctl: AbortController } | null = null;
 let hfGenerator: any | null = null;
 
-import { pipeline, TextStreamer } from '@huggingface/transformers';
+import { pipeline, TextStreamer, env } from '@huggingface/transformers';
 
 function emitProgress(text: string, progress?: number) {
   (self as any).postMessage({ type: 'progress', text, progress });
@@ -35,6 +35,32 @@ self.onmessage = async (evt: MessageEvent<InMessageEx>) => {
       const cfg = (msg.appConfig || {}) as any;
       // Preferred: Transformers.js pipeline (downloads from HF Hub by default)
       {
+        try {
+          // Configure ONNX Runtime Web environment before creating pipeline
+          const threads = Number(cfg?.threads);
+          const simd = cfg?.simd;
+          if (!Number.isNaN(threads) && threads > 0) {
+            (env as any).backends ??= {};
+            (env as any).backends.onnx ??= { wasm: {} };
+            (env as any).backends.onnx.wasm ??= {};
+            (env as any).backends.onnx.wasm.numThreads = threads;
+          }
+          if (typeof simd === 'boolean') {
+            (env as any).backends ??= {};
+            (env as any).backends.onnx ??= { wasm: {} };
+            (env as any).backends.onnx.wasm ??= {};
+            (env as any).backends.onnx.wasm.simd = simd;
+          }
+          // If not cross-origin isolated, disable threading proxy to avoid WASM abort
+          if (!(self as any).crossOriginIsolated) {
+            (env as any).backends ??= {};
+            (env as any).backends.onnx ??= { wasm: {} };
+            (env as any).backends.onnx.wasm ??= {};
+            (env as any).backends.onnx.wasm.numThreads = 1;
+            (env as any).backends.onnx.wasm.proxy = 'none';
+            try { console.warn('[transformers] not cross-origin isolated; using single-thread WASM'); } catch {}
+          }
+        } catch {}
         const { hfModelId, ...opts } = (cfg || {}) as Record<string, unknown>;
         if (!hfModelId) {
           try { console.error('[transformers] pipeline init failed:', 'Missing hfModelId'); } catch {}
