@@ -63,6 +63,25 @@ self.onmessage = async (evt: MessageEvent<InMessage>) => {
       const hfModelId = String(cfg?.hfModelId || 'onnx-community/gemma-3-1b-it-ONNX-GQA');
       const dtype = String(pick(cfg?.dtype, 'q4'));
       try {
+        // Environment probe: COOP/COEP (cross-origin isolation) and SharedArrayBuffer availability
+        try {
+          const origin = (self as any).location?.origin ?? '(unknown)';
+          const isolated = (self as any).crossOriginIsolated === true;
+          const sabAvail = typeof (self as any).SharedArrayBuffer !== 'undefined';
+          let sabAlloc = false;
+          try { if (sabAvail) { const b = new (self as any).SharedArrayBuffer(16); sabAlloc = b.byteLength === 16; } } catch {}
+          // eslint-disable-next-line no-console
+          console.info('[llm-worker] env', { origin, crossOriginIsolated: isolated, sharedArrayBuffer: sabAvail, sabAlloc });
+          try {
+            const href = (self as any).location?.href || '/';
+            const res = await fetch(href, { method: 'GET', cache: 'no-store' });
+            const coop = res.headers.get('cross-origin-opener-policy');
+            const coep = res.headers.get('cross-origin-embedder-policy');
+            const corp = res.headers.get('cross-origin-resource-policy');
+            // eslint-disable-next-line no-console
+            console.info('[llm-worker] headers', { coop, coep, corp });
+          } catch {}
+        } catch {}
         // First attempt with progress callback that forwards raw status strings
         const withProgress = { device: 'wasm', dtype, progress_callback: (data: any) => {
           const status = String(data?.status ?? '');
