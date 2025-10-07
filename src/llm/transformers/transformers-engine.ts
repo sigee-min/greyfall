@@ -2,9 +2,15 @@ import type { LlmManagerKind, WebLLMProgress, ChatOptions } from '../llm-engine'
 import { emitProgress } from '../progress-bus';
 import { openStream, pushToken, markDone, markError, markAborted } from '../stream-bus';
 
-type State = { worker: Worker | null; initialised: boolean };
+type State = {
+  worker: Worker | null;
+  initialised: boolean;
+  initPromise: Promise<void> | null;
+  initResolve?: () => void;
+  initReject?: (err: any) => void;
+};
 
-const state: State = { worker: null, initialised: false };
+const state: State = { worker: null, initialised: false, initPromise: null };
 
 function ensureWorker(): Worker {
   if (state.worker) return state.worker;
@@ -14,12 +20,23 @@ function ensureWorker(): Worker {
     if (d.type === 'progress') {
       const text = String(d.text ?? '');
       // Set initialised when official callback reports 'ready'
-      if (text === 'ready') state.initialised = true;
+      if (text === 'ready') {
+        state.initialised = true;
+        if (state.initResolve) { try { state.initResolve(); } catch {} }
+        state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
+      }
       emitProgress({ text, progress: d.progress as number | undefined });
     } else if (d.type === 'ready') {
       // Reserved: worker no longer sends explicit 'ready'; rely on progress 'ready'
     } else if (d.type === 'unloaded') {
       state.initialised = false;
+      if (state.initReject) { try { state.initReject(new Error('worker unloaded')); } catch {} }
+      state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
+    } else if (d.type === 'error' && !d.id) {
+      // init-level error (no id)
+      state.initialised = false;
+      if (state.initReject) { try { state.initReject(new Error(String(d.error || 'transformers init error'))); } catch {} }
+      state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
     } else if (d.type === 'purged') {
       // Optional: caller may choose to show a toast; keep progress quiet here
     }
@@ -33,6 +50,7 @@ export function resetTransformersEngine() {
   try { state.worker?.terminate(); } catch {}
   state.worker = null;
   state.initialised = false;
+  state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
 }
 
 export function isTransformersInitialised(): boolean { return state.initialised; }
@@ -46,8 +64,17 @@ export async function loadTransformersEngineByManager(
     emitProgress({ text: 'ready', progress: 1 });
     return;
   }
-  const appConfig = { hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA', dtype: 'q8' } as const;
-  w.postMessage({ type: 'init', appConfig });
+  if (state.initPromise) { await state.initPromise; return; }
+  state.initPromise = new Promise<void>((resolve, reject) => { state.initResolve = resolve; state.initReject = reject; });
+  try {
+    const appConfig = { hfModelId: 'onnx-community/gemma-3-1b-it-ONNX-GQA', dtype: 'q8' } as const;
+    w.postMessage({ type: 'init', appConfig });
+  } catch (e) {
+    const rej = state.initReject; state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
+    if (rej) rej(e);
+    throw e;
+  }
+  await state.initPromise;
 }
 
 export async function ensureTransformersReady(
