@@ -15,10 +15,7 @@ export const ReadyzCommand: CommandSpec<string> = {
       if (active) return true; // approved; caller may proceed to next command
     }
     // Do not surface errors; log and wait
-    console.debug('[llm.readyz] waiting', {
-      initialised: probe.initialised,
-      chatApiReady: probe.chatApiReady
-    });
+    console.debug(`[llm.readyz] waiting initialised=${probe.initialised} chatApiReady=${probe.chatApiReady}`);
     return false;
   }
 };

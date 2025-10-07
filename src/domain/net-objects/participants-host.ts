@@ -1,6 +1,8 @@
 import { PARTICIPANTS_OBJECT_ID, makeParticipantsSnapshot } from './participants.js';
 import type { CommonDeps, HostObject } from './types';
 import { HostReplicator } from './replicator.js';
+import { registerNetObject, HostAckFallback } from './registry.js';
+import { ClientParticipantsObject } from './participants-client.js';
 
 export class HostParticipantsObject implements HostObject {
   readonly id = PARTICIPANTS_OBJECT_ID;
@@ -59,3 +61,25 @@ export class HostParticipantsObject implements HostObject {
     return this.replicator.getLogsSince(this.id, sinceRev);
   }
 }
+
+registerNetObject({
+  id: PARTICIPANTS_OBJECT_ID,
+  host: {
+    create: (deps) => new HostParticipantsObject(deps),
+    ack: {
+      incrementalMax: 5,
+      fallbackStrategy: HostAckFallback.Snapshot,
+      broadcast: (object) => {
+        (object as HostParticipantsObject).broadcast('ack:resend');
+      }
+    },
+    onPeerConnect: (object) => {
+      (object as HostParticipantsObject).broadcast('peer-connected');
+    }
+  },
+  client: {
+    create: ({ lobbyStore }) => new ClientParticipantsObject(lobbyStore),
+    requestOnStart: true,
+    requestContext: 'request participants'
+  }
+});

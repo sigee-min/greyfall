@@ -7,7 +7,7 @@ export class InMemoryToolsHost implements ToolsHost {
   constructor(private registry: ToolRegistry, private baseCtx: Omit<ToolCtx, 'providers'> & { providers?: ToolCtx['providers'] }) {}
 
   async invoke<TIn, TOut>(id: string, input: TIn, opts?: { cacheKey?: string; ttlMs?: number }): Promise<ToolResult<TOut>> {
-    const tool = this.registry.get(id);
+    const tool = this.registry.get<TIn, TOut>(id);
     if (!tool) return { ok: false, error: `unknown-tool:${id}` };
 
     const key = opts?.cacheKey ? `${id}:${opts.cacheKey}` : null;
@@ -18,9 +18,15 @@ export class InMemoryToolsHost implements ToolsHost {
     }
 
     try {
-      if (tool.inputGuard) tool.inputGuard(input);
+      if (tool.inputGuard) {
+        const guard: (value: unknown) => asserts value is TIn = tool.inputGuard;
+        guard(input);
+      }
       const result = await tool.invoke(this.baseCtx as ToolCtx, input);
-      if (result.ok && tool.outputGuard) tool.outputGuard(result.data);
+      if (result.ok && tool.outputGuard) {
+        const guard: (value: unknown) => asserts value is TOut = tool.outputGuard;
+        guard(result.data);
+      }
       if (key && opts?.ttlMs) this.cache.set(key, { expiresAt: Date.now() + Math.max(100, opts.ttlMs), result });
       return result as ToolResult<TOut>;
     } catch (err) {
@@ -28,4 +34,3 @@ export class InMemoryToolsHost implements ToolsHost {
     }
   }
 }
-

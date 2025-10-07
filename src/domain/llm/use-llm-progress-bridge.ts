@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../chat/use-chat-net-sync';
+import { subscribeProgress, getLastProgress } from '../../llm/progress-bus';
 
 export type LlmProgressPayload = {
   ready?: boolean;
@@ -18,25 +19,56 @@ export function useBroadcastLlmProgress(options: {
   const { enabled, payload, publish, throttleMs = 300 } = options;
   const lastSentRef = useRef<LlmProgressPayload>({});
   const lastAtRef = useRef(0);
+  const payloadRef = useRef<LlmProgressPayload>(payload);
+
+  useEffect(() => {
+    payloadRef.current = payload;
+  }, [payload]);
+
+  const tryBroadcast = useCallback((candidate: LlmProgressPayload) => {
+    if (!enabled) return;
+    const now = Date.now();
+    const last = lastSentRef.current;
+    const changed = hasDiff(last, candidate);
+    const statusChanged = last.status !== candidate.status;
+    const mustSend = changed && (now - lastAtRef.current >= throttleMs || Boolean(candidate.ready) || Boolean(candidate.error) || statusChanged);
+    if (!mustSend) return;
+    const ok = publish('llm:progress', normalizePayload(candidate), 'llm-progress');
+    if (ok) {
+      lastSentRef.current = { ...candidate };
+      lastAtRef.current = now;
+    }
+  }, [enabled, publish, throttleMs]);
 
   // Only emit when values actually change (shallow compare) and throttle bursts,
   // but always send immediately on status/ready/error changes to avoid UI stuck.
   useEffect(() => {
+    tryBroadcast(payload);
+  }, [payload, tryBroadcast]);
+
+  useEffect(() => {
     if (!enabled) return;
-    const now = Date.now();
-
-    const changed = hasDiff(lastSentRef.current, payload);
-    const elapsed = now - lastAtRef.current;
-    const statusChanged = lastSentRef.current.status !== payload.status;
-    const mustSend = changed && (elapsed >= throttleMs || Boolean(payload.ready) || Boolean(payload.error) || statusChanged);
-    if (!mustSend) return;
-
-    const ok = publish('llm:progress', normalizePayload(payload), 'llm-progress');
-    if (ok) {
-      lastSentRef.current = { ...payload };
-      lastAtRef.current = now;
+    // Replay last progress snapshot immediately for new guests, then subscribe for live updates
+    const last = getLastProgress();
+    if (last) {
+      tryBroadcast({
+        ...payloadRef.current,
+        status: typeof last.text === 'string' ? last.text : payloadRef.current.status,
+        progress: typeof last.progress === 'number' ? last.progress : payloadRef.current.progress
+      });
     }
-  }, [enabled, payload, publish, throttleMs]);
+    const unsub = subscribeProgress((report) => {
+      const current = payloadRef.current;
+      const next: LlmProgressPayload = {
+        ready: current.ready,
+        progress: typeof report.progress === 'number' ? report.progress : current.progress,
+        status: typeof report.text === 'string' ? report.text : current.status,
+        error: current.error
+      };
+      tryBroadcast(next);
+    });
+    return () => unsub();
+  }, [enabled, tryBroadcast]);
 }
 
 import { LLM_PROGRESS_OBJECT_ID } from '../net-objects/llm-progress-host';

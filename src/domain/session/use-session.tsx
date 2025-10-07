@@ -84,7 +84,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
   const sessionRef = useRef<HostLobbySession | GuestLobbySession | null>(null);
   const modeRef = useRef<SessionMode | null>(null);
   const pendingOfferRef = useRef<Promise<void> | null>(null);
-  const disconnectTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const disconnectTimerRef = useRef<number | null>(null);
   const renegotiateAttemptsRef = useRef(0);
   const renegotiateInFlightRef = useRef(false);
 
@@ -105,12 +105,12 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
           if (session?.channel.readyState === 'open') {
             const envelope = createLobbyMessage('leave', { participantId: localId });
             session.channel.send(JSON.stringify(envelope));
-            console.info('[lobby] send', { context: 'guest-leave-inline', kind: 'leave' });
+            console.info('[lobby] send context=guest-leave-inline kind=leave');
           } else {
             console.info('[lobby] leave queued/skipped – channel not open');
           }
         } catch (error) {
-          console.warn('[lobby] failed to send leave inline', error);
+          console.warn(`[lobby] failed to send leave inline ${String((error as any)?.message || error)}`);
         }
       }
     }
@@ -247,35 +247,30 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
           'interact:cancel'
         ]);
         if ((kind as string) === 'llm:progress') {
-          // Ingest to keep Net-Object snapshot updated, and also broadcast for immediate guest UI updates
           hostControllerRef.current?.ingest(envelope);
         } else if (hostHandledKinds.has(kind as string)) {
           hostControllerRef.current?.ingest(envelope);
           return true;
         }
         hostPeersRef.current.sendAll(envelope);
-        if (kind === 'llm:progress' || context === 'llm-progress') {
-          console.debug('[lobby] broadcast', { context, kind });
-        } else {
-          console.info('[lobby] broadcast', { context, kind });
-        }
+        const logMsg = `[lobby] broadcast context=${context} kind=${kind as string}`;
+        if (kind === 'llm:progress' || context === 'llm-progress') console.debug(logMsg);
+        else console.info(logMsg);
         return true;
       }
 
       // 게스트/레거시 단일 채널 경로
       const session = sessionRef.current;
       if (!session) {
-        console.warn('[lobby] send skipped – no session', { context, kind });
+        console.warn(`[lobby] send skipped – no session context=${context} kind=${kind as string}`);
         return false;
       }
       const { channel } = session;
       if (channel.readyState !== 'open') return false;
       channel.send(JSON.stringify(envelope));
-      if (kind === 'llm:progress' || context === 'llm-progress') {
-        console.debug('[lobby] send', { context, kind });
-      } else {
-        console.info('[lobby] send', { context, kind });
-      }
+      const logMsg = `[lobby] send context=${context} kind=${kind as string}`;
+      if (kind === 'llm:progress' || context === 'llm-progress') console.debug(logMsg);
+      else console.info(logMsg);
       return true;
     },
     [lobbyBus]
@@ -294,7 +289,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
   const handleChannelOpen = useCallback(
     (channel: RTCDataChannel) => {
-      console.info('[lobby] channel open', { mode: modeRef.current, state: channel.readyState });
+      console.info(`[lobby] channel open mode=${modeRef.current} state=${channel.readyState}`);
 
       // Queuing removed: do not flush any backlog
 
@@ -318,7 +313,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
   const handleChannelClose = useCallback(
     (event: Event) => {
-      console.warn('[lobby] channel closed', { mode: modeRef.current, event });
+      console.warn(`[lobby] channel closed mode=${modeRef.current} state=${(event as any)?.type ?? 'unknown'}`);
       // Host: ignore individual per-guest channel closures here.
       // Precise removal is handled via signal 'peer-disconnected' in HostRouter.
       if (modeRef.current === 'guest') {
@@ -329,7 +324,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
   );
 
   const handleChannelError = useCallback((event: Event) => {
-    console.warn('[lobby] channel error', event);
+    console.warn(`[lobby] channel error type=${event.type}`);
   }, []);
 
   const events: RTCBridgeEvents = useMemo(

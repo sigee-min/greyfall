@@ -1,17 +1,20 @@
 import { parseLobbyMessage, type LobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
-import type { HostObject } from './types';
+import type { CommonDeps, HostObject } from './types';
 import { HostParticipantsObject } from './participants-host.js';
 import { HostChatObject } from './chat-host.js';
-import { HostWorldPositionsObject } from './world-positions-host.js';
+import { CHAT_OBJECT_ID } from './chat.js';
+import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
 import { HostLlmProgressObject, LLM_PROGRESS_OBJECT_ID } from './llm-progress-host.js';
 import { requestAICommand } from '../ai/ai-gateway';
 import { executeAICommand } from '../ai/ai-router';
-import { HostPartyObject } from './party-host.js';
+import { HostPartyObject, PARTY_OBJECT_ID } from './party-host.js';
 import { WORLD_STATIC } from '../world/data';
 import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
+import { PARTICIPANTS_OBJECT_ID } from './participants.js';
+import type { NetObjectDescriptor } from './registry.js';
 
 type Publish = (message: LobbyMessage) => void;
 type Send = <K extends LobbyMessage['kind']>(kind: K, body: Extract<LobbyMessage, { kind: K }>['body'], context?: string) => boolean;
@@ -20,6 +23,9 @@ export class HostRouter {
   private readonly send: Send;
   private readonly lobbyStore: LobbyStore;
   private readonly publishToBus: Publish;
+  private readonly descriptors: NetObjectDescriptor[];
+  private readonly commonDeps: CommonDeps;
+  private readonly objects: Map<string, HostObject>;
   private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
   private readonly world: HostWorldPositionsObject;
@@ -41,37 +47,60 @@ export class HostRouter {
     send: Send;
     lobbyStore: LobbyStore;
     publishToBus: Publish;
-    participants: HostParticipantsObject;
-    chat: HostChatObject;
+    descriptors: NetObjectDescriptor[];
+    objects: Map<string, HostObject>;
+    commonDeps: CommonDeps;
     limiter?: SlidingWindowLimiter;
     onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   }) {
     this.send = args.send;
     this.lobbyStore = args.lobbyStore;
     this.publishToBus = args.publishToBus;
-    this.participants = args.participants;
-    this.chat = args.chat;
+    this.descriptors = [...args.descriptors];
+    this.commonDeps = args.commonDeps;
+    this.objects = args.objects;
     this.limiter = args.limiter ?? new SlidingWindowLimiter(5, 10_000);
     this.onAck = args.onAck;
-    this.register(this.participants);
-    this.register(this.chat);
-    this.llm = new HostLlmProgressObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore });
-    this.register(this.llm);
-    this.world = new HostWorldPositionsObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore });
-    this.register(this.world);
-    this.party = new HostPartyObject({ publish: (k: any, b: any, c?: string) => this.send(k, b, c), lobbyStore: this.lobbyStore }, this.world);
-    this.register(this.party);
+    for (const object of this.objects.values()) {
+      this.register(object);
+    }
+    this.participants = this.require<HostParticipantsObject>(PARTICIPANTS_OBJECT_ID);
+    this.chat = this.require<HostChatObject>(CHAT_OBJECT_ID);
+    this.llm = this.require<HostLlmProgressObject>(LLM_PROGRESS_OBJECT_ID);
+    this.world = this.require<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
+    this.party = this.require<HostPartyObject>(PARTY_OBJECT_ID);
   }
 
   register(object: HostObject) {
     this.registry.set(object.id, object);
+    if (!this.objects.has(object.id)) {
+      this.objects.set(object.id, object);
+    }
+  }
+
+  addNetObject(descriptor: NetObjectDescriptor, object: HostObject) {
+    if (!this.descriptors.some((entry) => entry.id === descriptor.id)) {
+      this.descriptors.push(descriptor);
+    }
+    this.register(object);
+  }
+
+  private require<T extends HostObject>(id: string): T {
+    const object = this.registry.get(id);
+    if (!object) {
+      throw new Error(`HostRouter missing host object "${id}"`);
+    }
+    return object as T;
   }
 
   onPeerConnected(_peerId: string) {
-    this.participants.broadcast('peer-connected');
-    // Proactively push initial snapshots so early patches don't trigger fallback loops on guests.
-    this.chat.onRequest(undefined);
-    this.llm.onRequest(undefined);
+    for (const descriptor of this.descriptors) {
+      const object = this.registry.get(descriptor.id);
+      if (!object) continue;
+      if (descriptor.host.onPeerConnect) {
+        descriptor.host.onPeerConnect(object, this.commonDeps);
+      }
+    }
   }
 
   onPeerDisconnected(peerId: string) {

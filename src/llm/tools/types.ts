@@ -21,12 +21,11 @@ export type Tool<TIn = unknown, TOut = unknown> = {
 };
 
 export type ToolRegistry = {
-  register(tool: Tool): void;
-  get(id: string): Tool | null;
+  register<TIn = unknown, TOut = unknown>(tool: Tool<TIn, TOut>): void;
+  get<TIn = unknown, TOut = unknown>(id: string): Tool<TIn, TOut> | null;
   list(): Tool[];
 };
 
 export type ToolsHost = {
   invoke<TIn = unknown, TOut = unknown>(id: string, input: TIn, opts?: { cacheKey?: string; ttlMs?: number }): Promise<ToolResult<TOut>>;
 };
-

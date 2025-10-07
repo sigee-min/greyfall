@@ -1,4 +1,4 @@
-// CPU WASM worker skeleton. Replace internals with ONNX/llama.cpp later.
+// Transformers.js worker skeleton. Replace internals with ONNX/llama.cpp later.
 
 type InitMsg = { type: 'init'; modelId: string; threads?: number; simd?: boolean; appConfig?: Record<string, unknown> };
 type RunMsg = {
@@ -37,11 +37,11 @@ self.onmessage = async (evt: MessageEvent<InMessageEx>) => {
       {
         const { hfModelId, ...opts } = (cfg || {}) as Record<string, unknown>;
         if (!hfModelId) {
-          try { console.error('[cpu] pipeline init failed:', 'Missing hfModelId'); } catch {}
+          try { console.error('[transformers] pipeline init failed:', 'Missing hfModelId'); } catch {}
         } else {
           emitProgress('필요한 파일을 불러오는 중이에요…', 0.25);
           hfGenerator = await pipeline('text-generation', String(hfModelId), opts as any).catch((e: any) => {
-            try { console.error('[cpu] pipeline init failed:', String(e?.message || e)); } catch {}
+            try { console.error('[transformers] pipeline init failed:', String(e?.message || e)); } catch {}
             return null as any;
           });
           if (hfGenerator) emitProgress('거의 준비됐어요…', 0.9);
@@ -72,13 +72,13 @@ self.onmessage = async (evt: MessageEvent<InMessageEx>) => {
     }
     case 'run': {
       if (!initialised) {
-        (self as any).postMessage({ type: 'error', id: msg.id, error: 'CPU engine not initialised' });
+        (self as any).postMessage({ type: 'error', id: msg.id, error: 'Transformers engine not initialised' });
         return;
       }
       inflight = { id: msg.id, ctl: new AbortController() } as any;
       let out = '';
       try {
-        if (!hfGenerator) throw new Error('CPU generator not ready');
+        if (!hfGenerator) throw new Error('Transformers generator not ready');
         const messages = [
           { role: 'system', content: String(msg.systemPrompt || 'You are a helpful assistant.') },
           { role: 'user', content: String(msg.prompt || '') }
@@ -122,4 +122,4 @@ self.onmessage = async (evt: MessageEvent<InMessageEx>) => {
 };
 
 // Expose init status for lightweight probe (optional)
-(self as any).__cpu_engine_ready__ = () => initialised;
+(self as any).__transformers_engine_ready__ = () => initialised;

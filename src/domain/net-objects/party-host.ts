@@ -1,7 +1,8 @@
 import type { HostObject, CommonDeps } from './types';
 import { HostReplicator } from './replicator';
 import { getMap } from '../world/nav';
-import { HostWorldPositionsObject } from './world-positions-host';
+import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-positions-host';
+import { registerNetObject, HostAckFallback } from './registry.js';
 
 export const PARTY_OBJECT_ID = 'party';
 
@@ -61,3 +62,26 @@ export class HostPartyObject implements HostObject {
   }
 }
 
+registerNetObject({
+  id: PARTY_OBJECT_ID,
+  host: {
+    create: (deps, ctx) => {
+      const world = ctx.get<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
+      if (!world) {
+        throw new Error('HostPartyObject requires world positions object');
+      }
+      return new HostPartyObject(deps, world);
+    },
+    ack: {
+      incrementalMax: 16,
+      fallbackStrategy: HostAckFallback.Snapshot
+    },
+    onPeerConnect: (object) => {
+      object.onRequest(undefined);
+    }
+  },
+  client: {
+    requestOnStart: true,
+    requestContext: 'request party'
+  }
+});

@@ -1,11 +1,11 @@
 import {
-  loadCpuEngineByManager,
-  ensureCpuReady,
-  generateCpuChat,
-  probeCpuActive,
-  resetCpuEngine,
-  isCpuInitialised
-} from './cpu/cpu-engine';
+  loadTransformersEngineByManager,
+  ensureTransformersReady,
+  generateTransformersChat,
+  probeTransformersActive,
+  resetTransformersEngine,
+  isTransformersInitialised
+} from './transformers/transformers-engine';
 
 export type LlmManagerKind = 'fast' | 'smart';
 
@@ -26,29 +26,33 @@ export async function loadEngineByManager(
   manager: LlmManagerKind,
   onProgress?: (report: WebLLMProgress) => void
 ): Promise<void> {
-  await loadCpuEngineByManager(manager, onProgress as any);
+  await loadTransformersEngineByManager(manager, onProgress as any);
 }
 
-export function resetEngine() { resetCpuEngine(); }
+export function resetEngine() { resetTransformersEngine(); }
 
 export async function generateChat(prompt: string, options: ChatOptions = {}) {
-  return generateCpuChat(prompt, options);
+  return generateTransformersChat(prompt, options);
 }
 
-export async function ensureChatApiReady(timeoutMs = 8000, onProgress?: (report: WebLLMProgress) => void): Promise<void> {
-  await ensureCpuReady(timeoutMs, onProgress as any);
+export async function ensureChatApiReady(
+  manager: LlmManagerKind,
+  timeoutMs = 8000,
+  onProgress?: (report: WebLLMProgress) => void
+): Promise<void> {
+  await ensureTransformersReady(manager, timeoutMs, onProgress as any);
 }
 
 export async function probeChatApiActive(timeoutMs = 800): Promise<boolean> {
-  return probeCpuActive(timeoutMs);
+  return probeTransformersActive(timeoutMs);
 }
 
 export async function probeChatApiReady(_timeoutMs = 500): Promise<{ initialised: boolean; chatApiReady: boolean }> {
-  const ready = isCpuInitialised();
+  const ready = isTransformersInitialised();
   return { initialised: ready, chatApiReady: ready };
 }
 
 // readyz 제거: 필요 시 ensureChatApiReady와 isCpuInitialised 조합으로 확인
 export async function readyz(_timeoutMs = 2000): Promise<boolean> {
-  return isCpuInitialised();
+  return isTransformersInitialised();
 }

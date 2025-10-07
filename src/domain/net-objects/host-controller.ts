@@ -1,10 +1,17 @@
 import { createLobbyMessage, type LobbyMessage, type LobbyMessageBodies, type LobbyMessageKind } from '../../protocol';
-import { PARTICIPANTS_OBJECT_ID, makeParticipantsSnapshot } from './participants.js';
+import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 import type { LobbyStore } from '../session/session-store';
 import { HostParticipantsObject } from './participants-host.js';
-import type { HostObject } from './types';
-import { HostChatObject } from './chat-host.js';
+import type { CommonDeps, HostObject } from './types';
 import { HostRouter } from './host-router.js';
+import {
+  HostAckFallback,
+  attachHostObject,
+  getNetObjectDescriptor,
+  getNetObjectDescriptors,
+  subscribeNetObjectDescriptors,
+  type NetObjectDescriptor
+} from './registry.js';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -24,14 +31,16 @@ export class HostNetController {
   private readonly publish: Publish;
   private readonly lobbyStore: LobbyStore;
   private readonly busPublish: (message: LobbyMessage) => void;
-  private readonly participants: HostParticipantsObject;
-  private readonly chat: HostChatObject;
   private readonly router: HostRouter;
   private readonly getPeerIds?: () => string[];
   private readonly sendToPeer?: (peerId: string, message: LobbyMessage) => boolean;
   private readonly ackTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly lastSentPerPeer = new Map<string, number>();
   private readonly ackedRevPerPeer = new Map<string, number>();
+  private readonly hostObjects: Map<string, HostObject>;
+  private readonly descriptorsById: Map<string, NetObjectDescriptor>;
+  private readonly commonDeps: CommonDeps;
+  private readonly _descriptorUnsubscribe: () => void;
 
   constructor({ publish, lobbyStore, busPublish, getPeerIds, sendToPeer }: Deps) {
     // wrap publish to track object acks
@@ -56,16 +65,31 @@ export class HostNetController {
     this.busPublish = busPublish;
     this.getPeerIds = getPeerIds;
     this.sendToPeer = sendToPeer;
-    this.participants = new HostParticipantsObject({ publish: this.publish, lobbyStore: this.lobbyStore });
-    this.chat = new HostChatObject({ publish: this.publish, lobbyStore: this.lobbyStore });
+    this.commonDeps = { publish: this.publish, lobbyStore: this.lobbyStore };
+    this.hostObjects = new Map();
+    this.descriptorsById = new Map();
+    const initialDescriptors = getNetObjectDescriptors();
+    for (const descriptor of initialDescriptors) {
+      const object = this.instantiateHostObject(descriptor);
+      this.hostObjects.set(descriptor.id, object);
+      this.descriptorsById.set(descriptor.id, descriptor);
+    }
     this.router = new HostRouter({
       send: (kind, body, ctx) => this.publish(kind as any, body as any, ctx),
       lobbyStore: this.lobbyStore,
       publishToBus: (message) => this.busPublish(message),
-      participants: this.participants,
-      chat: this.chat,
+      descriptors: Array.from(this.descriptorsById.values()),
+      objects: this.hostObjects,
+      commonDeps: this.commonDeps,
       limiter: undefined,
       onAck: (peerId, id, rev) => this.resolveAck(peerId, id, rev)
+    });
+    this._descriptorUnsubscribe = subscribeNetObjectDescriptors((descriptor) => {
+      if (this.descriptorsById.has(descriptor.id)) return;
+      const object = this.instantiateHostObject(descriptor);
+      this.descriptorsById.set(descriptor.id, descriptor);
+      this.hostObjects.set(descriptor.id, object);
+      this.router.addNetObject(descriptor, object);
     });
   }
 
@@ -89,11 +113,20 @@ export class HostNetController {
   // Message handling moved into HostRouter
 
   broadcastParticipants(context: string = 'participants-sync') {
-    this.participants.broadcast(context);
+    const obj = this.hostObjects.get(PARTICIPANTS_OBJECT_ID) as HostParticipantsObject | undefined;
+    obj?.broadcast(context);
   }
 
   register(object: HostObject) {
-    this.router.register(object);
+    this.hostObjects.set(object.id, object);
+    attachHostObject(object);
+    const descriptor = this.descriptorsById.get(object.id) ?? getNetObjectDescriptor(object.id);
+    if (descriptor && !this.descriptorsById.has(object.id)) {
+      this.descriptorsById.set(object.id, descriptor);
+      this.router.addNetObject(descriptor, object);
+    } else {
+      this.router.register(object);
+    }
   }
 
   onPeerDisconnected(peerId: string) {
@@ -109,29 +142,28 @@ export class HostNetController {
     if (this.ackTimers.has(key)) {
       clearTimeout(this.ackTimers.get(key)!);
     }
-    const timeout = Math.min(5000, 1000 * attempt); // linear backoff up to 5s
+    const timeout = Math.min(5000, 1000 * attempt);
     const timer = setTimeout(() => {
       const last = this.lastSentPerPeer.get(`${peerId ?? ':global'}:${id}`);
-      if (last !== rev) return; // newer rev sent
-      // targeted resend for this peer (if available), otherwise fallback broadcast
+      if (last !== rev) return;
+      const descriptor = this.descriptorsById.get(id);
+      const hostObject = this.hostObjects.get(id);
+      if (!hostObject) {
+        if (attempt < 3) this.scheduleAck(peerId, id, rev, attempt + 1);
+        else this.ackTimers.delete(key);
+        return;
+      }
+      const ackPolicy = descriptor?.host.ack;
       if (peerId && this.sendToPeer) {
         const baseKey = `${peerId}:${id}`;
         const acked = this.ackedRevPerPeer.get(baseKey) ?? 0;
-        // Try incremental resend from acked+1 to last
         let sentIncremental = false;
-        if (id === PARTICIPANTS_OBJECT_ID && (this.participants as any).getLogsSince) {
-          const logs = (this.participants as any).getLogsSince(acked) as { rev: number; ops: any[] }[];
-          if (logs && logs.length > 0 && logs.length <= 5) {
-            for (const entry of logs) {
-              const msg = createLobbyMessage('object:patch', { id, rev: entry.rev, ops: entry.ops } as any);
-              this.sendToPeer(peerId, msg);
-            }
-            sentIncremental = true;
-          }
-        } else if (id === 'chatlog' && (this.chat as any).getLogsSince) {
-          const logs = (this.chat as any).getLogsSince(acked) as { rev: number; ops: any[] }[];
-          if (logs && logs.length > 0 && logs.length <= 20) {
-            for (const entry of logs) {
+        const incrementalLimit = ackPolicy?.incrementalMax;
+        if (incrementalLimit != null && hostObject.getLogsSince) {
+          const logs = hostObject.getLogsSince(acked) ?? [];
+          const pending = logs.filter((entry) => entry.rev > acked);
+          if (pending.length > 0 && pending.length <= incrementalLimit) {
+            for (const entry of pending) {
               const msg = createLobbyMessage('object:patch', { id, rev: entry.rev, ops: entry.ops } as any);
               this.sendToPeer(peerId, msg);
             }
@@ -139,23 +171,31 @@ export class HostNetController {
           }
         }
         if (!sentIncremental) {
-          // Fallback snapshot
-          let msg: LobbyMessage | null = null;
-          if (id === PARTICIPANTS_OBJECT_ID) {
-            const value = makeParticipantsSnapshot(this.lobbyStore.snapshotWire(), 4);
-            msg = createLobbyMessage('object:replace', { id, rev, value } as any);
-          } else if (id === 'chatlog') {
-            const snap = this.chat.getSnapshot?.() as { rev: number; value: unknown } | undefined;
-            if (snap) msg = createLobbyMessage('object:replace', { id, rev: snap.rev, value: snap.value } as any);
+          const fallback = ackPolicy?.fallbackStrategy ?? HostAckFallback.Snapshot;
+          if (fallback === HostAckFallback.Snapshot) {
+            const snapshot = hostObject.getSnapshot?.();
+            if (snapshot) {
+              const msg = createLobbyMessage('object:replace', { id, rev, value: snapshot.value } as any);
+              this.sendToPeer(peerId, msg);
+            } else {
+              hostObject.onRequest(undefined);
+            }
+          } else if (fallback === HostAckFallback.OnRequest) {
+            hostObject.onRequest(undefined);
+          } else if (fallback === HostAckFallback.None) {
+            // no-op
           }
-          if (msg) this.sendToPeer(peerId, msg);
         }
       } else {
-        // broadcast fallback
-        if (id === 'participants') this.participants.broadcast('ack:resend');
-        else if (id === 'chatlog') this.chat.onRequest(undefined);
+        const broadcast = ackPolicy?.broadcast;
+        if (broadcast) {
+          broadcast(hostObject, this.commonDeps);
+        } else if ((ackPolicy?.fallbackStrategy ?? HostAckFallback.Snapshot) === HostAckFallback.None) {
+          // no-op
+        } else {
+          hostObject.onRequest(undefined);
+        }
       }
-      // schedule next attempt (max 3)
       if (attempt < 3) this.scheduleAck(peerId, id, rev, attempt + 1);
       else this.ackTimers.delete(key);
     }, timeout);
@@ -184,5 +224,22 @@ export class HostNetController {
     } catch (err) {
       console.error('[host-controller] ingest failed', err);
     }
+  }
+
+  dispose() {
+    this._descriptorUnsubscribe();
+  }
+
+  private instantiateHostObject(descriptor: NetObjectDescriptor): HostObject {
+    const existing = this.hostObjects.get(descriptor.id);
+    if (existing) return existing;
+    const object = descriptor.host.create(this.commonDeps, {
+      get: <T extends HostObject>(id: string) => this.hostObjects.get(id) as T | null
+    });
+    if (object.id !== descriptor.id) {
+      throw new Error(`Host object id mismatch for ${descriptor.id}`);
+    }
+    attachHostObject(object);
+    return object;
   }
 }

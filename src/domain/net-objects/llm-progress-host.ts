@@ -1,6 +1,7 @@
 import type { HostObject, CommonDeps } from './types';
 import { HostValueObject } from './base/value-object';
 import type { LobbyMessageBodies } from '../../protocol';
+import { registerNetObject, HostAckFallback } from './registry.js';
 
 export const LLM_PROGRESS_OBJECT_ID = 'llm:progress:obj';
 
@@ -44,3 +45,21 @@ export class HostLlmProgressObject extends HostValueObject<ProgressState> implem
     return super.getLogsSince(sinceRev);
   }
 }
+
+registerNetObject({
+  id: LLM_PROGRESS_OBJECT_ID,
+  host: {
+    create: (deps) => new HostLlmProgressObject(deps),
+    ack: {
+      incrementalMax: 10,
+      fallbackStrategy: HostAckFallback.Snapshot
+    },
+    onPeerConnect: (object) => {
+      object.onRequest(undefined);
+    }
+  },
+  client: {
+    requestOnStart: true,
+    requestContext: 'request llm progress'
+  }
+});

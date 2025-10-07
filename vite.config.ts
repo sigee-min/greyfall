@@ -7,6 +7,12 @@ export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
     host: true,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'X-Content-Type-Options': 'nosniff'
+    },
     // basicSsl() plugin enables HTTPS; explicit boolean can conflict with types
     proxy: {
       // Forward REST API to local signal server during dev
@@ -32,6 +38,14 @@ export default defineConfig({
           'vendor-pixi': ['pixi.js', '@pixi/filter-kawase-blur', '@pixi/filter-noise', '@pixi/layers']
         }
       }
+    }
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'X-Content-Type-Options': 'nosniff'
     }
   }
 });

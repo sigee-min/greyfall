@@ -1,5 +1,6 @@
 import type { HostObject, CommonDeps } from './types';
 import { ChatHostStore, type ChatEntry, CHAT_OBJECT_ID } from './chat.js';
+import { registerNetObject, HostAckFallback } from './registry.js';
 
 export class HostChatObject implements HostObject {
   readonly id = CHAT_OBJECT_ID;
@@ -25,3 +26,24 @@ export class HostChatObject implements HostObject {
     return this.store.getLogsSince(sinceRev);
   }
 }
+
+registerNetObject({
+  id: CHAT_OBJECT_ID,
+  host: {
+    create: (deps) => new HostChatObject(deps),
+    ack: {
+      incrementalMax: 20,
+      fallbackStrategy: HostAckFallback.Snapshot,
+      broadcast: (object) => {
+        object.onRequest(undefined);
+      }
+    },
+    onPeerConnect: (object) => {
+      object.onRequest(undefined);
+    }
+  },
+  client: {
+    requestOnStart: true,
+    requestContext: 'request chatlog'
+  }
+});

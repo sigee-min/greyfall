@@ -1,6 +1,8 @@
 import type { HostObject, CommonDeps } from './types';
 import { HostReplicator } from './replicator';
 import { getMap, getEntryField, isNeighbor } from '../world/nav';
+import { registerNetObject, HostAckFallback } from './registry.js';
+import { worldPositionsClient } from './world-positions-client.js';
 
 export const WORLD_POSITIONS_OBJECT_ID = 'world:positions';
 
@@ -55,3 +57,22 @@ export class HostWorldPositionsObject implements HostObject {
     return this.replicator.onRequest(this.id, sinceRev, 'object-request world:positions');
   }
 }
+
+registerNetObject({
+  id: WORLD_POSITIONS_OBJECT_ID,
+  host: {
+    create: (deps) => new HostWorldPositionsObject(deps),
+    ack: {
+      incrementalMax: 32,
+      fallbackStrategy: HostAckFallback.Snapshot
+    },
+    onPeerConnect: (object) => {
+      object.onRequest(undefined);
+    }
+  },
+  client: {
+    create: () => worldPositionsClient,
+    requestOnStart: true,
+    requestContext: 'request world positions'
+  }
+});

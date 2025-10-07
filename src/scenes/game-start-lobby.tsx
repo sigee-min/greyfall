@@ -583,6 +583,10 @@ export function GameStartLobby({
                 onChange={(event) => setChatInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
+                    const composing = (event as any)?.isComposing || (event.nativeEvent as any)?.isComposing;
+                    if (composing) {
+                      return;
+                    }
                     event.preventDefault();
                     submitChat();
                   }

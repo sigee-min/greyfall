@@ -1,16 +1,15 @@
 import type { Tool, ToolRegistry } from './types';
 
-const MAP = new Map<string, Tool>();
+const MAP = new Map<string, Tool<any, any>>();
 
 export const InMemoryToolRegistry: ToolRegistry = {
-  register(tool: Tool): void {
+  register<TIn = unknown, TOut = unknown>(tool: Tool<TIn, TOut>): void {
     MAP.set(tool.id, tool);
   },
-  get(id: string): Tool | null {
-    return MAP.get(id) ?? null;
+  get<TIn = unknown, TOut = unknown>(id: string): Tool<TIn, TOut> | null {
+    return (MAP.get(id) as Tool<TIn, TOut> | undefined) ?? null;
   },
   list(): Tool[] {
     return Array.from(MAP.values());
   }
 };
-

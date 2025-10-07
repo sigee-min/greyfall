@@ -2,10 +2,18 @@ import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../p
 import { parseLobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
-import { ClientParticipantsObject } from './participants-client.js';
-import { worldPositionsClient, WORLD_POSITIONS_OBJECT_ID } from './world-positions-client';
-import { LLM_PROGRESS_OBJECT_ID } from './llm-progress-host';
-import { PARTICIPANTS_OBJECT_ID } from './participants.js';
+import {
+  attachClientObject,
+  getNetObjectDescriptors,
+  subscribeNetObjectDescriptors,
+  type NetObjectDescriptor
+} from './registry.js';
+// Side-effect imports to ensure builtin net objects self-register before controller initialization.
+import './participants-host.js';
+import './chat-host.js';
+import './world-positions-host.js';
+import './party-host.js';
+import './llm-progress-host.js';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -24,23 +32,22 @@ export class ClientNetController {
   private readonly lobbyStore: LobbyStore;
   private readonly busPublish: (message: LobbyMessage) => void;
   private readonly store = new ClientNetObjectStore();
-  private readonly registry: Map<string, { onReplace: (rev: number, value: unknown) => void; onPatch?: (rev: number, ops: unknown[]) => void }>; 
+  private readonly registry: Map<string, { onReplace: (rev: number, value: unknown) => void; onPatch?: (rev: number, ops: unknown[]) => void }>;
+  private readonly snapshotRequests = new Map<string, string>();
+  private readonly knownDescriptors = new Set<string>();
+  private readonly _descriptorUnsubscribe: () => void;
 
   constructor({ publish, lobbyStore, busPublish }: Deps) {
     this.publish = publish;
     this.lobbyStore = lobbyStore;
     this.busPublish = busPublish;
     this.registry = new Map();
-    // register built-in participants client object
-    const participants = new ClientParticipantsObject(this.lobbyStore);
-    this.registry.set(participants.id, {
-      onReplace: (rev, value) => participants.onReplace(rev, value),
-      onPatch: (rev, ops) => participants.onPatch?.(rev, ops)
-    });
-    this.registry.set(WORLD_POSITIONS_OBJECT_ID, {
-      onReplace: (rev, value) => worldPositionsClient.onReplace(rev, value),
-      onPatch: (rev, ops) => worldPositionsClient.onPatch?.(rev, ops as any)
-    });
+
+    const descriptors = getNetObjectDescriptors();
+    for (const descriptor of descriptors) {
+      this.addDescriptor(descriptor);
+    }
+    this._descriptorUnsubscribe = subscribeNetObjectDescriptors((descriptor) => this.addDescriptor(descriptor));
   }
 
   bindChannel(channel: RTCDataChannel) {
@@ -57,10 +64,9 @@ export class ClientNetController {
   }
 
   requestSnapshots() {
-    this.publish('object:request', { id: PARTICIPANTS_OBJECT_ID }, 'request participants');
-    this.publish('object:request', { id: 'chatlog' }, 'request chatlog');
-    this.publish('object:request', { id: WORLD_POSITIONS_OBJECT_ID }, 'request world positions');
-    this.publish('object:request', { id: LLM_PROGRESS_OBJECT_ID }, 'request llm progress');
+    for (const [id, context] of this.snapshotRequests.entries()) {
+      this.publish('object:request', { id }, context);
+    }
   }
 
   private handlePayload(payload: unknown, _channel?: RTCDataChannel) {
@@ -112,5 +118,31 @@ export class ClientNetController {
 
   register(object: { id: string; onReplace: (rev: number, value: unknown) => void; onPatch?: (rev: number, ops: unknown[]) => void }) {
     this.registry.set(object.id, { onReplace: object.onReplace, onPatch: object.onPatch });
+  }
+
+  dispose() {
+    this._descriptorUnsubscribe();
+  }
+
+  private addDescriptor(descriptor: NetObjectDescriptor) {
+    if (this.knownDescriptors.has(descriptor.id)) return;
+    this.knownDescriptors.add(descriptor.id);
+    const client = descriptor.client;
+    if (client?.requestOnStart) {
+      this.snapshotRequests.set(descriptor.id, client.requestContext ?? `request ${descriptor.id}`);
+    }
+    if (client?.create) {
+      const instance = client.create({ lobbyStore: this.lobbyStore });
+      if (instance) {
+        if (instance.id !== descriptor.id) {
+          console.warn('[client-net] descriptor id mismatch', { descriptor: descriptor.id, instance: instance.id });
+        }
+        this.registry.set(descriptor.id, {
+          onReplace: (rev, value) => instance.onReplace(rev, value),
+          onPatch: (rev, ops) => instance.onPatch?.(rev, ops)
+        });
+        attachClientObject(instance);
+      }
+    }
   }
 }

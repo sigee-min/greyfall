@@ -12,16 +12,17 @@ export async function runPipeline(options: {
   const { start, ctx, registry, exec } = options;
   let cur: Step | null = start;
   while (cur) {
-    const node = registry.get(cur.nodeId);
-    if (!node) throw new Error(`Unknown node: ${cur.nodeId}`);
-    const params = await cur.params(ctx);
+    const step: Step = cur;
+    const node = registry.get(step.nodeId);
+    if (!node) throw new Error(`Unknown node: ${step.nodeId}`);
+    const params = await step.params(ctx);
     const sys = renderTemplate(node.prompt.systemTpl, params);
     const userSuffix = node.prompt.userTpl ? renderTemplate(node.prompt.userTpl, params) : '';
     const messages: ChatMessage[] = [
       { role: 'system', content: sys },
       { role: 'user', content: [ctx.user, userSuffix].filter(Boolean).join('\n') }
     ];
-    emitProgress({ text: `${cur.id} 실행`, progress: null });
+    emitProgress({ text: `${step.id} 실행`, progress: null });
     try {
       const overrides: any = (ctx as any)?.scratch?.overrides || {};
       const temperature = (overrides.temperature as number | undefined) ?? node.options?.temperature ?? 0.7;
@@ -35,10 +36,10 @@ export async function runPipeline(options: {
       const text = node.validate ? (await node.validate(raw, ctx)).fixed ?? raw : raw;
       // Store last output into scratch for downstream steps
       ctx.scratch.last = { nodeId: node.id, text };
-      cur = cur.next ?? null;
+      cur = step.next ?? null;
     } catch (err) {
-      emitProgress({ text: `${cur.id} 실패: ${String((err as any)?.message || err)}`, progress: null });
-      if (cur.onErrorNext) { cur = cur.onErrorNext; continue; }
+      emitProgress({ text: `${step.id} 실패: ${String((err as any)?.message || err)}`, progress: null });
+      if (step.onErrorNext) { cur = step.onErrorNext; continue; }
       throw err;
     }
   }

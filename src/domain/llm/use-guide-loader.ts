@@ -39,8 +39,8 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
         setHistory([]);
         lastUpdateAtRef.current = Date.now();
 
-        const { loadEngineByManager, ensureChatApiReady, probeChatApiActive, resetEngine } = await import('../../llm/webllm-engine');
-        const isCpu = (getActiveModelPreset()?.backend === 'cpu');
+        const { loadEngineByManager, ensureChatApiReady, probeChatApiActive } = await import('../../llm/webllm-engine');
+        const presetBackend = getActiveModelPreset()?.backend;
         const onProgress = (report: { text?: string; progress?: number }) => {
           if (cancelled) return;
           setProgress((prev) => {
@@ -80,9 +80,9 @@ export function useGuideLoader(options: { manager: LlmManagerKind; enabled?: boo
           }
           lastUpdateAtRef.current = Date.now();
         };
-        await ensureChatApiReady(1_800_000, onEnsure as any);
+        await ensureChatApiReady(manager, 1_800_000, onEnsure as any);
 
-        if (isCpu) {
+        if (presetBackend === 'cpu') {
           if (cancelled) return;
           setReady(true);
           setProgress(null);
