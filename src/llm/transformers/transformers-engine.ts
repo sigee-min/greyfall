@@ -1,5 +1,5 @@
 import type { ChatOptions } from '../webllm-engine';
-import { getActiveModelPreset, setActiveModelPreset } from '../engine-selection';
+import { getActiveModelPreset } from '../engine-selection';
 import { emitProgress } from '../progress-bus';
 
 type TransformersState = {
@@ -103,8 +103,7 @@ export async function loadTransformersEngineByManager(
   const startReport = { text: '심판자를 준비하고 있어요…', progress: 0.05 };
   try { emitProgress(startReport); } catch {}
   onProgress?.(startReport);
-  // preset 보장이 안될 경우 기본값으로 초기화해 파이프라인에 올바른 값이 전달되도록 함
-  const preset = getActiveModelPreset() ?? setActiveModelPreset('gemma3-1b');
+  const preset = getActiveModelPreset();
   const appConfig = (preset?.appConfig || {}) as Record<string, unknown>;
   try {
     const meta = { hfModelId: (appConfig as any)?.hfModelId, dtype: (appConfig as any)?.dtype, device: (appConfig as any)?.device };
