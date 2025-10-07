@@ -1,0 +1,10 @@
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  X-Content-Type-Options: nosniff
+
+  # Optional: cache hints for WASM/large model chunks
+  Cache-Control: public, max-age=3600
+*/
+
