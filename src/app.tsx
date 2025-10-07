@@ -6,11 +6,9 @@ import { ControlDock } from './ui/controls/control-dock';
 import { SettingsOverlay } from './ui/settings/settings-overlay';
 import { OptionsDialog } from './ui/dialogs/options-dialog';
 import { DeveloperDialog } from './ui/dialogs/developer-dialog';
-import { ManagerSelectDialog } from './ui/dialogs/manager-select-dialog';
 import { ErrorDialog } from './ui/dialogs/error-dialog';
 import { GameLobby } from './scenes/game-lobby';
 import { GameStartLobby } from './scenes/game-start-lobby';
-import { chooseModel } from './llm/selection-storage';
 import { useSession } from './domain/session';
 import { useLobbyChat } from './domain/chat/use-lobby-chat';
 import { exitFullscreen, getFullscreenElement, requestFullscreen, logFullscreenState } from './lib/fullscreen';
@@ -53,8 +51,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [developerOpen, setDeveloperOpen] = useState(false);
-  const [managerOpen, setManagerOpen] = useState(false);
-  const [selectedManager, setSelectedManager] = useState<'fast' | 'smart'>('smart');
+  // Manager selection UI removed; default manager handled inside loaders/components
   const [playerName, setPlayerName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const preferencesLoaded = usePreferencesStore(selectPreferencesLoaded);
@@ -197,53 +194,24 @@ function App() {
         await requestFullscreen(document.documentElement, 'lobby-create');
       }
 
-      // Open manager selection first
+      // 바로 세션을 생성하고 시작 로비로 진입
       setPlayerName(name);
-      setManagerOpen(true);
+      try {
+        await createGame(name);
+        changeScene('startLobby');
+      } catch (error) {
+        console.error(error);
+        globalBus.publish('error:show', {
+          message: '호스트 세션을 시작하지 못했습니다. 콘솔 로그를 확인해 주세요.',
+          context: 'create-game',
+          cause: error
+        });
+      }
     },
     [changeScene, createGame, fullscreenEnabled, globalBus]
   );
 
-  const handleManagerSelect = useCallback(
-    async (manager: 'fast' | 'smart') => {
-      setSelectedManager(manager);
-      setManagerOpen(false);
-      try {
-        await createGame(playerName);
-        changeScene('startLobby');
-      } catch (error) {
-        console.error(error);
-        globalBus.publish('error:show', {
-          message: '호스트 세션을 시작하지 못했습니다. 콘솔 로그를 확인해 주세요.',
-          context: 'create-game',
-          cause: error
-        });
-      }
-    },
-    [changeScene, createGame, globalBus, playerName]
-  );
-
-  const handleCpuModelSelect = useCallback(
-    async (modelId: string) => {
-      chooseModel(modelId);
-      // Align manager (fast/smart) with the chosen low-spec preset
-      if (modelId === 'granite-micro') setSelectedManager('smart');
-      else setSelectedManager('fast');
-      setManagerOpen(false);
-      try {
-        await createGame(playerName);
-        changeScene('startLobby');
-      } catch (error) {
-        console.error(error);
-        globalBus.publish('error:show', {
-          message: '호스트 세션을 시작하지 못했습니다. 콘솔 로그를 확인해 주세요.',
-          context: 'create-game',
-          cause: error
-        });
-      }
-    },
-    [changeScene, createGame, globalBus, playerName]
-  );
+  // 모델/매니저 선택 절차 제거로 관련 핸들러 삭제됨
 
   const handleJoinGame = useCallback(
     async (name: string, code: string) => {
@@ -364,7 +332,7 @@ function App() {
           autoConnect={autoConnect}
           onOptions={() => setOptionsOpen(true)}
           onSendChat={sendChatMessage}
-          llmManager={selectedManager}
+          // 매니저는 컴포넌트 내부 기본값 사용 (기본: 'smart')
           publishLobbyMessage={publishLobbyMessage}
           registerLobbyHandler={registerLobbyHandler}
           probeChannel={probeChannel}
@@ -467,7 +435,6 @@ function App() {
     startMission,
     toggleReady,
     sendChatMessage,
-    selectedManager,
     publishLobbyMessage,
     registerLobbyHandler
   ]);
@@ -508,12 +475,7 @@ function App() {
         onPreviewMusicVolume={previewMusicVolume}
       />
       <DeveloperDialog open={developerOpen} onClose={() => setDeveloperOpen(false)} />
-      <ManagerSelectDialog
-        open={managerOpen}
-        onClose={() => setManagerOpen(false)}
-        onSelect={handleManagerSelect}
-        onSelectCpuModel={handleCpuModelSelect}
-      />
+      {/* 매니저 선택 다이얼로그 제거됨 */}
       <ErrorDialog open={Boolean(errorMessage)} message={errorMessage ?? ''} onClose={dismissError} />
     </>
   );
