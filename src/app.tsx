@@ -37,6 +37,7 @@ import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
 import { useI18n } from './i18n';
 import { setToolsProviders } from './llm/tools/providers';
+import { LlmMonitor } from './ui/dev/llm-monitor';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -51,6 +52,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [developerOpen, setDeveloperOpen] = useState(false);
+  const [llmMonitorOpen, setLlmMonitorOpen] = useState(false);
   // Manager selection UI removed; default manager handled inside loaders/components
   const [playerName, setPlayerName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -192,7 +194,13 @@ function App() {
   // Backquote(`)로 개발자 디버그 페이지 토글 (옵션에서 허용 시)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.code === 'Backquote' || event.key === '`') {
+      // Ctrl+` → LLM 모니터 토글, 단일 ` → 개발자 다이얼로그(옵션 허용 시)
+      if ((event.code === 'Backquote' || event.key === '`') && event.ctrlKey) {
+        event.preventDefault();
+        setLlmMonitorOpen((v) => !v);
+        return;
+      }
+      if ((event.code === 'Backquote' || event.key === '`') && !event.ctrlKey) {
         if (debugPageEnabled) setDeveloperOpen(true);
       }
     };
@@ -485,6 +493,7 @@ function App() {
         onPreviewMusicVolume={previewMusicVolume}
       />
       <DeveloperDialog open={developerOpen} onClose={() => setDeveloperOpen(false)} />
+      {llmMonitorOpen && <LlmMonitor onClose={() => setLlmMonitorOpen(false)} />}
       {/* 매니저 선택 다이얼로그 제거됨 */}
       <ErrorDialog open={Boolean(errorMessage)} message={errorMessage ?? ''} onClose={dismissError} />
     </>

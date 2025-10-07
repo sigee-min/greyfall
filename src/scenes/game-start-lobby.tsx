@@ -12,6 +12,7 @@ import { useGuideLoader } from '../domain/llm/use-guide-loader';
 import { executeAICommand } from '../domain/ai/ai-router';
 import { requestAICommand } from '../domain/ai/ai-gateway';
 import { loadEngineByManager, ensureChatApiReady } from '../llm/llm-engine';
+import { subscribeProgress, getLastProgress } from '../llm/progress-bus';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 import { useResponsive } from '../ui/responsive/use-responsive';
 import { ActionBar } from '../ui/responsive/action-bar';
@@ -157,17 +158,27 @@ export function GameStartLobby({
     prewarmedRef.current = true;
     void (async () => {
       try {
-        const onProgress = (report: { text?: string; progress?: number }) => {
+        // subscribe engine progress bus
+        const last = getLastProgress();
+        if (last?.text) setLlmPrewarmText(last.text === 'ready' ? '세팅 완료' : String(last.text));
+        if (typeof last?.progress === 'number') setLlmPrewarmPct(Math.round(Math.max(0, Math.min(1, last.progress)) * 100));
+        const unsub = subscribeProgress((report) => {
           if (typeof report.progress === 'number') {
             const pct = Math.round(Math.max(0, Math.min(1, report.progress)) * 100);
             setLlmPrewarmPct(pct >= 100 ? null : pct);
           }
-          if (report.text) setLlmPrewarmText(report.text || null);
-        };
-        await loadEngineByManager(llmManager, onProgress as any);
-        await ensureChatApiReady(llmManager, 180_000, onProgress as any);
+          if (report.text) {
+            const raw = String(report.text || '');
+            setLlmPrewarmText(raw === 'ready' ? '세팅 완료' : raw);
+          }
+        });
+
+        await loadEngineByManager(llmManager);
+        await ensureChatApiReady(llmManager, 180_000);
+        // 준비 완료 후에도 텍스트는 잠시 유지
         setLlmPrewarmPct(null);
-        setLlmPrewarmText(null);
+        setLlmPrewarmText((prev) => (prev && prev !== '세팅 완료' ? '세팅 완료' : prev || '세팅 완료'));
+        unsub();
       } catch (e) {
         console.warn('[llm] prewarm failed', e);
         setLlmPrewarmText('로컬 LLM 준비에 실패했어요. 나중에 다시 시도해 주세요.');

@@ -97,6 +97,19 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
   // Define leaveSession earlier so we can schedule timeouts without TS hoisting errors
   const leaveSession = useCallback(() => {
+    // Also reset local LLM engine/pipeline to free resources when leaving a session.
+    // Use dynamic import to avoid hard-coupling and unnecessary bundle cost.
+    void (async () => {
+      try {
+        const mod = await import('../../llm/llm-engine');
+        mod.resetEngine();
+      } catch { /* ignore */ }
+      try {
+        const bus = await import('../../llm/progress-bus');
+        if (typeof bus.clearProgress === 'function') bus.clearProgress();
+      } catch { /* ignore */ }
+    })();
+
     if (modeRef.current === 'guest') {
       const localId = lobbyStore.localParticipantIdRef.current;
       if (localId) {
