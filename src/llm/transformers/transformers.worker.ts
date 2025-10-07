@@ -30,12 +30,19 @@
 // Configure ONNX Runtime Web for multi-thread + SIMD, and map jsep → non-jsep at fetch level
 import * as ort from 'onnxruntime-web';
 try {
-  // Modest thread count to balance stability/perf
-  ort.env.wasm.numThreads = 2;
+  const anySelf: any = self as any;
+  const hc = Number(anySelf?.navigator?.hardwareConcurrency);
+  const sabOk = anySelf?.crossOriginIsolated === true && typeof anySelf?.SharedArrayBuffer !== 'undefined';
+  // Threads: (hardware - 1), but clamp to 1 if SAB/threads not available or unknown
+  let threads = Number.isFinite(hc) && hc > 0 ? Math.max(1, Math.floor(hc) - 1) : 1;
+  if (!sabOk) threads = 1;
+  ort.env.wasm.numThreads = threads;
   ort.env.wasm.proxy = true;
   // Prefer SIMD path for CPU perf
   // @ts-ignore
   ort.env.wasm.simd = true;
+  // eslint-disable-next-line no-console
+  console.info('[llm-worker] ort.env.wasm.numThreads', { requested: threads, hardware: hc ?? null, sabOk });
 } catch {}
 
 // Rewrite any '*.jsep.wasm' requests to the corresponding non-jsep '*.wasm'
