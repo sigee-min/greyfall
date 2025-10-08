@@ -23,8 +23,6 @@ coverage
 # Ignore Markdown docs except README
 *.md
 !README.md
-!docs/
-!docs/*.md
 *.py
 .Zone.Identifier
 *:Zone.Identifier
