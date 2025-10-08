@@ -26,6 +26,7 @@ type HostWorldPositionsApi = {
   id: string;
   ensureParticipant: (participantId: string, mapId: string) => boolean;
   movePartyToMap: (mapId: string, memberIds: string[]) => boolean;
+  moveField: (playerId: string, mapId: string, fromFieldId: string, toFieldId: string) => boolean;
   onRequest: (sinceRev?: number) => boolean;
 };
 
@@ -33,6 +34,8 @@ type HostPartyApi = {
   id: string;
   addMember: (id: string) => boolean;
   removeMember: (id: string) => boolean;
+  getMembers: () => string[];
+  travel: (direction?: 'next' | 'prev', toMapId?: string) => boolean;
   onRequest: (sinceRev?: number) => boolean;
 };
 
@@ -301,7 +304,7 @@ export class HostRouter {
           const map = getMap(first.mapId);
           if (!map) break;
           const entry = getEntryField(map);
-          const allOnSameMap = members.every((m) => {
+          const allOnSameMap = members.every((m: string) => {
             const p = list.find((e) => e.id === m);
             return p && p.mapId === first.mapId && p.fieldId === (entry?.id ?? '');
           });
@@ -333,7 +336,7 @@ export class HostRouter {
           const map = getMap(first.mapId);
           if (!map) break;
           const entry = getEntryField(map);
-          const allOnSameMap = members.every((m) => {
+          const allOnSameMap = members.every((m: string) => {
             const p = list.find((e) => e.id === m);
             return p && p.mapId === first.mapId && p.fieldId === (entry?.id ?? '');
           });
