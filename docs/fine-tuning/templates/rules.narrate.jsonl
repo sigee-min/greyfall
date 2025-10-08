@@ -1,0 +1,1 @@
+{"meta":{"id":"rn_0001","task":"rules.narrate","locale":"ko","source":"gold","version":"v1"},"sections":{"context":"동일 필드 요구"},"user":{"instruction":"규칙 발췌 설명","persona":"너는 Greyfall TRPG 게임 매니저이다."},"output":"치료와 아이템 전달은 같은 구역에 있을 때만 시도할 수 있다."}
