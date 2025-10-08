@@ -95,16 +95,27 @@ export class HostWorldActorsObject implements HostObject {
     const e = list.find((a) => a.id === actorId) ?? this.ensure(actorId);
     const have = (e.inventory ?? []).find((i) => i.key === key)?.count ?? 0;
     if (have <= 0) return false;
-    // Enforce slot capacities
+    // Enforce slot capacities with auto-replacement
     const slot = itemSlot(key);
     const cap = slotCapacity(slot);
     const eq = Array.isArray(e.equipment) ? e.equipment.slice() : [];
-    const curInSlot = eq.filter((k) => itemSlot(k) === slot).length;
-    if (curInSlot >= cap) {
-      // Reject equipping beyond capacity to prevent abuse (e.g., multiple hats)
-      return false;
+    const inSlotIdxs = eq.map((k, i) => ({ k, i })).filter((p) => itemSlot(p.k) === slot).map((p) => p.i);
+    let inv = e.inventory ?? [];
+    if (inSlotIdxs.length >= cap) {
+      // Remove as many existing items from this slot as needed to make room for 1
+      const toRemove = inSlotIdxs.length - cap + 1;
+      for (let n = 0; n < toRemove; n += 1) {
+        // Remove oldest first (lowest index)
+        const rmIdx = inSlotIdxs[n];
+        const rmKey = eq[rmIdx];
+        // Actually splice from eq; adjust subsequent indices
+        eq.splice(rmIdx - n, 1);
+        // Return removed item to inventory
+        inv = this.adjustInventory(inv, rmKey, +1);
+      }
     }
-    const inv = this.adjustInventory(e.inventory, key, -1);
+    // Consume item from inventory and equip
+    inv = this.adjustInventory(inv, key, -1);
     eq.push(key);
     return this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:equip');
   }
