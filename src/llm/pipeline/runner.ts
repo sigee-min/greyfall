@@ -1,8 +1,17 @@
-// Progress bus removed; no-op shims
-const emitProgress = (_r: any) => {};
 import type { ChatMessage } from '../../domain/ai/gateway/llm-exec';
 import { renderTemplate, withTimeoutRetry } from './utils';
 import type { MessageExecutor, NodeRegistry, PipelineCtx, Step } from './types';
+
+type ProgressEvent = { text: string; progress: number | null };
+
+// Progress bus removed; keep signature for potential future reintroduction.
+const emitProgress = (_event: ProgressEvent): void => {};
+
+type PipelineOverrides = {
+  temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
+};
 
 export async function runPipeline(options: {
   start: Step;
@@ -25,10 +34,10 @@ export async function runPipeline(options: {
     ];
     emitProgress({ text: `${step.id} 실행`, progress: null });
     try {
-      const overrides: any = (ctx as any)?.scratch?.overrides || {};
-      const temperature = (overrides.temperature as number | undefined) ?? node.options?.temperature ?? 0.7;
-      const maxTokens = (overrides.maxTokens as number | undefined) ?? node.options?.maxTokens ?? 512;
-      const timeoutMs = (overrides.timeoutMs as number | undefined) ?? node.options?.timeoutMs ?? 20000;
+      const overrides = readOverrides(ctx.scratch);
+      const temperature = overrides.temperature ?? node.options?.temperature ?? 0.7;
+      const maxTokens = overrides.maxTokens ?? node.options?.maxTokens ?? 512;
+      const timeoutMs = overrides.timeoutMs ?? node.options?.timeoutMs ?? 20000;
       const retries = node.options?.retries ?? 0;
       const raw = await withTimeoutRetry(
         () => exec(messages, { temperature, maxTokens, timeoutMs, signal: ctx.signal }),
@@ -39,11 +48,27 @@ export async function runPipeline(options: {
       ctx.scratch.last = { nodeId: node.id, text };
       cur = step.next ?? null;
     } catch (err) {
-      emitProgress({ text: `${step.id} 실패: ${String((err as any)?.message || err)}`, progress: null });
+      emitProgress({ text: `${step.id} 실패: ${formatError(err)}`, progress: null });
       if (step.onErrorNext) { cur = step.onErrorNext; continue; }
       throw err;
     }
   }
   emitProgress({ text: '파이프라인 완료', progress: 1 });
   return ctx;
+}
+
+function readOverrides(scratch: PipelineCtx['scratch']): PipelineOverrides {
+  const raw = scratch.overrides;
+  if (!raw || typeof raw !== 'object') return {};
+  const record = raw as Record<string, unknown>;
+  const readNumber = (value: unknown): number | undefined => (typeof value === 'number' ? value : undefined);
+  return {
+    temperature: readNumber(record.temperature),
+    maxTokens: readNumber(record.maxTokens),
+    timeoutMs: readNumber(record.timeoutMs)
+  };
+}
+
+function formatError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }

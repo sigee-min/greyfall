@@ -14,15 +14,12 @@
     } catch { return false; }
   };
   const wrap = <T extends (...a: any[]) => any>(fn: T): T => {
-    return ((...a: any[]) => { if (!shouldDrop(a)) return (fn as any)(...a); }) as any as T;
+    return ((...a: any[]) => { if (!shouldDrop(a)) return (fn as any)(...a); }) as unknown as T;
   };
   // Narrowly wrap warn/info/log used by transformers.js hub client
   try {
-    // eslint-disable-next-line no-console
     console.warn = wrap(console.warn.bind(console));
-    // eslint-disable-next-line no-console
     console.info = wrap(console.info.bind(console));
-    // eslint-disable-next-line no-console
     console.log = wrap(console.log.bind(console));
   } catch {}
 })();
@@ -39,9 +36,8 @@ try {
   ort.env.wasm.numThreads = threads;
   ort.env.wasm.proxy = true;
   // Prefer SIMD path for CPU perf
-  // @ts-ignore
+  // @ts-expect-error SIMD flag not typed in upstream definitions
   ort.env.wasm.simd = true;
-  // eslint-disable-next-line no-console
   console.info('[llm-worker] ort.env.wasm.numThreads', { requested: threads, hardware: hc ?? null, sabOk });
 } catch {}
 
@@ -88,7 +84,6 @@ self.onmessage = async (evt: MessageEvent<InMessage>) => {
           const sabAvail = typeof (self as any).SharedArrayBuffer !== 'undefined';
           let sabAlloc = false;
           try { if (sabAvail) { const b = new (self as any).SharedArrayBuffer(16); sabAlloc = b.byteLength === 16; } } catch {}
-          // eslint-disable-next-line no-console
           console.info('[llm-worker] env', { origin, crossOriginIsolated: isolated, sharedArrayBuffer: sabAvail, sabAlloc });
           try {
             const href = (self as any).location?.href || '/';
@@ -96,7 +91,6 @@ self.onmessage = async (evt: MessageEvent<InMessage>) => {
             const coop = res.headers.get('cross-origin-opener-policy');
             const coep = res.headers.get('cross-origin-embedder-policy');
             const corp = res.headers.get('cross-origin-resource-policy');
-            // eslint-disable-next-line no-console
             console.info('[llm-worker] headers', { coop, coep, corp });
           } catch {}
         } catch {}

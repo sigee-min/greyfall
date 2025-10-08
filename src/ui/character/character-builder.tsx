@@ -4,20 +4,23 @@ import { useGlobalBus } from '../../bus/global-bus';
 import { TRAITS } from '../../domain/character/traits';
 import { cn } from '../../lib/utils';
 import { useI18n } from '../../i18n';
+import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 
 function rollD6(): number { return Math.floor(Math.random() * 6) + 1; }
+
+type Publish = <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean;
+type FilterOption = 'all' | 'positive' | 'negative';
 
 type Props = {
   onClose: () => void;
   playerName?: string;
   localParticipantId: string | null;
-  publish: <K extends any>(kind: K, body: any, context?: string) => boolean;
+  publish: Publish;
 };
 
 export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish }: Props) {
   const { t: tt } = useI18n();
   const bus = useGlobalBus();
-  const built = useCharacterStore((s) => s.built);
   const roll = useCharacterStore((s) => s.roll);
   const budget = useCharacterStore((s) => s.budget);
   const remaining = useCharacterStore((s) => s.remaining);
@@ -39,7 +42,7 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
   const remove = (id: string) => deselectTrait(id);
 
   const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'positive' | 'negative'>('all');
+  const [typeFilter, setTypeFilter] = useState<FilterOption>('all');
   const canFinalize = remaining >= 0;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -103,7 +106,7 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                 />
                 <select
                   value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  onChange={(e) => setTypeFilter(e.target.value as FilterOption)}
                   className="rounded-md border border-border/60 bg-background/60 px-2 py-1 text-xs"
                 >
                   <option value="all">{tt('char.filter.all')}</option>
@@ -154,7 +157,7 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                   const traitNames = selected.map((t) => t.name).join(', ') || '—';
                   const passiveNames = passives.map((p) => p.name).join(', ') || '—';
                   const body = tt('char.broadcast', { playerName, stats: s, traits: traitNames, passives: passiveNames });
-                  if (localParticipantId) publish('chat:append:request' as any, { body, authorId: localParticipantId } as any, 'character:finalized');
+                  if (localParticipantId) publish('chat:append:request', { body, authorId: localParticipantId }, 'character:finalized');
                   bus.publish('toast:show', { title: tt('char.ready'), message: playerName, status: 'success', durationMs: 2500 });
                 } catch {}
                 onClose();

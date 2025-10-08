@@ -390,7 +390,7 @@ function App() {
 
           <div className="pointer-events-auto absolute bottom-6 left-6 flex w-[360px] flex-col gap-4">
             <ChatDock />
-            <CommandConsole publish={publishLobbyMessage as any} localParticipantId={localParticipantId} />
+            <CommandConsole publish={publishLobbyMessage} localParticipantId={localParticipantId} />
           </div>
 
           {scene === 'game' && (
@@ -398,7 +398,6 @@ function App() {
               <div className="pointer-events-auto absolute bottom-6 right-6 w-[360px]">
                 <FieldGraph
                   localParticipantId={localParticipantId}
-                  participants={participants}
                   publish={publishLobbyMessage}
                 />
                 <div className="mt-4" />
@@ -430,7 +429,7 @@ function App() {
             onClose={() => setShowCharBuilder(false)}
             playerName={playerName}
             localParticipantId={localParticipantId}
-            publish={publishLobbyMessage as any}
+            publish={publishLobbyMessage}
           />)
         }
       </StageViewport>
@@ -454,7 +453,12 @@ function App() {
     toggleReady,
     sendChatMessage,
     publishLobbyMessage,
-    registerLobbyHandler
+    registerLobbyHandler,
+    channelOpen,
+    probeChannel,
+    showCharBuilder,
+    t,
+    worldMedia.bgSrc
   ]);
 
   const leaveSessionRef = useRef(leaveSession);
@@ -469,7 +473,7 @@ function App() {
   // Wire tools providers (e.g., chat.history) with latest chat log
   useEffect(() => {
     setToolsProviders({
-      getChatHistory: async (limit: number, includeSystem?: boolean) => {
+      getChatHistory: async (limit: number, _includeSystem?: boolean) => {
         const lim = Math.max(1, Math.min(10, Number(limit) || 10));
         const slice = chatMessages.slice(-lim);
         return slice.map((m) => ({

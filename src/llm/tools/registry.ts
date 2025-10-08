@@ -1,6 +1,6 @@
 import type { Tool, ToolRegistry } from './types';
 
-const MAP = new Map<string, Tool<any, any>>();
+const MAP = new Map<string, Tool<unknown, unknown>>();
 
 export const InMemoryToolRegistry: ToolRegistry = {
   register<TIn = unknown, TOut = unknown>(tool: Tool<TIn, TOut>): void {

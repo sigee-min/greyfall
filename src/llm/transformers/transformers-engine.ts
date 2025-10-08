@@ -7,7 +7,7 @@ type State = {
   initialised: boolean;
   initPromise: Promise<void> | null;
   initResolve?: () => void;
-  initReject?: (err: any) => void;
+  initReject?: (err: unknown) => void;
 };
 
 const state: State = { worker: null, initialised: false, initPromise: null };
@@ -15,29 +15,36 @@ const state: State = { worker: null, initialised: false, initPromise: null };
 function ensureWorker(): Worker {
   if (state.worker) return state.worker;
   const w = new Worker(new URL('./transformers.worker.ts', import.meta.url), { type: 'module' });
-  w.addEventListener('message', (ev) => {
-    const d = (ev as MessageEvent<any>).data || {};
-    if (d.type === 'progress') {
-      const text = String(d.text ?? '');
+  w.addEventListener('message', (ev: MessageEvent<unknown>) => {
+    const raw = typeof ev.data === 'object' && ev.data !== null ? ev.data as Record<string, unknown> : {};
+    const type = String(raw.type ?? '');
+    if (type === 'progress') {
+      const text = String(raw.text ?? '');
       // Set initialised when official callback reports 'ready'
       if (text === 'ready') {
         state.initialised = true;
-        if (state.initResolve) { try { state.initResolve(); } catch {} }
+        if (state.initResolve) {
+          try { state.initResolve(); } catch {}
+        }
         state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
       }
-      emitProgress({ text, progress: d.progress as number | undefined });
-    } else if (d.type === 'ready') {
+      emitProgress({ text, progress: typeof raw.progress === 'number' ? raw.progress : undefined });
+    } else if (type === 'ready') {
       // Reserved: worker no longer sends explicit 'ready'; rely on progress 'ready'
-    } else if (d.type === 'unloaded') {
+    } else if (type === 'unloaded') {
       state.initialised = false;
-      if (state.initReject) { try { state.initReject(new Error('worker unloaded')); } catch {} }
+      if (state.initReject) {
+        try { state.initReject(new Error('worker unloaded')); } catch {}
+      }
       state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
-    } else if (d.type === 'error' && !d.id) {
+    } else if (type === 'error' && !('id' in raw && raw.id)) {
       // init-level error (no id)
       state.initialised = false;
-      if (state.initReject) { try { state.initReject(new Error(String(d.error || 'transformers init error'))); } catch {} }
+      if (state.initReject) {
+        try { state.initReject(new Error(String(raw.error ?? 'transformers init error'))); } catch {}
+      }
       state.initPromise = null; state.initResolve = undefined; state.initReject = undefined;
-    } else if (d.type === 'purged') {
+    } else if (type === 'purged') {
       // Optional: caller may choose to show a toast; keep progress quiet here
     }
   });
@@ -85,7 +92,6 @@ export async function ensureTransformersReady(
   await loadTransformersEngineByManager(manager);
   const start = Date.now();
   while (!state.initialised && Date.now() - start < timeoutMs) {
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 100));
   }
   if (!state.initialised) throw new Error('Transformers generator not ready');
@@ -98,7 +104,7 @@ export async function probeTransformersActive(): Promise<boolean> {
 export async function generateTransformersChat(prompt: string, options: ChatOptions): Promise<string> {
   const w = ensureWorker();
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const { systemPrompt, temperature, topP, maxTokens, onToken, signal } = options || {} as ChatOptions;
+  const { systemPrompt, temperature, topP, maxTokens, onToken, signal } = options ?? {};
 
   // Open monitoring stream (tee) irrespective of consumer's onToken usage
   const streamId = openStream({
@@ -110,42 +116,50 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
     options: { temperature, topP, maxTokens }
   });
 
-  const listeners = new Set<(e: MessageEvent<any>) => void>();
-  const cleanup = () => { for (const l of listeners) w.removeEventListener('message', l as any); listeners.clear(); };
+  const listeners = new Set<(e: MessageEvent<unknown>) => void>();
+  const cleanup = () => {
+    for (const listener of listeners) {
+      w.removeEventListener('message', listener as EventListener);
+    }
+    listeners.clear();
+  };
 
   const p = new Promise<string>((resolve, reject) => {
     let acc = '';
-    const onMsg = (ev: MessageEvent<any>) => {
-      const d = ev.data || {};
-      if (!d || d.id !== id) return;
-      if (d.type === 'token') {
-        const t = String(d.token || '');
+    const onMsg = (ev: MessageEvent<unknown>) => {
+      const raw = typeof ev.data === 'object' && ev.data !== null ? ev.data as Record<string, unknown> : {};
+      if (raw.id !== id) return;
+      const type = String(raw.type ?? '');
+      if (type === 'token') {
+        const t = String(raw.token ?? '');
         acc += t;
         try { onToken?.(t, 0); } catch {}
         try { pushToken(streamId, t); } catch {}
-      } else if (d.type === 'done') {
+      } else if (type === 'done') {
         cleanup();
-        const text = String(d.text || acc);
+        const text = String(raw.text ?? acc);
         try { markDone(streamId, text); } catch {}
         resolve(text);
-      } else if (d.type === 'aborted') {
+      } else if (type === 'aborted') {
         cleanup();
         try { markAborted(streamId); } catch {}
         reject(new DOMException('Aborted', 'AbortError'));
-      } else if (d.type === 'error') {
+      } else if (type === 'error') {
         cleanup();
-        const errMsg = String(d.error || 'transformers error');
+        const errMsg = String(raw.error ?? 'transformers error');
         try { markError(streamId, errMsg); } catch {}
         reject(new Error(errMsg));
       }
     };
-    listeners.add(onMsg); w.addEventListener('message', onMsg as any);
+    listeners.add(onMsg);
+    w.addEventListener('message', onMsg as EventListener);
     try {
       w.postMessage({ type: 'run', id, prompt, systemPrompt, temperature, topP, maxTokens });
     } catch (e) {
       cleanup();
-      try { markError(streamId, String((e as any)?.message || e)); } catch {}
-      reject(e as any);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      try { markError(streamId, errorMessage); } catch {}
+      reject(e instanceof Error ? e : new Error(errorMessage));
     }
   });
 
@@ -156,9 +170,16 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
       try { markAborted(streamId); } catch {}
       throw new DOMException('Aborted', 'AbortError');
     }
-    const onAbort = () => { try { w.postMessage({ type: 'abort', id }); } catch {}; cleanup(); };
+    const onAbort = () => {
+      try { w.postMessage({ type: 'abort', id }); } catch {}
+      cleanup();
+    };
     signal.addEventListener('abort', onAbort, { once: true });
-    try { return await p; } finally { signal.removeEventListener('abort', onAbort as any); }
+    try {
+      return await p;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
   }
   return p;
 }
@@ -167,15 +188,30 @@ export async function purgeTransformersInstalledModels(onProgress?: (r: WebLLMPr
   const w = ensureWorker();
   return await new Promise<boolean>((resolve) => {
     let done = false;
-    const listener = (ev: MessageEvent<any>) => {
-      const d = ev.data || {};
-      if (d.type === 'progress') {
-        try { onProgress?.({ text: d.text as string | undefined, progress: d.progress as number | undefined }); } catch {}
-      } else if (d.type === 'purged') { done = true; cleanup(); resolve(true); }
+    const listener = (ev: MessageEvent<unknown>) => {
+      const raw = typeof ev.data === 'object' && ev.data !== null ? ev.data as Record<string, unknown> : {};
+      const type = String(raw.type ?? '');
+      if (type === 'progress') {
+        try {
+          onProgress?.({
+            text: typeof raw.text === 'string' ? raw.text : undefined,
+            progress: typeof raw.progress === 'number' ? raw.progress : undefined
+          });
+        } catch {}
+      } else if (type === 'purged') {
+        done = true;
+        cleanup();
+        resolve(true);
+      }
     };
-    const cleanup = () => { w.removeEventListener('message', listener as any); };
-    w.addEventListener('message', listener as any);
-    try { w.postMessage({ type: 'purge' }); } catch { cleanup(); resolve(false); }
+    const cleanup = () => { w.removeEventListener('message', listener as EventListener); };
+    w.addEventListener('message', listener as EventListener);
+    try {
+      w.postMessage({ type: 'purge' });
+    } catch {
+      cleanup();
+      resolve(false);
+    }
     setTimeout(() => { if (!done) { cleanup(); resolve(false); } }, timeoutMs);
   });
 }

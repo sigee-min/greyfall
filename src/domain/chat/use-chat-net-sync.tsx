@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
 import type { SessionParticipant } from '../session/types';
 import type { SessionMeta } from '../session/use-session';
-import type { SessionChatLogEntry, SessionChatMessage } from './types';
+import type { SessionChatLogEntry } from './types';
 import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 import { useGameBus } from '../../bus/game-bus';
 
@@ -100,20 +100,9 @@ export function useChatNetSync({
   useEffect(() => {
     const unsubscribe = registerLobbyHandler('object:replace', (message) => {
       if (message.body.id !== 'chatlog') return;
-      const value: any = message.body.value;
-      const entries = Array.isArray(value?.entries) ? (value.entries as SessionChatLogEntry[] | any[]) : Array.isArray(value?.list) ? (value.list as SessionChatLogEntry[] | any[]) : null;
-      if (!entries) return;
-      const mapped = entries.map((e: any) => ({
-        id: String(e.id),
-        authorId: String(e.authorId),
-        authorName: String(e.authorName),
-        authorTag: String(e.authorTag),
-        authorRole: e.authorRole,
-        body: String(e.body),
-        at: Number(e.at),
-        isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
-      })) as SessionChatLogEntry[];
-      setChatMessages(mapped);
+      const entries = extractSnapshotEntries(message.body.value, localIdRef.current);
+      if (entries === undefined) return;
+      setChatMessages(entries);
     });
     return unsubscribe;
   }, [registerLobbyHandler]);
@@ -121,49 +110,27 @@ export function useChatNetSync({
   useEffect(() => {
     const unsubscribe = registerLobbyHandler('object:patch', (message) => {
       if (message.body.id !== 'chatlog') return;
-      const ops = (message.body as any).ops as any[];
-      if (!Array.isArray(ops) || ops.length === 0) return;
+      const ops = message.body.ops;
+      if (ops.length === 0) return;
       setChatMessages((prev) => {
-        let next = prev.slice();
+        let next = prev;
+        let changed = false;
         for (const op of ops) {
-          if (op?.op === 'insert') {
-            const val = op.value;
-            const list = Array.isArray(val) ? val : [val];
-            for (const e of list) {
-              const mapped: SessionChatLogEntry = {
-                id: String(e.id),
-                authorId: String(e.authorId),
-                authorName: String(e.authorName),
-                authorTag: String(e.authorTag),
-                authorRole: e.authorRole,
-                body: String(e.body),
-                at: Number(e.at),
-                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
-              };
-              next.push(mapped);
+          if (op.op === 'insert') {
+            const inserted = normaliseEntryList(op.value, localIdRef.current);
+            if (inserted && inserted.length > 0) {
+              next = [...next, ...inserted];
+              changed = true;
             }
-          } else if (op?.op === 'set') {
-            const value: any = op.value;
-            const entries = Array.isArray(value?.entries)
-              ? (value.entries as any[])
-              : Array.isArray(value?.list)
-                ? (value.list as any[])
-                : null;
-            if (entries) {
-              next = entries.map((e: any) => ({
-                id: String(e.id),
-                authorId: String(e.authorId),
-                authorName: String(e.authorName),
-                authorTag: String(e.authorTag),
-                authorRole: e.authorRole,
-                body: String(e.body),
-                at: Number(e.at),
-                isSelf: localIdRef.current ? String(e.authorId) === localIdRef.current : false
-              }));
+          } else if (op.op === 'set') {
+            const entries = extractSnapshotEntries(op.value, localIdRef.current);
+            if (entries !== undefined) {
+              next = entries;
+              changed = true;
             }
           }
         }
-        return next;
+        return changed ? next : prev;
       });
     });
     return unsubscribe;
@@ -178,17 +145,6 @@ export function useChatNetSync({
         console.warn('[chat] send skipped – missing local participant');
         return false;
       }
-      const author = participantsRef.current.find((participant) => participant.id === authorId);
-      const authorRole: SessionParticipant['role'] = author?.role ?? modeRef.current ?? 'guest';
-      const entry: SessionChatMessage = {
-        id: nanoid(12),
-        authorId,
-        authorName: author?.name ?? 'Unknown',
-        authorTag: author?.tag ?? '#????',
-        authorRole,
-        body: trimmed,
-        at: Date.now()
-      };
       const delivered = publishLobbyMessage('chat:append:request', { body: trimmed, authorId }, 'chat-send');
       if (delivered) {
         // Do not locally echo; rely on host broadcast (object:patch/replace)
@@ -198,7 +154,7 @@ export function useChatNetSync({
       console.info('[chat] send skipped – channel not open');
       return false;
     },
-    [gameBus, publishLobbyMessage]
+    [publishLobbyMessage]
   );
 
   const chatLog = useMemo(() => chatMessages, [chatMessages]);
@@ -220,4 +176,84 @@ export function useChatNetSync({
     channelOpen: channelReady,
     probeChannel
   } as const;
+}
+
+type RawChatEntry = {
+  id?: unknown;
+  authorId?: unknown;
+  authorName?: unknown;
+  authorTag?: unknown;
+  authorRole?: unknown;
+  body?: unknown;
+  at?: unknown;
+};
+
+function extractSnapshotEntries(value: unknown, selfId: string | null): SessionChatLogEntry[] | undefined {
+  if (value == null) return undefined;
+  if (Array.isArray(value)) return normaliseEntryList(value, selfId);
+  if (typeof value === 'object') {
+    const record = value as { entries?: unknown; list?: unknown };
+    if (record.entries !== undefined) return normaliseEntryList(record.entries, selfId);
+    if (record.list !== undefined) return normaliseEntryList(record.list, selfId);
+  }
+  return undefined;
+}
+
+function normaliseEntryList(value: unknown, selfId: string | null): SessionChatLogEntry[] | undefined {
+  if (Array.isArray(value)) {
+    const mapped = value
+      .map((entry) => toChatLogEntry(entry, selfId))
+      .filter((entry): entry is SessionChatLogEntry => Boolean(entry));
+    return mapped;
+  }
+  const single = toChatLogEntry(value, selfId);
+  return single ? [single] : undefined;
+}
+
+function toChatLogEntry(raw: unknown, selfId: string | null): SessionChatLogEntry | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const entry = raw as RawChatEntry;
+  const authorId = coerceString(entry.authorId);
+  if (!authorId) return null;
+  const id = coerceId(entry.id);
+  const authorName = coerceString(entry.authorName, 'Unknown');
+  const authorTag = coerceString(entry.authorTag, '#????');
+  const authorRole = coerceRole(entry.authorRole);
+  const body = coerceString(entry.body);
+  const at = coerceTimestamp(entry.at);
+  return {
+    id,
+    authorId,
+    authorName,
+    authorTag,
+    authorRole,
+    body,
+    at,
+    isSelf: selfId ? authorId === selfId : false
+  };
+}
+
+function coerceString(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return fallback;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
+  return fallback;
+}
+
+function coerceId(value: unknown): string {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    const str = String(value);
+    return str.trim() ? str : nanoid(12);
+  }
+  return nanoid(12);
+}
+
+function coerceRole(value: unknown): SessionParticipant['role'] {
+  return value === 'host' || value === 'guest' ? value : 'guest';
+}
+
+function coerceTimestamp(value: unknown): number {
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) ? num : Date.now();
 }

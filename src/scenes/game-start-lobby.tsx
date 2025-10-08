@@ -70,7 +70,7 @@ export function GameStartLobby({
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
 
-  const { ready: llmReady, progress: llmProgress, status: llmStatus, error: llmError, history: llmHistory } = useGuideLoader({
+  const { ready: llmReady } = useGuideLoader({
     manager: llmManager,
     enabled: mode === 'host'
   });
@@ -81,7 +81,6 @@ export function GameStartLobby({
   const [llmPrewarmText, setLlmPrewarmText] = useState<string | null>(null);
   const [llmPrewarmPct, setLlmPrewarmPct] = useState<number | null>(null);
   // 진행률 UI 제거됨
-  const progressPercent = null as number | null;
   const guideAnnouncedRef = useRef(false);
   const prewarmedRef = useRef(false);
 
@@ -110,12 +109,6 @@ export function GameStartLobby({
   // Host broadcasts progress; guests subscribe and display
   // LLM progress broadcast removed
 
-  const uiReady = llmReady;
-  const uiError = llmError;
-  // 간소화: 상태/진행률 텍스트 비노출
-  const simpleUiStatus = llmStatus;
-  const simpleUiProgressPercent = progressPercent;
-  const isActiveLoading = !uiReady && !uiError && (simpleUiProgressPercent !== null || Boolean(simpleUiStatus));
 
   // (moved earlier) Preset defaulting now runs before engine load
 
@@ -544,8 +537,7 @@ export function GameStartLobby({
                 onChange={(event) => setChatInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
-                    const composing = (event as any)?.isComposing || (event.nativeEvent as any)?.isComposing;
-                    if (composing) {
+                    if (event.isComposing || event.nativeEvent.isComposing) {
                       return;
                     }
                     event.preventDefault();

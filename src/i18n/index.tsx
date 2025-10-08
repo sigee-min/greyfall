@@ -21,7 +21,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const next = normalizeLocale(prefLocale);
     if (next !== locale) setLocaleState(next);
-  }, [prefLocale]);
+  }, [prefLocale, locale]);
 
   // Load messages when locale changes
   useEffect(() => {
@@ -59,4 +59,3 @@ export function useI18n(): I18nContextValue {
   if (!ctx) throw new Error('useI18n must be used within I18nProvider');
   return ctx;
 }
-

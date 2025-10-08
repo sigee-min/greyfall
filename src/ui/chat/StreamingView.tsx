@@ -12,7 +12,7 @@ type Props = {
 
 export function StreamingView({ manager = 'fast', debugSystemPrompt, className }: Props) {
   const [userInput, setUserInput] = useState('');
-  const { state, start, abort, reset, setSystemPrompt, hardReset } = useLlmStream(debugSystemPrompt);
+  const { state, start, abort, reset, hardReset } = useLlmStream(debugSystemPrompt);
 
   const canStart = state.phase === 'idle' || state.phase === 'done' || state.phase === 'error' || state.phase === 'aborted';
   const canAbort = state.phase === 'generating';

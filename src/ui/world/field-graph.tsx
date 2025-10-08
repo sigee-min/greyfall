@@ -1,41 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { WORLD_STATIC } from '../../domain/world/data';
 import { useI18n } from '../../i18n';
 import { worldPositionsClient } from '../../domain/net-objects/world-positions-client';
 import type { PublishLobbyMessage } from '../../domain/chat/use-lobby-chat';
-import type { SessionParticipant } from '../../domain/session/types';
 
 type Props = {
   localParticipantId: string | null;
-  participants: SessionParticipant[];
   publish: PublishLobbyMessage;
 };
 
-export function FieldGraph({ localParticipantId, participants, publish }: Props) {
+export function FieldGraph({ localParticipantId, publish }: Props) {
   const { t } = useI18n();
-  const [positions, setPositions] = useState(worldPositionsClient.getAll());
-  useEffect(() => worldPositionsClient.subscribe(setPositions), []);
+  const [, bumpVersion] = useState(0);
+  useEffect(() => worldPositionsClient.subscribe(() => bumpVersion((v) => v + 1)), []);
 
-  const local = useMemo(() => {
-    return localParticipantId ? worldPositionsClient.getFor(localParticipantId) : null;
-  }, [positions, localParticipantId]);
-
-  const map = useMemo(() => {
+  const local = localParticipantId ? worldPositionsClient.getFor(localParticipantId) : null;
+  const map = (() => {
     const mid = local?.mapId ?? WORLD_STATIC.head;
     return WORLD_STATIC.maps.find((m) => m.id === mid) ?? WORLD_STATIC.maps[0];
-  }, [local]);
+  })();
 
   const currentFieldId = local?.fieldId ?? map.entryFieldId;
 
   const handleMove = (toFieldId: string) => {
     if (!localParticipantId) return;
     if (toFieldId === currentFieldId) return;
-    publish('field:move:request' as any, {
+    publish('field:move:request', {
       playerId: localParticipantId,
       mapId: map.id,
       fromFieldId: currentFieldId,
       toFieldId
-    } as any, 'ui:move');
+    }, 'ui:move');
   };
 
   return (

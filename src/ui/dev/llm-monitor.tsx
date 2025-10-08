@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { listStreams, subscribeStreams, type StreamSnapshot, type StreamEvent } from '../../llm/stream-bus';
 import { subscribeProgress, getLastProgress, type ProgressReport } from '../../llm/progress-bus';
@@ -51,6 +51,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
   const current = useMemo(() => active.find((s) => s.meta.id === selectedId) ?? active[0] ?? null, [active, selectedId]);
   const tokenBoxRef = useRef<HTMLDivElement | null>(null);
   const [autoFollow, setAutoFollow] = useState(true);
+  const handleClose = useCallback(() => { onClose?.(); }, [onClose]);
 
   // Drag handling
   useEffect(() => {
@@ -96,7 +97,24 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
           <div style={{ fontWeight: 700, letterSpacing: 0.5 }}>LLM Monitor</div>
           <div style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>streams: {active.length}</div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            {/* Close 버튼 제거됨; Ctrl+`로 토글하세요 */}
+            <button
+              type="button"
+              onClick={handleClose}
+              onMouseDown={(ev) => ev.stopPropagation()}
+              style={{
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'transparent',
+                color: '#e5e7eb',
+                borderRadius: 6,
+                padding: '4px 8px',
+                fontSize: 11,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>
         {progress && (

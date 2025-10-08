@@ -33,7 +33,6 @@ async function main() {
   let failed = 0;
   for (const c of cases) {
     try {
-      // eslint-disable-next-line no-await-in-loop
       await c.fn();
       console.log(`✔ ${c.name}`);
       passed++;

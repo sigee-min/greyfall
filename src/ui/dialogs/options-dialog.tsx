@@ -331,39 +331,6 @@ function OptionSlider({ label, description, value, onChange, disabled }: OptionS
   );
 }
 
-type OptionSelectProps = {
-  label: string;
-  description: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  disabled?: boolean;
-};
-
-function OptionSelect({ label, description, value, onChange, options, disabled }: OptionSelectProps) {
-  return (
-    <div className={cn('space-y-3 rounded-xl border border-border/60 bg-card/70 p-4', disabled ? 'opacity-60' : undefined)}>
-      <div className="flex items-center justify-between text-sm">
-        <div>
-          <p className="font-semibold text-foreground">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        <select
-          data-cursor="pointer"
-          className="rounded-md border border-border bg-background/70 px-2 py-1 text-xs"
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-    </div>
-  );
-}
-
 function PurgeModelsPanel() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);

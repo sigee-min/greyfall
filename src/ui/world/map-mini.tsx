@@ -4,7 +4,6 @@ import { worldPositionsClient } from '../../domain/net-objects/world-positions-c
 import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/chat/use-lobby-chat';
 import { useGlobalBus } from '../../bus/global-bus';
 import type { SessionParticipant } from '../../domain/session/types';
-import type { LobbyMessage } from '../../protocol';
 import { useI18n } from '../../i18n';
 
 type Props = {
@@ -28,23 +27,26 @@ export function MapMini({ localParticipantId, participants, publish, register }:
     return () => window.clearInterval(id);
   }, []);
 
-  const local = useMemo(() => (localParticipantId ? worldPositionsClient.getFor(localParticipantId) : null), [positions, localParticipantId]);
+  const local = useMemo(() => {
+    if (!localParticipantId) return null;
+    return positions.find((position) => position.id === localParticipantId) ?? null;
+  }, [positions, localParticipantId]);
   const mapId = local?.mapId ?? WORLD_STATIC.head;
   const mapIndex = Math.max(0, WORLD_STATIC.maps.findIndex((m) => m.id === mapId));
   const localRole = useMemo(() => participants.find((p) => p.id === localParticipantId)?.role ?? 'guest', [participants, localParticipantId]);
 
   useEffect(() => {
-    const unsubscribe = register('map:travel:update' as any, (msg: any) => {
-      const b: any = msg.body;
-      setVote({ inviteId: String(b.inviteId), targetMapId: String(b.targetMapId), yes: Number(b.yes), no: Number(b.no), total: Number(b.total), quorum: b.quorum, status: b.status });
-      if (b.status === 'proposed' && deadlineAt == null) {
+    const unsubscribe = register('map:travel:update', (msg) => {
+      const { inviteId, targetMapId, yes, no, total, quorum, status } = msg.body;
+      setVote({ inviteId, targetMapId, yes, no, total, quorum, status });
+      if (status === 'proposed' && deadlineAt == null) {
         setDeadlineAt(Date.now() + 60_000);
       }
-      if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-        const mapName = WORLD_STATIC.maps.find((m) => m.id === b.targetMapId)?.name ?? b.targetMapId;
-        const statusTitle = b.status === 'approved' ? t('map.travel.approved') : b.status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
-        const statusKind = b.status === 'approved' ? 'success' : b.status === 'rejected' ? 'warning' : 'info';
-        bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind as any, durationMs: 2500 });
+      if (status === 'approved' || status === 'rejected' || status === 'cancelled') {
+        const mapName = WORLD_STATIC.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId;
+        const statusTitle = status === 'approved' ? t('map.travel.approved') : status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
+        const statusKind: 'success' | 'warning' | 'info' = status === 'approved' ? 'success' : status === 'rejected' ? 'warning' : 'info';
+        bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind, durationMs: 2500 });
         setTimeout(() => {
           setVote(null);
           setDeadlineAt(null);
@@ -52,26 +54,26 @@ export function MapMini({ localParticipantId, participants, publish, register }:
       }
     });
     return unsubscribe;
-  }, [deadlineAt, register]);
+  }, [bus, deadlineAt, register, t]);
 
   const handleTravel = (dir: 'next' | 'prev') => {
     if (!localParticipantId) return;
-    publish('map:travel:propose' as any, { requesterId: localParticipantId, direction: dir, quorum: policy } as any, 'ui:travel:propose');
+    publish('map:travel:propose', { requesterId: localParticipantId, direction: dir, quorum: policy }, 'ui:travel:propose');
   };
 
   const voteYes = () => {
     if (!localParticipantId || !vote) return;
-    publish('map:travel:vote' as any, { inviteId: vote.inviteId, voterId: localParticipantId, approve: true } as any, 'ui:travel:vote');
+    publish('map:travel:vote', { inviteId: vote.inviteId, voterId: localParticipantId, approve: true }, 'ui:travel:vote');
   };
   const voteNo = () => {
     if (!localParticipantId || !vote) return;
-    publish('map:travel:vote' as any, { inviteId: vote.inviteId, voterId: localParticipantId, approve: false } as any, 'ui:travel:vote');
+    publish('map:travel:vote', { inviteId: vote.inviteId, voterId: localParticipantId, approve: false }, 'ui:travel:vote');
   };
 
   const cancelTravel = () => {
     if (!localParticipantId || !vote) return;
     if (localRole !== 'host') return;
-    publish('map:travel:cancel' as any, { inviteId: vote.inviteId, byId: localParticipantId } as any, 'ui:travel:cancel');
+    publish('map:travel:cancel', { inviteId: vote.inviteId, byId: localParticipantId }, 'ui:travel:cancel');
   };
 
   const occupancyByField = useMemo(() => {
@@ -97,7 +99,7 @@ export function MapMini({ localParticipantId, participants, publish, register }:
           {localRole === 'host' && (
             <select
               value={policy}
-              onChange={(e) => setPolicy(e.target.value as any)}
+              onChange={(e) => setPolicy(e.target.value as 'majority' | 'all')}
               className="rounded-md border border-border/60 bg-background/80 px-2 py-1 text-[11px]"
               title={t('map.vote.policy')}
             >

@@ -222,7 +222,7 @@ wss.on('connection', (socket, request) => {
     if (role === 'host') {
       delete currentSession.host;
       console.log(`[ws] host disconnected ${sessionId}`);
-      for (const [pid, guest] of currentSession.guests.entries()) {
+      for (const guest of currentSession.guests.values()) {
         if (guest.socket.readyState === WebSocket.OPEN) {
           send(guest.socket, createSignalServerMessage('peer-disconnected', { peerId: 'host' }));
         }
@@ -254,10 +254,10 @@ setInterval(() => {
   wss.clients.forEach((ws) => {
     const last = heartbeats.get(ws) ?? 0;
     if (now - last > 45_000) {
-      try { ws.terminate(); } catch {}
+      safeTerminate(ws);
       return;
     }
-    try { ws.ping(); } catch {}
+    safePing(ws);
   });
 }, 15_000);
 
@@ -280,6 +280,7 @@ function send(socket: WebSocket, payload: SignalServerMessage) {
     socket.send(JSON.stringify(payload));
   }
 }
+
 const MAX_PENDING = 256;
 function enqueue(map: Map<string, string[]>, peerId: string, candidate: string) {
   const list = map.get(peerId) ?? [];
@@ -318,6 +319,26 @@ function safeParseJson(value: string): unknown {
 }
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function safeTerminate(ws: WebSocket) {
+  try {
+    ws.terminate();
+  } catch (error) {
+    console.warn('[ws] terminate failed', describeError(error));
+  }
+}
+
+function safePing(ws: WebSocket) {
+  try {
+    ws.ping();
+  } catch (error) {
+    console.warn('[ws] ping failed', describeError(error));
+  }
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function randomBlock() {
   let block = '';

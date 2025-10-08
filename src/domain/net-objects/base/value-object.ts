@@ -1,23 +1,24 @@
 import type { CommonDeps, HostObject } from '../types';
-import { HostReplicator } from '../replicator';
+import { HostReplicator, type PatchOp } from '../replicator';
 
-export class HostValueObject<T extends unknown> implements HostObject {
+export class HostValueObject<T> implements HostObject {
   readonly id: string;
   protected readonly replicator: HostReplicator;
   constructor(protected deps: CommonDeps, id: string, initial?: T, context = 'value:init') {
     this.id = id;
-    this.replicator = new HostReplicator((k, b, c) => deps.publish(k as any, b as any, c), 256, 64);
+    this.replicator = new HostReplicator((kind, body, ctx) => deps.publish(kind, body, ctx), 256, 64);
     if (initial !== undefined) {
-      this.replicator.set(this.id, initial as unknown, context);
+      this.replicator.set(this.id, initial, context);
     }
   }
 
   set(value: T, context = 'value:set') {
-    return this.replicator.set(this.id, value as unknown, context);
+    return this.replicator.set(this.id, value, context);
   }
 
   merge(partial: Partial<T>, context = 'value:merge') {
-    return this.replicator.apply(this.id, [{ op: 'merge', value: partial as unknown }] as any, context);
+    const op: PatchOp = { op: 'merge', value: partial };
+    return this.replicator.apply(this.id, [op], context);
   }
 
   onRequest(sinceRev?: number) {
@@ -27,4 +28,3 @@ export class HostValueObject<T extends unknown> implements HostObject {
   getSnapshot() { return this.replicator.get(this.id); }
   getLogsSince(sinceRev: number) { return this.replicator.getLogsSince(this.id, sinceRev); }
 }
-

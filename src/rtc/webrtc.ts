@@ -242,8 +242,11 @@ export function createHostPeer(events: RTCBridgeEvents, iceServers: RTCIceServer
   const channel = peer.createDataChannel('greyfall');
   // Set a low threshold for backpressure signaling; consumers may attach listeners
   try {
-    (channel as any).bufferedAmountLowThreshold = 64 * 1024; // 64KB
-  } catch (_err) {
+    const ch = channel as RTCDataChannel & { bufferedAmountLowThreshold?: number };
+    if (typeof ch.bufferedAmountLowThreshold === 'number') {
+      ch.bufferedAmountLowThreshold = 64 * 1024; // 64KB
+    }
+  } catch {
     // ignore if unavailable
   }
   channel.addEventListener('open', () => events.onOpen?.(channel));

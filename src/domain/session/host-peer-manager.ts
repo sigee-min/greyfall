@@ -33,7 +33,7 @@ export class HostPeerManager {
     this.peers.set(peerId, entry);
     // Attach backpressure listener to drain per-peer queue
     const drain = () => this.flush(peerId);
-    (channel as any).addEventListener?.('bufferedamountlow', drain as any);
+    channel.addEventListener?.('bufferedamountlow', drain as EventListener);
     this.events.onPeerCreated?.(entry);
     return entry;
   }
@@ -43,13 +43,13 @@ export class HostPeerManager {
     if (!entry) return;
     try {
       entry.channel.close();
-    } catch (_err) {
-      void 0; // noop
+    } catch {
+      // ignore close errors
     }
     try {
       entry.peer.close();
-    } catch (_err) {
-      void 0; // noop
+    } catch {
+      // ignore close errors
     }
     this.peers.delete(peerId);
     this.events.onPeerClosed?.(peerId);
@@ -73,7 +73,7 @@ export class HostPeerManager {
 
   sendAll(payload: unknown) {
     const data = JSON.stringify(payload);
-    this.peers.forEach(({ channel, peerId }) => {
+    this.peers.forEach(({ peerId }) => {
       this.sendTo(peerId, data);
     });
   }
@@ -97,23 +97,27 @@ export class HostPeerManager {
     if (!entry) return;
     const { channel } = entry;
     if (channel.readyState !== 'open') return; // do not queue closed channels for now
-    const buffered = (channel as any).bufferedAmount ?? 0;
-    const threshold = (channel as any).bufferedAmountLowThreshold ?? 64 * 1024;
+    const buffered = channel.bufferedAmount ?? 0;
+    const threshold = channel.bufferedAmountLowThreshold ?? 64 * 1024;
     if (buffered > threshold * 4) {
       // queue
       const q = this.pending.get(peerId) ?? [];
-      if (q.length < this.maxQueue) q.push(data);
-      else q.shift(), q.push(data);
+      if (q.length >= this.maxQueue) {
+        q.shift();
+      }
+      q.push(data);
       this.pending.set(peerId, q);
       return;
     }
     try {
       channel.send(data);
-    } catch (_err) {
+    } catch {
       // enqueue on failure
       const q = this.pending.get(peerId) ?? [];
-      if (q.length < this.maxQueue) q.push(data);
-      else q.shift(), q.push(data);
+      if (q.length >= this.maxQueue) {
+        q.shift();
+      }
+      q.push(data);
       this.pending.set(peerId, q);
     }
   }
@@ -125,14 +129,14 @@ export class HostPeerManager {
     if (channel.readyState !== 'open') return;
     const q = this.pending.get(peerId);
     if (!q || q.length === 0) return;
-    const threshold = (channel as any).bufferedAmountLowThreshold ?? 64 * 1024;
+    const threshold = channel.bufferedAmountLowThreshold ?? 64 * 1024;
     while (q.length > 0) {
-      const buffered = (channel as any).bufferedAmount ?? 0;
+      const buffered = channel.bufferedAmount ?? 0;
       if (buffered > threshold * 2) break;
       const next = q.shift()!;
       try {
         channel.send(next);
-      } catch (_err) {
+      } catch {
         // push back and break
         q.unshift(next);
         break;

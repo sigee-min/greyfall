@@ -7,7 +7,7 @@ export const ReadyzCommand: CommandSpec<string> = {
   schema: z.string(),
   doc: 'llm.readyz — LLM 준비 상태 헬스체크(준비 전에는 에러 대신 대기 로그만).',
   policy: { role: 'host', cooldownMs: 1500 },
-  handler: async (_text, ctx) => {
+  handler: async (_text, _ctx) => {
     // Non-blocking probe; does not trigger model download
     const probe = await probeChatApiReady(600);
     if (probe.initialised && probe.chatApiReady) {

@@ -1,5 +1,5 @@
 export function renderTemplate(tpl: string, params: Record<string, unknown>): string {
-  return tpl.replace(/\$\{\s*([a-zA-Z0-9_\.]+)\s*\}/g, (_m, key) => {
+  return tpl.replace(/\$\{\s*([a-zA-Z0-9_.]+)\s*\}/g, (_m, key) => {
     const val = get(params, String(key));
     if (val == null) return '';
     if (typeof val === 'object') return JSON.stringify(val);
@@ -7,14 +7,15 @@ export function renderTemplate(tpl: string, params: Record<string, unknown>): st
   });
 }
 
-function get(obj: any, path: string): unknown {
+function get(obj: unknown, path: string): unknown {
   const parts = path.split('.');
-  let cur = obj;
-  for (const p of parts) {
-    if (cur == null) return undefined;
-    cur = cur[p];
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current == null || typeof current !== 'object') return undefined;
+    const record = current as Record<string, unknown>;
+    current = record[part];
   }
-  return cur;
+  return current;
 }
 
 export async function withTimeoutRetry<T>(
@@ -23,22 +24,22 @@ export async function withTimeoutRetry<T>(
 ): Promise<T> {
   const { timeoutMs, retries, signal } = opts;
   let attempt = 0;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  let lastError: unknown = null;
+  while (attempt <= Math.max(0, retries)) {
     try {
       return await withTimeout(work(), timeoutMs, signal);
     } catch (err) {
+      lastError = err;
       attempt += 1;
-      if (attempt > Math.max(0, retries)) throw err;
-      // small backoff
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 200));
+      if (attempt > Math.max(0, retries)) break;
+      await delay(200);
     }
   }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError ?? 'Unknown error'));
 }
 
 async function withTimeout<T>(p: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
-  let timer: any = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return await Promise.race([
     p,
     new Promise<T>((_resolve, reject) => {
@@ -49,6 +50,11 @@ async function withTimeout<T>(p: Promise<T>, ms: number, signal?: AbortSignal): 
         else signal.addEventListener('abort', onAbort, { once: true });
       }
     })
-  ]).finally(() => { if (timer) clearTimeout(timer); });
+  ]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}

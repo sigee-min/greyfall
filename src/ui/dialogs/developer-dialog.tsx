@@ -6,8 +6,8 @@ type DeveloperDialogProps = {
 };
 
 export function DeveloperDialog({ open, onClose }: DeveloperDialogProps) {
-  if (!open) return null;
   const { t } = useI18n();
+  if (!open) return null;
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-6 py-10 backdrop-blur">

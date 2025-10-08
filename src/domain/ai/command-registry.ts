@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import type { SessionParticipant } from '../session/types';
+import type { LlmManagerKind } from '../../llm/llm-engine';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
+
 export type PublishLobbyMessage = <K extends LobbyMessageKind>(
   kind: K,
   body: LobbyMessageBodies[K],
   context?: string
 ) => boolean;
-import type { SessionParticipant } from '../session/types';
-import type { LlmManagerKind } from '../../llm/llm-engine';
 
 export type CommandContext = {
   manager: LlmManagerKind;
@@ -46,7 +47,7 @@ class Registry {
   private executedIds = new Set<string>();
 
   register<T>(spec: CommandSpec<T>) {
-    this.specs.set(spec.cmd.toLowerCase(), spec as unknown as CommandSpec<unknown>);
+    this.specs.set(spec.cmd.toLowerCase(), spec as CommandSpec<unknown>);
   }
 
   list(): CommandSpec<unknown>[] {
@@ -109,7 +110,7 @@ class Registry {
       }
       return ok;
     } catch (err) {
-      console.error(`[ai] handler failed cmd=${spec.cmd} error=${String((err as any)?.message || err)}`);
+      console.error(`[ai] handler failed cmd=${spec.cmd} error=${formatError(err)}`);
       return false;
     }
   }
@@ -125,3 +126,7 @@ class Registry {
 }
 
 export const commandRegistry = new Registry();
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

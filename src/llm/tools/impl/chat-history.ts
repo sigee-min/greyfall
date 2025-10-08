@@ -12,7 +12,19 @@ export const ChatHistoryTool: Tool<ChatHistoryIn, ChatHistoryOut> = {
     if (i.includeSystem != null && typeof i.includeSystem !== 'boolean') throw new Error('includeSystem:boolean');
   },
   outputGuard: (data: unknown): asserts data is ChatHistoryOut => {
-    if (!data || typeof data !== 'object' || !Array.isArray((data as any).items)) throw new Error('invalid output');
+    if (!data || typeof data !== 'object') throw new Error('invalid output');
+    const record = data as Record<string, unknown>;
+    if (!Array.isArray(record.items)) throw new Error('invalid output');
+    for (const item of record.items) {
+      if (!item || typeof item !== 'object') throw new Error('invalid output');
+      const entry = item as Record<string, unknown>;
+      if (typeof entry.author !== 'string' || typeof entry.body !== 'string' || typeof entry.at !== 'number') {
+        throw new Error('invalid output');
+      }
+      if (!['user', 'assistant', 'system'].includes(entry.role as string)) {
+        throw new Error('invalid output');
+      }
+    }
   },
   async invoke(ctx, input) {
     const limit = input.limit ?? 10;

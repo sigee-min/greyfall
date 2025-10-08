@@ -7,13 +7,11 @@ import {
   createLobbyMessage,
   LobbyMessage,
   LobbyMessageBodies,
-  LobbyMessageKind,
-  parseLobbyMessage
+  LobbyMessageKind
 } from '../../protocol';
 import { useLobbyStore, type SessionWireParticipant } from './session-store';
 import { useLobbyBus } from '../../bus/lobby-bus';
 import { HostPeerManager } from './host-peer-manager';
-import { PARTICIPANTS_OBJECT_ID } from '../net-objects/participants';
 import { HostNetController } from '../net-objects/host-controller';
 import { ClientNetController } from '../net-objects/client-controller';
 import { useGlobalBus } from '../../bus/global-bus';
@@ -363,7 +361,6 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       const id = nanoid(8);
 
       let signalSessionId: string | null = null;
-      let forwardOffer: (() => Promise<void>) | null = null;
 
       // For multi-guest architecture, do NOT relay ICE from the legacy base host peer.
       // Per-guest peers created in onPeerConnected will send candidates with peerId.
@@ -474,10 +471,20 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       const hostParticipant: SessionWireParticipant = { id, name, tag, ready: false, role: 'host' };
       lobbyStore.replaceFromWire([hostParticipant]);
       globalBus.publish('session:state', { mode: 'host', code: sessionCode, participants: 1 });
-
-      forwardOffer = async () => undefined;
     },
-    [events, globalBus, lobbyStore, signalBridge, startHost, attachPeerWatchers, lobbyBus]
+    [
+      attachPeerWatchers,
+      events,
+      globalBus,
+      handleChannelClose,
+      handleChannelError,
+      handleChannelOpen,
+      lobbyBus,
+      lobbyStore,
+      publishLobbyMessage,
+      signalBridge,
+      startHost
+    ]
   );
 
   const joinGame = useCallback(
@@ -502,12 +509,6 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       const offerPromise = createDeferred<string>();
       let offerResolved = false;
       console.info('[signal] waiting for offer via socket', { sessionId: upperInput });
-
-      const relayIceCandidate = (candidate: RTCIceCandidateInit) => {
-        if (!signalBridge.sendCandidate(candidate)) {
-          console.debug('[signal] candidate skipped – socket not open (guest)');
-        }
-      };
 
       try {
         await signalBridge.connect(upperInput, 'guest', {
@@ -673,7 +674,17 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       });
 
     },
-    [events, globalBus, joinHost, leaveSession, lobbyStore, signalBridge, attachPeerWatchers]
+    [
+      attachPeerWatchers,
+      events,
+      globalBus,
+      joinHost,
+      leaveSession,
+      lobbyStore,
+      lobbyBus,
+      publishLobbyMessage,
+      signalBridge
+    ]
   );
 
   const toggleReady = useCallback(

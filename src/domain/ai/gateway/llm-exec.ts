@@ -2,6 +2,8 @@
 import type { ChatOptions } from '../../../llm/llm-engine';
 import type { LlmManagerKind } from '../../../llm/llm-engine';
 
+const DEBUG = Boolean(import.meta.env?.VITE_LLM_DEBUG);
+
 type LlmOps = {
   generateChat: (prompt: string, options?: ChatOptions) => Promise<string>;
   ensureChatApiReady: (manager: LlmManagerKind, timeoutMs?: number) => Promise<void>;
@@ -30,9 +32,7 @@ export async function ensureRuntimeReady(manager: LlmManagerKind): Promise<void>
       await ensureChatApiReady(manager, 1_800_000);
       if (!(await probeChatApiActive(1_000))) {
         for (let i = 0; i < 6; i += 1) {
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((r) => setTimeout(r, 250));
-          // eslint-disable-next-line no-await-in-loop
+          await sleep(250);
           const ok = await probeChatApiActive(750);
           if (ok) break;
         }
@@ -42,7 +42,7 @@ export async function ensureRuntimeReady(manager: LlmManagerKind): Promise<void>
       attempt += 1;
       if (attempt >= 2) throw err;
       resetEngine('ensureRuntimeReady:retry');
-      await new Promise((r) => setTimeout(r, 400));
+      await sleep(400);
     }
   }
 }
@@ -85,13 +85,15 @@ export async function transientRetryGenerate(
     const { ensureChatApiReady, probeChatApiActive, resetEngine, loadEngineByManager } = await loadOps();
     try {
       resetEngine('transientRetry');
-      await new Promise((r) => setTimeout(r, 200));
+      await sleep(200);
       await loadEngineByManager(manager);
       await ensureChatApiReady(manager, 2_000);
       if (!(await probeChatApiActive(1_000))) {
-        await new Promise((r) => setTimeout(r, 300));
+        await sleep(300);
       }
-    } catch {}
+    } catch (retryErr) {
+      if (DEBUG) console.debug('[llm-exec] retry remediation failed', formatError(retryErr));
+    }
     return await generateWithTimeout(user, { ...opts, timeoutMs: Math.min(12_000, Math.max(1_000, Math.floor(opts.timeoutMs / 2))) });
   }
 }
@@ -119,7 +121,7 @@ export async function generateMessagesWithTimeout(
       timeoutMs: opts.timeoutMs
     });
   } catch (err) {
-    if (DEBUG) console.warn(`[llm-exec] generate failed, retrying once reason=${String((err as any)?.message || err)}`);
+    if (DEBUG) console.warn(`[llm-exec] generate failed, retrying once reason=${formatError(err)}`);
     return transientRetryGenerate(manager, user, {
       systemPrompt,
       temperature: opts.temperature,
@@ -128,4 +130,11 @@ export async function generateMessagesWithTimeout(
     });
   }
 }
-const DEBUG = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

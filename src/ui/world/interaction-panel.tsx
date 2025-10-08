@@ -16,7 +16,10 @@ export function InteractionPanel({ localParticipantId, participants, publish, re
   const { t } = useI18n();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
-  const local = useMemo(() => (localParticipantId ? worldPositionsClient.getFor(localParticipantId) : null), [positions, localParticipantId]);
+  const local = useMemo(() => {
+    if (!localParticipantId) return null;
+    return positions.find((position) => position.id === localParticipantId) ?? null;
+  }, [positions, localParticipantId]);
   const mapId = local?.mapId ?? 'LUMENFORD';
   const fieldId = local?.fieldId ?? 'gate';
 

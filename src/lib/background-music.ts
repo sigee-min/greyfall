@@ -122,7 +122,7 @@ export function useBackgroundMusic(
       next.pause();
       disposeUnlockHandler();
     }
-  }, [sources, sourcesKey, shouldPlay]);
+  }, [shouldPlay, sources, sourcesKey, volume]);
 
   useEffect(() => {
     return () => {

@@ -8,7 +8,15 @@ import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 import { useGreyfallStore } from '../../store';
 import { useI18n } from '../../i18n';
 
-export function CommandConsole({ publish, localParticipantId }: { publish: <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean; localParticipantId: string | null }) {
+type Publish = <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean;
+
+const STAT_KEYS: readonly StatKey[] = ['근력', '운동신경', '공학', '손재주', '의술'] as const;
+
+function isStatKey(value: string): value is StatKey {
+  return STAT_KEYS.includes(value as StatKey);
+}
+
+export function CommandConsole({ publish, localParticipantId }: { publish: Publish; localParticipantId: string | null }) {
   const { t } = useI18n();
   const appendLog = useGreyfallStore((state) => state.appendLog);
   const [intent, setIntent] = useState('');
@@ -38,17 +46,19 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
       return { dice: 20, mod, label: labels.join('+') };
     }
     // stat+N or d20+N
-    if (/^d?20(\s*[+\-]\s*\d+)?$/i.test(expr)) {
-      const mm = expr.match(/^d?20(\s*([+\-])\s*(\d+))?$/i)!;
+    if (/^d?20(\s*[+-]\s*\d+)?$/i.test(expr)) {
+      const mm = expr.match(/^d?20(\s*([+-])\s*(\d+))?$/i)!;
       const sign = mm[2] === '-' ? -1 : 1;
       const mod = mm[3] ? sign * parseInt(mm[3], 10) : 0;
       return { dice: 20, mod, label: 'd20' };
     }
     // stat name [+/-N]
-    const m2 = expr.match(/^([\S]+)(\s*([+\-])\s*(\d+))?$/);
+    const m2 = expr.match(/^([\S]+)(\s*([+-])\s*(\d+))?$/);
     if (!m2) return null;
-    const key = m2[1] as StatKey;
-    const base = (stats as any)[key] ?? 0;
+    const keyCandidate = m2[1];
+    if (!isStatKey(keyCandidate)) return null;
+    const key = keyCandidate;
+    const base = stats[key] ?? 0;
     const sign2 = m2[3] === '-' ? -1 : 1;
     const extra = m2[4] ? sign2 * parseInt(m2[4], 10) : 0;
     return { dice: 20, mod: base + extra, label: key };
@@ -69,7 +79,7 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
       const critIcon = isCrit ? '✨' : isFail ? '💥' : '';
       const summary = `${dieIcon} /roll ${parsed.label} → [${d}] ${parsed.mod >= 0 ? '+' : ''}${parsed.mod} = ${total} ${critIcon}`;
       appendLog({ id: nanoid(6), body: summary });
-      if (localParticipantId) publish('chat:append:request' as any, { body: summary, authorId: localParticipantId } as any, 'roll');
+      if (localParticipantId) publish('chat:append:request', { body: summary, authorId: localParticipantId }, 'roll');
       bus.publish('toast:show', { title: t('console.roll'), message: summary, status: isCrit ? 'success' : isFail ? 'warning' : 'info', durationMs: 2200, icon: '🎲' });
       setIntent('');
       return;
@@ -84,7 +94,7 @@ export function CommandConsole({ publish, localParticipantId }: { publish: <K ex
     setError(null);
 
     try {
-      const response = await (async function requestChoicesOffline(p: CardPrompt) {
+      const response = await (async function requestChoicesOffline(_prompt: CardPrompt) {
         const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `offline-${Date.now()}`;
         return {
           promptId: id,

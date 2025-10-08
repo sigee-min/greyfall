@@ -1,6 +1,5 @@
 import type { SessionParticipant } from '../session/types';
 import type { SessionMeta } from '../session/use-session';
-import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
 import { useChatNetSync, type RegisterLobbyHandler, type PublishLobbyMessage } from './use-chat-net-sync';
 
 type UseLobbyChatOptions = {

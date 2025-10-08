@@ -30,7 +30,12 @@ export class InMemoryToolsHost implements ToolsHost {
       if (key && opts?.ttlMs) this.cache.set(key, { expiresAt: Date.now() + Math.max(100, opts.ttlMs), result });
       return result as ToolResult<TOut>;
     } catch (err) {
-      return { ok: false, error: String((err as any)?.message || err) } as ToolResult<TOut>;
+      return { ok: false, error: describeError(err) } as ToolResult<TOut>;
     }
   }
+}
+
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }

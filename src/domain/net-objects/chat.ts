@@ -1,4 +1,5 @@
 import type { LobbyMessageBodies } from '../../protocol';
+import type { PatchOp } from './replicator';
 
 export const CHAT_OBJECT_ID = 'chatlog';
 
@@ -21,7 +22,7 @@ export type Publish = <K extends keyof LobbyMessageBodies>(
 export class ChatHostStore {
   private log: ChatEntry[] = [];
   private rev = 0;
-  private opsLog: { rev: number; ops: any[] }[] = [];
+  private opsLog: { rev: number; ops: PatchOp[] }[] = [];
   constructor(private publish: Publish, private max = 200) {}
 
   append(entry: ChatEntry, context = 'chat-append') {
@@ -32,20 +33,21 @@ export class ChatHostStore {
       const nextRev = ++this.rev;
       const snapshot = { entries: this.log };
       // record as a 'set' op so incremental resend can reconstruct state
-      this.opsLog.push({ rev: nextRev, ops: [{ op: 'set', value: snapshot }] as any[] });
-      this.publish('object:replace', { id: CHAT_OBJECT_ID, rev: nextRev, value: snapshot } as any, context);
+      const op: PatchOp = { op: 'set', value: snapshot };
+      this.opsLog.push({ rev: nextRev, ops: [op] });
+      this.publish('object:replace', { id: CHAT_OBJECT_ID, rev: nextRev, value: snapshot }, context);
       return;
     }
     // Otherwise, send an incremental append patch
     const nextRev = ++this.rev;
-    const ops = [{ op: 'insert', path: 'entries', value: entry }] as any[];
+    const ops: PatchOp[] = [{ op: 'insert', path: 'entries', value: entry }];
     this.opsLog.push({ rev: nextRev, ops });
     this.publish('object:patch', { id: CHAT_OBJECT_ID, rev: nextRev, ops }, context);
   }
 
   broadcastSnapshot(context = 'chat-snapshot') {
     if (this.log.length === 0) return false;
-    return this.publish('object:replace', { id: CHAT_OBJECT_ID, rev: this.rev, value: { entries: this.log } } as any, context);
+    return this.publish('object:replace', { id: CHAT_OBJECT_ID, rev: this.rev, value: { entries: this.log } }, context);
   }
 
   onRequest(sinceRev?: number, context = 'chat-request') {
@@ -54,7 +56,7 @@ export class ChatHostStore {
       const logs = this.getLogsSince(sr);
       if (logs.length > 0 && logs.length <= 50) {
         for (const entry of logs) {
-          this.publish('object:patch', { id: CHAT_OBJECT_ID, rev: entry.rev, ops: entry.ops } as any, context);
+          this.publish('object:patch', { id: CHAT_OBJECT_ID, rev: entry.rev, ops: entry.ops }, context);
         }
         return true;
       }

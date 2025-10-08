@@ -1,7 +1,7 @@
 import type { AICommand } from './ai-router';
 import { runWithManagerLock } from './gateway/lock';
 import { resolveGatewayConfig } from './gateway/config';
-import { ensureRuntimeReady, generateMessagesWithTimeout, type ChatMessage } from './gateway/llm-exec';
+import { ensureRuntimeReady, generateMessagesWithTimeout } from './gateway/llm-exec';
 import { runPipeline } from '../../llm/pipeline/runner';
 import { InMemoryNodeRegistry } from '../../llm/pipeline/registry';
 import type { Step, PipelineCtx, MessageExecutor } from '../../llm/pipeline/types';
@@ -11,7 +11,30 @@ import { getToolsProviders } from '../../llm/tools/providers';
 import type { AIGatewayParams } from './gateway/types';
 import type { ChatHistoryIn, ChatHistoryOut } from '../../llm/tools/impl/chat-history';
 
-const DEBUG = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+const DEBUG = Boolean(import.meta.env?.VITE_LLM_DEBUG);
+
+function getChosenCommand(scratch: PipelineCtx['scratch']): string {
+  const raw = scratch.chosenCmd;
+  return typeof raw === 'string' && raw.trim() ? raw : 'chat';
+}
+
+function getLastOutputText(scratch: PipelineCtx['scratch']): string | null {
+  const last = scratch.last;
+  if (!last || typeof last !== 'object') return null;
+  if (!('text' in last)) return null;
+  const text = (last as { text?: unknown }).text;
+  return typeof text === 'string' && text.trim() ? text : null;
+}
+
+function formatHistory(items: ChatHistoryOut['items']): string {
+  return items
+    .map((item) => `- ${item.author}(${item.role}): ${item.body.slice(0, 140)}`)
+    .join('\n');
+}
+
+function formatError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 // NOTE: Phase-based request flow removed.
 // This gateway now builds a single messages array (system + user) and calls the LLM once.
@@ -57,7 +80,7 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
     };
     const exec: MessageExecutor = async (msgs, opts) => {
       if (DEBUG) console.debug(`[gw.exec] run messages=${msgs.length} temp=${opts.temperature} maxTokens=${opts.maxTokens} timeout=${opts.timeoutMs}`);
-      const out = await generateMessagesWithTimeout(manager, msgs as ChatMessage[], opts);
+      const out = await generateMessagesWithTimeout(manager, msgs, opts);
       if (DEBUG) console.debug(`[gw.exec] done chars=${out.length}`);
       return out;
     };
@@ -65,7 +88,7 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
       // run choose node
       if (DEBUG) console.debug('[gw] choose.begin');
       await runPipeline({ start: choose, ctx, registry: InMemoryNodeRegistry, exec });
-      const cmd = String((ctx.scratch?.chosenCmd as any) || 'chat');
+      const cmd = getChosenCommand(ctx.scratch);
       if (DEBUG) console.debug(`[gw] choose.done cmd=${cmd}`);
       // 2) Build pipeline per command (for now, only chat.basic)
       let start: Step;
@@ -78,13 +101,12 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
             let historyText = '';
             try {
               const res = await c.tools?.invoke<ChatHistoryIn, ChatHistoryOut>('chat.history', { limit: 10 });
-              if (res && res.ok) {
-                const items = res.data.items || [];
-                historyText = items
-                  .map((it: any) => `- ${it.author}(${it.role}): ${String(it.body || '').slice(0, 140)}`)
-                  .join('\n');
+              if (res?.ok) {
+                historyText = formatHistory(res.data.items);
               }
-            } catch {}
+            } catch (err) {
+              if (DEBUG) console.debug('[gw] chat.history failed', formatError(err));
+            }
             const parts: string[] = [];
             if (contextText && contextText.trim()) parts.push(`맥락:\n${contextText}`);
             if (historyText) parts.push(`최근 채팅(최대 10개):\n${historyText}`);
@@ -105,11 +127,11 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
       if (DEBUG) console.debug(`[gw] pipeline.begin node=${start.nodeId}`);
       const done = await runPipeline({ start, ctx, registry: InMemoryNodeRegistry, exec });
       if (DEBUG) console.debug('[gw] pipeline.done');
-      const text = String((done.scratch?.last as any)?.text || '') || fallbackChatText;
+      const text = getLastOutputText(done.scratch) ?? fallbackChatText;
       if (DEBUG) console.debug(`[gw] out chars=${text.length}`);
       return { cmd, body: text };
     } catch (e) {
-      if (DEBUG) console.debug('[gw] error', String((e as any)?.message || e));
+      if (DEBUG) console.debug('[gw] error', formatError(e));
       return { cmd: 'chat', body: fallbackChatText };
     }
   });

@@ -8,7 +8,7 @@ export type AICommand = { cmd: string; body?: unknown };
 
 const EnvelopeSchema = z.object({ cmd: z.string().min(1), body: z.any().optional() }).passthrough();
 
-const DEBUG = Boolean((import.meta as any).env?.VITE_LLM_DEBUG);
+const DEBUG = Boolean(import.meta.env?.VITE_LLM_DEBUG);
 
 function extractFirstJsonObject(input: string): string | null {
   let start = -1;
@@ -45,7 +45,9 @@ function extractFirstJsonObject(input: string): string | null {
 }
 
 export function parseAICommand(text: string): AICommand | null {
-  const log = (...args: unknown[]) => DEBUG && console.debug('[ai-parser]', ...args);
+  const log = (...args: unknown[]) => {
+    if (DEBUG) console.debug('[ai-parser]', ...args);
+  };
   const original = String(text ?? '');
   if (DEBUG) console.info('[ai-parser] raw', original);
   // 1) direct parse
@@ -53,7 +55,9 @@ export function parseAICommand(text: string): AICommand | null {
     const obj = JSON.parse(original) as unknown;
     const parsed = EnvelopeSchema.safeParse(obj);
     if (parsed.success) return { cmd: parsed.data.cmd, body: parsed.data.body };
-  } catch {}
+  } catch (err) {
+    log('parse-direct-failed', err instanceof Error ? err.message : String(err));
+  }
 
   // 2) relaxed extraction without regex: find first JSON object only
   const jsonSlice = extractFirstJsonObject(original) ?? original.trim();

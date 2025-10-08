@@ -9,7 +9,6 @@ import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-pos
 import { requestAICommand } from '../ai/ai-gateway';
 import { executeAICommand } from '../ai/ai-router';
 import { HostPartyObject, PARTY_OBJECT_ID } from './party-host.js';
-import { WORLD_STATIC } from '../world/data';
 import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
@@ -339,7 +338,16 @@ export class HostRouter {
             const status = this.evaluateTravelVote();
             const { yes, no, total } = this.computeVoteCounts();
             if (status === 'approved') {
-              const ok = this.party.travel(undefined as any, this.travelPoll.targetMapId);
+              const succeeded = this.party.travel(undefined as any, this.travelPoll.targetMapId);
+              if (!succeeded) {
+                this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+                this.travelPoll = null;
+                if (this.travelPollTimer) {
+                  clearTimeout(this.travelPollTimer);
+                  this.travelPollTimer = null;
+                }
+                return;
+              }
               this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
             } else {
               this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
@@ -364,9 +372,13 @@ export class HostRouter {
             this.send('map:travel:update' as any, { inviteId, status: 'proposed', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
           } else if (status === 'approved') {
             // Execute travel
-            const ok = this.party.travel(undefined as any, this.travelPoll.targetMapId);
+            const succeeded = this.party.travel(undefined as any, this.travelPoll.targetMapId);
             const { yes, no, total } = this.computeVoteCounts();
-            this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+            if (!succeeded) {
+              this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+            } else {
+              this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
+            }
             this.travelPoll = null;
             if (this.travelPollTimer) {
               clearTimeout(this.travelPollTimer);

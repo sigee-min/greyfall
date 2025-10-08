@@ -1,4 +1,4 @@
-import type { StatKey, TraitSpec } from '../../store/character';
+import type { TraitSpec } from '../../store/character';
 
 export const TRAITS: TraitSpec[] = [
   {

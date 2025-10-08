@@ -55,8 +55,8 @@ export class ClientNetController {
       let payload: unknown = event.data;
       try {
         payload = JSON.parse(event.data);
-      } catch (_err) {
-        // Ignore non-JSON payloads
+      } catch {
+        /* ignore non-JSON payloads */
       }
       this.handlePayload(payload, channel);
     };

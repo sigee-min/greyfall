@@ -7,7 +7,7 @@ export class HostChatObject implements HostObject {
   private readonly store: ChatHostStore;
 
   constructor(deps: CommonDeps) {
-    this.store = new ChatHostStore((kind, body, ctx) => deps.publish(kind as any, body as any, ctx));
+    this.store = new ChatHostStore((kind, body, ctx) => deps.publish(kind, body, ctx));
   }
 
   append(entry: ChatEntry, context?: string) {
