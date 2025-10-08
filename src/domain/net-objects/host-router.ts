@@ -5,7 +5,7 @@ import { CHAT_OBJECT_ID } from './chat.js';
 import { WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
 // LLM progress net-object removed
 import { PARTY_OBJECT_ID } from './party-host.js';
-import { getEntryField, getMap } from '../world/nav';
+// import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
 import type { NetObjectDescriptor } from './registry.js';
@@ -55,13 +55,7 @@ export class HostRouter {
   private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
   private readonly map = new PeerParticipantMap();
   private readonly registry = new Map<string, HostObject>();
-  private travelPoll: {
-    inviteId: string;
-    targetMapId: string;
-    quorum: 'majority' | 'all';
-    votes: Map<string, boolean | undefined>;
-  } | null = null;
-  private travelPollTimer: ReturnType<typeof setTimeout> | null = null;
+  // Travel voting moved to world:travel control model
 
   constructor(args: {
     send: Send;
@@ -157,157 +151,19 @@ export class HostRouter {
         }
         // field:move:request handled by world:control command
         case 'map:travel:request': {
-          const { requesterId, direction, toMapId } = message.body as any;
-          if (!this.limiter.allow(`travel:${requesterId}`)) {
-            console.warn('[travel] rate limited', { requesterId });
-            break;
-          }
-          // Validate all current party members are on the same map at its entry field
-          const members = this.party.getMembers();
-          if (members.length === 0) break;
-          const posState = (this.world as any).replicator?.get?.('world:positions')?.value as any;
-          const list: { id: string; mapId: string; fieldId: string }[] = Array.isArray(posState?.list) ? posState.list : [];
-          const first = list.find((e) => e.id === members[0]);
-          if (!first) break;
-          const map = getMap(first.mapId);
-          if (!map) break;
-          const entry = getEntryField(map);
-          const allOnSameMap = members.every((m: string) => {
-            const p = list.find((e) => e.id === m);
-            return p && p.mapId === first.mapId && p.fieldId === (entry?.id ?? '');
-          });
-          if (!allOnSameMap) {
-            console.warn('[travel] denied: not all at entry', { firstMap: first.mapId });
-            break;
-          }
-          const ok = this.party.travel(direction as any, toMapId as any);
-          if (!ok) console.warn('[travel] failed', { direction, toMapId });
+          // handled by world:travel:control
           break;
         }
         case 'map:travel:propose': {
-          const { requesterId, direction, toMapId, quorum } = message.body as any;
-          if (!this.limiter.allow(`travel:${requesterId}`)) {
-            console.warn('[travel] rate limited', { requesterId });
-            break;
-          }
-          if (this.travelPoll) {
-            console.warn('[travel] already in progress');
-            break;
-          }
-          // Validate preconditions (all members at entry of current map)
-          const members = this.party.getMembers();
-          if (members.length === 0) break;
-          const posState = (this.world as any).replicator?.get?.('world:positions')?.value as any;
-          const list: { id: string; mapId: string; fieldId: string }[] = Array.isArray(posState?.list) ? posState.list : [];
-          const first = list.find((e) => e.id === members[0]);
-          if (!first) break;
-          const map = getMap(first.mapId);
-          if (!map) break;
-          const entry = getEntryField(map);
-          const allOnSameMap = members.every((m: string) => {
-            const p = list.find((e) => e.id === m);
-            return p && p.mapId === first.mapId && p.fieldId === (entry?.id ?? '');
-          });
-          if (!allOnSameMap) {
-            console.warn('[travel] denied: not all at entry', { firstMap: first.mapId });
-            break;
-          }
-          let targetId = String(toMapId ?? '');
-          if (!targetId && direction) {
-            targetId = direction === 'next' ? (map.next ?? map.id) : (map.prev ?? map.id);
-          }
-          if (!targetId || targetId === map.id) break;
-          const inviteId = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
-          const votes = new Map<string, boolean | undefined>();
-          for (const m of members) votes.set(m, undefined);
-          votes.set(String(requesterId), true);
-          // Use requested quorum if provided; default to majority
-          const q: 'majority' | 'all' = (quorum === 'all' ? 'all' : 'majority');
-          this.travelPoll = { inviteId, targetMapId: targetId, quorum: q, votes };
-          const { yes, no, total } = this.computeVoteCounts();
-          this.send('map:travel:update' as any, { inviteId, status: 'proposed', targetMapId: targetId, yes, no, total, quorum: q } as any, 'travel:update');
-          // Start timeout (1 minute)
-          if (this.travelPollTimer) {
-            clearTimeout(this.travelPollTimer);
-            this.travelPollTimer = null;
-          }
-          this.travelPollTimer = setTimeout(() => {
-            if (!this.travelPoll) return;
-            // On timeout, if not approved, reject
-            const status = this.evaluateTravelVote();
-            const { yes, no, total } = this.computeVoteCounts();
-            if (status === 'approved') {
-              const succeeded = this.party.travel(undefined as any, this.travelPoll.targetMapId);
-              if (!succeeded) {
-                this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-                this.travelPoll = null;
-                if (this.travelPollTimer) {
-                  clearTimeout(this.travelPollTimer);
-                  this.travelPollTimer = null;
-                }
-                return;
-              }
-              this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-            } else {
-              this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-            }
-            this.travelPoll = null;
-            if (this.travelPollTimer) {
-              clearTimeout(this.travelPollTimer);
-              this.travelPollTimer = null;
-            }
-          }, 60_000);
+          // handled by world:travel:control
           break;
         }
         case 'map:travel:vote': {
-          if (!this.travelPoll) break;
-          const { inviteId, voterId, approve } = message.body as any;
-          if (inviteId !== this.travelPoll.inviteId) break;
-          if (!this.travelPoll.votes.has(String(voterId))) break;
-          this.travelPoll.votes.set(String(voterId), Boolean(approve));
-          const status = this.evaluateTravelVote();
-          if (status === 'pending') {
-            const { yes, no, total } = this.computeVoteCounts();
-            this.send('map:travel:update' as any, { inviteId, status: 'proposed', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-          } else if (status === 'approved') {
-            // Execute travel
-            const succeeded = this.party.travel(undefined as any, this.travelPoll.targetMapId);
-            const { yes, no, total } = this.computeVoteCounts();
-            if (!succeeded) {
-              this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-            } else {
-              this.send('map:travel:update' as any, { inviteId, status: 'approved', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-            }
-            this.travelPoll = null;
-            if (this.travelPollTimer) {
-              clearTimeout(this.travelPollTimer);
-              this.travelPollTimer = null;
-            }
-          } else if (status === 'rejected') {
-            const { yes, no, total } = this.computeVoteCounts();
-            this.send('map:travel:update' as any, { inviteId, status: 'rejected', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-            this.travelPoll = null;
-            if (this.travelPollTimer) {
-              clearTimeout(this.travelPollTimer);
-              this.travelPollTimer = null;
-            }
-          }
+          // handled by world:travel:control
           break;
         }
         case 'map:travel:cancel': {
-          if (!this.travelPoll) break;
-          const { inviteId, byId } = message.body as any;
-          if (inviteId !== this.travelPoll.inviteId) break;
-          // Only host can cancel
-          const isHost = this.lobbyStore.participantsRef.current.some((p) => p.id === String(byId) && p.role === 'host');
-          if (!isHost) break;
-          const { yes, no, total } = this.computeVoteCounts();
-          this.send('map:travel:update' as any, { inviteId, status: 'cancelled', targetMapId: this.travelPoll.targetMapId, yes, no, total, quorum: this.travelPoll.quorum } as any, 'travel:update');
-          this.travelPoll = null;
-          if (this.travelPollTimer) {
-            clearTimeout(this.travelPollTimer);
-            this.travelPollTimer = null;
-          }
+          // handled by world:travel:control
           break;
         }
         case 'interact:invite': {
@@ -352,31 +208,5 @@ export class HostRouter {
     this.publishToBus(message);
   }
 
-  private computeVoteCounts() {
-    const poll = this.travelPoll;
-    if (!poll) return { yes: 0, no: 0, total: 0 };
-    let yes = 0;
-    let no = 0;
-    poll.votes.forEach((v) => {
-      if (v === true) yes++;
-      else if (v === false) no++;
-    });
-    return { yes, no, total: poll.votes.size };
-  }
-
-  private evaluateTravelVote(): 'pending' | 'approved' | 'rejected' {
-    const poll = this.travelPoll;
-    if (!poll) return 'pending';
-    const { yes, no, total } = this.computeVoteCounts();
-    if (poll.quorum === 'all') {
-      if (yes === total) return 'approved';
-      if (no > 0) return 'rejected';
-      return 'pending';
-    }
-    // majority
-    const need = Math.floor(total / 2) + 1;
-    if (yes >= need) return 'approved';
-    if (no > total - need) return 'rejected';
-    return 'pending';
-  }
+  // No travel voting logic here
 }

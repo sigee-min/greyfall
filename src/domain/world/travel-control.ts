@@ -1,8 +1,7 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { travelSync } from './travel-session.js';
 import { getHostObject } from '../net-objects/registry.js';
-import { PARTY_OBJECT_ID, HostPartyObject } from '../net-objects/party-host.js';
-import { WORLD_POSITIONS_OBJECT_ID, HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
+import { PARTY_OBJECT_ID } from '../net-objects/party-host.js';
 import type { HostObject } from '../net-objects/types.js';
 import { SlidingWindowLimiter } from '../net-objects/rate-limit.js';
 
@@ -44,10 +43,9 @@ const control = defineSyncModel<VoidState>({
         const q: 'majority' | 'all' = quorum === 'all' ? 'all' : 'majority';
         return { requesterId, direction, toMapId, quorum: q };
       },
-      handle: ({ payload, context }) => {
-        const { requesterId, direction, toMapId, quorum } = payload as {
+      handle: ({ payload }) => {
+        const { requesterId, toMapId, quorum } = payload as {
           requesterId: string;
-          direction?: 'next' | 'prev';
           toMapId?: string;
           quorum: 'majority' | 'all';
         };
@@ -69,7 +67,7 @@ const control = defineSyncModel<VoidState>({
         if (typeof inviteId !== 'string' || typeof voterId !== 'string' || typeof approve !== 'boolean') return null;
         return { inviteId, voterId, approve };
       },
-      handle: ({ payload, context }) => {
+      handle: ({ payload }) => {
         const { inviteId, voterId, approve } = payload as { inviteId: string; voterId: string; approve: boolean };
         if (!voteLimiter.allow(`vote:${voterId}`)) return;
         const current = travelSync.host.get();
@@ -120,4 +118,3 @@ const control = defineSyncModel<VoidState>({
 });
 
 registerSyncModel(control);
-

@@ -93,10 +93,11 @@
 
 ### Request Type 카탈로그 요약
 - Core: `chat`, `intent.plan`, `result.narrate`
-- Scene: `scene.brief`, `scene.detail`
+- Scene: `scene.brief`, `scene.detail`, `scene.hazard.tag`
 - Rules: `rules.extract`, `rules.narrate`
-- Summary: `turn.summarize`, `session.summarize`
+- Summary: `turn.summarize`, `session.summarize`, `turn.suggest`
 - NPC: `npc.reply`, `npc.name`
+- Linking/Safety: `entity.link`, `intent.disambiguate`, `safety.screen`
 
 각 타입의 상세 입출력/검증 규격과 JSON 예시는 `docs/llm-usage-spec.md` 8–10장을 참조하세요.
 
