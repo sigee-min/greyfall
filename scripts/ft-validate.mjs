@@ -155,26 +155,38 @@ function validate(task, sample) {
   return errs;
 }
 
+function validateDir(dir, partLabel = 'flat') {
+  const results = [];
+  for (const file of listFiles(dir)) {
+    const taskFromName = path.basename(file, '.jsonl');
+    let total = 0; let pass = 0; const errors = [];
+    for (const line of iterLines(file)) {
+      total += 1;
+      let obj;
+      try { obj = JSON.parse(line); } catch { errors.push({ line: total, error: 'invalid json' }); continue; }
+      const task = String(obj?.meta?.task || taskFromName);
+      if (!obj?.meta) { errors.push({ line: total, error: 'missing meta' }); continue; }
+      const errs = validate(task, obj);
+      if (errs.length === 0) pass += 1; else errors.push({ line: total, error: errs.join('|') });
+    }
+    results.push({ part: partLabel, task: taskFromName, file, total, pass, fail: total - pass, errors: errors.slice(0, 10) });
+  }
+  return results;
+}
+
 function main() {
   const parts = ['train','valid','test'];
-  const results = [];
-  for (const part of parts) {
-    const dir = path.join(BASE, part);
-    for (const file of listFiles(dir)) {
-      const task = path.basename(file, '.jsonl');
-      let total = 0; let pass = 0; const errors = [];
-      for (const line of iterLines(file)) {
-        total += 1;
-        let obj;
-        try { obj = JSON.parse(line); } catch { errors.push({ line: total, error: 'invalid json' }); continue; }
-        if (!obj?.meta || obj?.meta?.task !== task) { errors.push({ line: total, error: 'meta.task mismatch' }); continue; }
-        const errs = validate(task, obj);
-        if (errs.length === 0) pass += 1; else errors.push({ line: total, error: errs.join('|') });
-      }
-      results.push({ part, task, file, total, pass, fail: total - pass, errors: errors.slice(0, 10) });
+  let results = [];
+  // If base has jsonl directly, run flat mode
+  const flatFiles = listFiles(BASE);
+  if (flatFiles.length) {
+    results = results.concat(validateDir(BASE, 'flat'));
+  } else {
+    for (const part of parts) {
+      const dir = path.join(BASE, part);
+      results = results.concat(validateDir(dir, part));
     }
   }
-  // Print report
   for (const r of results) {
     const pct = r.total ? ((r.pass / r.total) * 100).toFixed(1) : 'n/a';
     console.log(`[${r.part}] ${r.task} ${r.pass}/${r.total} (${pct}%) - ${r.file}`);
@@ -185,4 +197,3 @@ function main() {
 }
 
 main();
-
