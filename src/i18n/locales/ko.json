@@ -50,9 +50,9 @@
   "debug.enable.note": "기본은 꺼져 있습니다. 활성화 시 단축키(`)로 열립니다.",
 
   "lobby.brand": "Greyfall Initiative",
-  "lobby.title.line1": "Lantern Circle",
-  "lobby.title.line2": "Operations Console",
-  "lobby.description": "잿빛 폭풍을 막기 위한 작전석에 오신 것을 환영합니다. 세션을 개설하거나 합류해 팀원들과 함께 Greyfall을 대비하세요.",
+  "lobby.title.line1": "Greyfall",
+  "lobby.title.line2": "Lantern Circle resistance",
+  "lobby.description": "Greyfall은 랜턴 서클 레지스탕스가 운영하는 내러티브 감시 거점입니다. 세션을 만들거나 합류해 폭풍을 막아내세요.",
   "lobby.callsign": "식별명",
   "lobby.callsign.placeholder": "예: Ash-Runner",
   "lobby.joinCode": "합류 코드",

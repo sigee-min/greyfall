@@ -320,7 +320,7 @@ function App() {
           onJoin={handleJoinGame}
           onOptions={() => setOptionsOpen(true)}
           onAbout={() => setDeveloperOpen(true)}
-          background="/assets/bg/lobby.gif"
+          background="/assets/bg/theme.png"
         />
       );
     }

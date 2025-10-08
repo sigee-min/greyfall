@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib/utils';
 
 function computeCandidates(src: string) {
@@ -14,11 +14,22 @@ type Props = {
   className?: string;
   alt?: string;
   fallbackSrc?: string; // default to main lobby background
+  objectFit?: CSSProperties['objectFit'];
+  objectPosition?: CSSProperties['objectPosition'];
+  style?: CSSProperties;
 };
 
-const LOBBY_BG = '/assets/bg/lobby.gif';
+const LOBBY_BG = '/assets/bg/theme.png';
 
-export function FallbackBackground({ src, className, alt = '', fallbackSrc = LOBBY_BG }: Props) {
+export function FallbackBackground({
+  src,
+  className,
+  alt = '',
+  fallbackSrc = LOBBY_BG,
+  objectFit,
+  objectPosition,
+  style
+}: Props) {
   const { gif, png } = useMemo(() => computeCandidates(src), [src]);
   const { gif: fbGif, png: fbPng } = useMemo(() => computeCandidates(fallbackSrc), [fallbackSrc]);
   const [current, setCurrent] = useState<string>(gif);
@@ -46,6 +57,7 @@ export function FallbackBackground({ src, className, alt = '', fallbackSrc = LOB
   return (
     <img
       src={current}
+      style={{ objectFit, objectPosition, ...style }}
       onError={handleError}
       alt={alt}
       className={cn('absolute inset-0 h-full w-full object-cover', className)}

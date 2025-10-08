@@ -1,0 +1,37 @@
+import type { MutableRefObject, KeyboardEvent } from 'react';
+import type { SessionParticipant, SessionRole } from '../../../domain/session/types';
+import type { SessionChatLogEntry } from '../../../domain/chat/types';
+
+export type StartLobbyLayoutProps = {
+  background: string;
+  mode: SessionRole;
+  lobbyCode: string;
+  answerCode?: string;
+  autoConnect: boolean;
+  participants: SessionParticipant[];
+  localParticipantId: string | null;
+  localParticipant?: SessionParticipant | null;
+  channelReady: boolean;
+  canSendChat: boolean;
+  chatMessages: SessionChatLogEntry[];
+  chatInput: string;
+  answerInput: string;
+  chatOpen: boolean;
+  canStartMission: boolean;
+  llmPrewarmPct: number | null;
+  llmPrewarmText: string | null;
+  onOptions?: () => void;
+  onLeave: () => void;
+  onStartGame: () => void;
+  onToggleReady: (participantId: string) => void;
+  onAnswerInputChange: (value: string) => void;
+  onAnswerSubmit?: (value: string) => void;
+  onChatInputChange: (value: string) => void;
+  onChatSubmit: () => void;
+  onChatOpen: () => void;
+  onChatClose: () => void;
+  onCopyLobbyCode?: () => void;
+  onCopyAnswerCode?: () => void;
+  onChatKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  chatListRef: MutableRefObject<HTMLDivElement | null>;
+};

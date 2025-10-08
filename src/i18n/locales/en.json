@@ -50,9 +50,9 @@
   "debug.enable.note": "Disabled by default. Use backquote (`) to open when enabled.",
 
   "lobby.brand": "Greyfall Initiative",
-  "lobby.title.line1": "Lantern Circle",
-  "lobby.title.line2": "Operations Console",
-  "lobby.description": "Welcome to the ops console to counter the ash storm. Create or join a session and prepare with your team.",
+  "lobby.title.line1": "Greyfall",
+  "lobby.title.line2": "Lantern Circle resistance",
+  "lobby.description": "Greyfall is the narrative watchpost operated by the Lantern Circle resistance. Create or join a session to keep the storm at bay.",
   "lobby.callsign": "Callsign",
   "lobby.callsign.placeholder": "e.g., Ash-Runner",
   "lobby.joinCode": "Join Code",

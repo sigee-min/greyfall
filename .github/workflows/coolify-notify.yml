@@ -1,0 +1,59 @@
+name: Notify Coolify
+
+on:
+  workflow_run:
+    workflows: ['Publish Docker image']
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  notify:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare image reference
+        id: image
+        env:
+          IMAGE_NAME: ${{ env.REGISTRY }}/${{ github.repository }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Coolify
+        env:
+          COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_APPLICATION_UUID: ${{ secrets.COOLIFY_APPLICATION_UUID }}
+          IMAGE_NAME: ${{ steps.image.outputs.image_name }}
+          IMAGE_TAG: ${{ steps.image.outputs.image_tag }}
+        run: |
+          if [ -z "$COOLIFY_BASE_URL" ] || [ -z "$COOLIFY_API_TOKEN" ] || [ -z "$COOLIFY_APPLICATION_UUID" ]; then
+            echo "Coolify secrets missing; skipping notification." >&2
+            exit 0
+          fi
+          if [ -z "$IMAGE_NAME" ] || [ -z "$IMAGE_TAG" ]; then
+            echo "Image reference unavailable; skipping notification." >&2
+            exit 0
+          fi
+          payload=$(cat <<PAYLOAD
+{
+  "docker_registry_image_name": "${IMAGE_NAME}",
+  "docker_registry_image_tag": "${IMAGE_TAG}",
+  "instant_deploy": true
+}
+PAYLOAD
+)
+          curl --fail --show-error --request PATCH \
+            --url "${COOLIFY_BASE_URL%/}/api/v1/applications/${COOLIFY_APPLICATION_UUID}" \
+            --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "$payload"
+        continue-on-error: true
