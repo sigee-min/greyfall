@@ -227,6 +227,67 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                     onClick={async () => { try { await navigator.clipboard.writeText(`${current.meta.system ?? current.meta.systemPreview ?? ''}\n\n${current.meta.prompt ?? current.meta.promptPreview ?? ''}\n\n${current.tailText}`.trim()); } catch {} }}
                     style={{ background: 'transparent', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '6px 8px', fontSize: 12 }}
                   >Copy View</button>
+                  <button
+                    onClick={() => {
+                      try {
+                        const payload = listStreams().map((s) => ({
+                          id: s.meta.id,
+                          startedAt: s.meta.startedAt,
+                          status: s.status,
+                          system: s.meta.system ?? s.meta.systemPreview ?? '',
+                          user: s.meta.prompt ?? s.meta.promptPreview ?? '',
+                          options: s.meta.options ?? {},
+                          tokenCount: s.tokenCount,
+                          firstTokenAt: s.firstTokenAt,
+                          endedAt: s.endedAt,
+                          text: s.tailText
+                        }));
+                        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                        a.href = url; a.download = `llm_streams_${ts}.json`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      } catch {}
+                    }}
+                    style={{ background: 'transparent', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '6px 8px', fontSize: 12 }}
+                  >Export JSON</button>
+                  <button
+                    onClick={() => {
+                      try {
+                        const lines: string[] = [];
+                        for (const s of listStreams()) {
+                          const system = (s.meta.system ?? s.meta.systemPreview ?? '').trim();
+                          const user = (s.meta.prompt ?? s.meta.promptPreview ?? '').trim();
+                          const text = (s.tailText ?? '').trim();
+                          if (!system || !user || !text) continue;
+                          const meta = s.meta.options ?? {};
+                          const rec = {
+                            request_type: 'chat',
+                            system_prompt: system,
+                            user_prompt: user,
+                            target_response: text,
+                            metadata: {
+                              ...meta,
+                              locale: 'ko',
+                              source: 'monitor',
+                              started_at: s.meta.startedAt
+                            }
+                          } as const;
+                          lines.push(JSON.stringify(rec));
+                        }
+                        const blob = new Blob([lines.join('\n')], { type: 'application/jsonl;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                        a.href = url; a.download = `finetune_dataset_${ts}.jsonl`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      } catch {}
+                    }}
+                    style={{ background: 'transparent', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '6px 8px', fontSize: 12 }}
+                  >Export JSONL</button>
                 </div>
               </>
             ) : (

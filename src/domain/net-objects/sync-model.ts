@@ -5,6 +5,7 @@ import type { LobbyStore } from '../session/session-store';
 import type { HostRouter } from './host-router.js';
 import { registerNetObject, HostAckFallback, attachClientObject, attachHostObject } from './registry.js';
 import type { CommonDeps, ClientObject, HostObject } from './types';
+import type { ClientDescriptorDeps } from './registry.js';
 
 type EqualityFn<T> = (a: T, b: T) => boolean;
 
@@ -29,6 +30,9 @@ type SyncModelConfig<T> = {
   incrementalMax?: number;
   ackFallback?: HostAckFallback;
   commands?: SyncModelCommandConfig<T, any>[];
+  // Optional client-side factory to override the default client adapter.
+  // Useful when a model needs to drive external stores (e.g., LobbyStore).
+  clientFactory?: (deps: ClientDescriptorDeps, model: SyncModel<T>) => ClientObject | null;
 };
 
 export type SyncModel<T> = SyncModelConfig<T>;
@@ -97,7 +101,7 @@ export function registerSyncModel<T>(model: SyncModel<T>): RegisteredSyncModel<T
       onPeerConnect: (object) => object.onRequest(undefined)
     },
     client: {
-      create: () => new ClientSyncModelObject(model),
+      create: (deps) => (model.clientFactory ? model.clientFactory(deps, model) : new ClientSyncModelObject(model)),
       requestOnStart: model.requestOnStart ?? true,
       requestContext: `request ${model.id}`
     }

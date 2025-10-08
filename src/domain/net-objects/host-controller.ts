@@ -8,6 +8,7 @@ import {
   getNetObjectDescriptor,
   getNetObjectDescriptors,
   subscribeNetObjectDescriptors,
+  registerNetObject,
   type NetObjectDescriptor
 } from './registry.js';
 import '../character/character-sync.js';
@@ -25,6 +26,9 @@ type Deps = {
   busPublish: (message: LobbyMessage) => void;
   getPeerIds?: () => string[];
   sendToPeer?: (peerId: string, message: LobbyMessage) => boolean;
+  // Optional: Provide descriptors without relying on side-effect imports.
+  // This callback will be invoked synchronously during construction.
+  provideDescriptors?: (register: (descriptor: NetObjectDescriptor) => void) => void;
 };
 
 export class HostNetController {
@@ -42,7 +46,7 @@ export class HostNetController {
   private readonly commonDeps: CommonDeps;
   private readonly _descriptorUnsubscribe: () => void;
 
-  constructor({ publish, lobbyStore, busPublish, getPeerIds, sendToPeer }: Deps) {
+  constructor({ publish, lobbyStore, busPublish, getPeerIds, sendToPeer, provideDescriptors }: Deps) {
     // wrap publish to track object acks
     this.publish = ((kind, body, ctx) => {
       const ok = publish(kind as any, body as any, ctx);
@@ -68,6 +72,12 @@ export class HostNetController {
     this.commonDeps = { publish: this.publish, lobbyStore: this.lobbyStore };
     this.hostObjects = new Map();
     this.descriptorsById = new Map();
+    // Allow the caller to register descriptors up-front without global imports.
+    try {
+      provideDescriptors?.((descriptor) => registerNetObject(descriptor));
+    } catch (err) {
+      console.warn('[host-net] provideDescriptors failed', err);
+    }
     const initialDescriptors = getNetObjectDescriptors();
     for (const descriptor of initialDescriptors) {
       const object = this.instantiateHostObject(descriptor);

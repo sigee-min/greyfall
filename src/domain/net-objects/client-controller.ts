@@ -6,14 +6,14 @@ import {
   attachClientObject,
   getNetObjectDescriptors,
   subscribeNetObjectDescriptors,
+  registerNetObject,
   type NetObjectDescriptor
 } from './registry.js';
-// Side-effect imports to ensure builtin net objects self-register before controller initialization.
-import './chat-host.js';
-import './world-positions-host.js';
-import './party-host.js';
-import '../character/character-sync.js';
-// LLM progress net-object removed
+// Note: Built-in net object registration via side-effect imports was used here.
+// We now support descriptor callback injection through the constructor to avoid
+// forcing imports at this layer. These imports are intentionally removed.
+// To maintain previous behavior, import `src/domain/net-objects/builtins.ts`
+// once at your composition root, or pass `provideDescriptors` to the constructor.
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -25,6 +25,9 @@ type Deps = {
   publish: Publish;
   lobbyStore: LobbyStore;
   busPublish: (message: LobbyMessage) => void;
+  // Optional: Provide descriptors without relying on side-effect imports.
+  // This callback will be invoked synchronously during construction.
+  provideDescriptors?: (register: (descriptor: NetObjectDescriptor) => void) => void;
 };
 
 export class ClientNetController {
@@ -37,11 +40,19 @@ export class ClientNetController {
   private readonly knownDescriptors = new Set<string>();
   private readonly _descriptorUnsubscribe: () => void;
 
-  constructor({ publish, lobbyStore, busPublish }: Deps) {
+  constructor({ publish, lobbyStore, busPublish, provideDescriptors }: Deps) {
     this.publish = publish;
     this.lobbyStore = lobbyStore;
     this.busPublish = busPublish;
     this.registry = new Map();
+
+    // Allow the caller to register descriptors up-front without global imports.
+    // This keeps controller decoupled from concrete net-object modules.
+    try {
+      provideDescriptors?.((descriptor) => registerNetObject(descriptor));
+    } catch (err) {
+      console.warn('[client-net] provideDescriptors failed', err);
+    }
 
     const descriptors = getNetObjectDescriptors();
     for (const descriptor of descriptors) {

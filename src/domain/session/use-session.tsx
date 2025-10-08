@@ -14,6 +14,8 @@ import { useLobbyBus } from '../../bus/lobby-bus';
 import { HostPeerManager } from './host-peer-manager';
 import { HostNetController } from '../net-objects/host-controller';
 import { ClientNetController } from '../net-objects/client-controller';
+// Ensure built-in net-objects are registered on both host and guest paths
+import '../net-objects/builtins.js';
 import { useGlobalBus } from '../../bus/global-bus';
 import { useGameBus } from '../../bus/game-bus';
 import {
