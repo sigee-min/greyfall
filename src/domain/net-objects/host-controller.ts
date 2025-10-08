@@ -15,6 +15,7 @@ import '../character/character-sync.js';
 import { publishParticipantsSnapshot } from '../session/participants-sync.js';
 import { netBus } from '../../bus/net-bus.js';
 import { getAckSchedulePolicy } from './policies.js';
+import { maybeCompressValue } from './codec.js';
 // Debug flag for network logs
 const DEBUG_NET = Boolean((import.meta as any)?.env?.VITE_NET_DEBUG);
 
@@ -53,6 +54,19 @@ export class HostNetController {
   constructor({ publish, lobbyStore, busPublish, getPeerIds, sendToPeer, provideDescriptors }: Deps) {
     // wrap publish to track object acks
     this.publish = ((kind, body, ctx) => {
+      // Compress oversized replace payloads before sending
+      if (kind === 'object:replace') {
+        try {
+          const b: any = body as any;
+          if (b && typeof b === 'object') {
+            const original = b.value;
+            const compressed = maybeCompressValue(original);
+            if (compressed !== original) {
+              (b as any).value = compressed;
+            }
+          }
+        } catch {}
+      }
       const ok = publish(kind as any, body as any, ctx);
       if (kind === 'object:replace' || kind === 'object:patch') {
         const b: any = body as any;

@@ -4,6 +4,7 @@ import { registerNetObject, HostAckFallback } from './registry.js';
 import type { ActorEntry, ActorInventoryItem } from './world-actors-client';
 import { worldActorsClient } from './world-actors-client.js';
 import { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
+import { itemSlot, slotCapacity } from '../world/equipment-rules.js';
 
 export { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 
@@ -87,6 +88,38 @@ export class HostWorldActorsObject implements HostObject {
     if (!item) return false;
     return this.transferItem(fromId, toId, item.key, 1);
   }
+
+  equipItem(actorId: string, key: string): boolean {
+    if (!key) return false;
+    const list = this.getAll();
+    const e = list.find((a) => a.id === actorId) ?? this.ensure(actorId);
+    const have = (e.inventory ?? []).find((i) => i.key === key)?.count ?? 0;
+    if (have <= 0) return false;
+    // Enforce slot capacities
+    const slot = itemSlot(key);
+    const cap = slotCapacity(slot);
+    const eq = Array.isArray(e.equipment) ? e.equipment.slice() : [];
+    const curInSlot = eq.filter((k) => itemSlot(k) === slot).length;
+    if (curInSlot >= cap) {
+      // Reject equipping beyond capacity to prevent abuse (e.g., multiple hats)
+      return false;
+    }
+    const inv = this.adjustInventory(e.inventory, key, -1);
+    eq.push(key);
+    return this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:equip');
+  }
+
+  unequipItem(actorId: string, key: string): boolean {
+    if (!key) return false;
+    const list = this.getAll();
+    const e = list.find((a) => a.id === actorId) ?? this.ensure(actorId);
+    const eq = Array.isArray(e.equipment) ? e.equipment.slice() : [];
+    const idx = eq.indexOf(key);
+    if (idx < 0) return false;
+    eq.splice(idx, 1);
+    const inv = this.adjustInventory(e.inventory, key, 1);
+    return this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:unequip');
+  }
 }
 
 registerNetObject({
@@ -105,4 +138,3 @@ registerNetObject({
     requestContext: 'request world actors'
   }
 });
-

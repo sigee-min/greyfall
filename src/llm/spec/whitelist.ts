@@ -5,7 +5,10 @@ export type ActorRole = 'player' | 'enemy' | 'ally' | 'neutral';
 
 export const ACTIONS = [
   'sneak_move', 'melee_attack', 'ranged_attack', 'cast_spell', 'observe',
-  'hide', 'dash', 'defend', 'interact', 'talk', 'no_action'
+  'hide', 'dash', 'defend', 'interact', 'talk',
+  // Extended actions handled by host side-effects
+  'heal', 'item.give', 'equip', 'unequip',
+  'no_action'
 ] as const;
 export type ActionId = (typeof ACTIONS)[number];
 
@@ -62,4 +65,3 @@ export function clampArray<T>(arr: T[], max: number): T[] {
   }
   return out;
 }
-

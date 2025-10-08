@@ -100,16 +100,27 @@ export function useGuideAgent({
 
           const target = Array.isArray(plan.targets) && plan.targets[0] ? String(plan.targets[0]) : null; // 'p:bravo'
           const toPid = target && target.startsWith('p:') ? target.slice(2) : target;
-          let narrated = '';
+      const effects: string[] = [];
           let applied = false;
           if (plan.action === 'heal' && toPid) {
             publishLobbyMessage('actors:hpAdd:request', { actorId: toPid, delta: 3 }, 'ai:plan');
             applied = true;
-            narrated = '상대에게 치료를 적용했어요.';
+            effects.push(`${target} hp.add 3 (by p:${requesterId})`);
           } else if (plan.action === 'item.give' && toPid && typeof plan.item === 'string' && plan.item.trim()) {
-            publishLobbyMessage('actors:inventory:transfer:request', { fromId: requesterId, toId: toPid, key: plan.item.trim(), count: 1 }, 'ai:plan');
+            const key = resolveItemKey(plan.item.trim(), requesterId);
+            publishLobbyMessage('actors:inventory:transfer:request', { fromId: requesterId, toId: toPid, key, count: 1 }, 'ai:plan');
             applied = true;
-            narrated = `${toPid}에게 아이템을 건넸어요.`;
+            effects.push(`item.transfer ${key} from p:${requesterId} to ${target}`);
+          } else if (plan.action === 'equip' && typeof plan.item === 'string' && plan.item.trim()) {
+            const key = resolveItemKey(plan.item.trim(), requesterId);
+            publishLobbyMessage('actors:equip:request', { actorId: requesterId, key }, 'ai:plan');
+            applied = true;
+            effects.push(`equip p:${requesterId} ${key}`);
+          } else if (plan.action === 'unequip' && typeof plan.item === 'string' && plan.item.trim()) {
+            const key = resolveItemKey(plan.item.trim(), requesterId);
+            publishLobbyMessage('actors:unequip:request', { actorId: requesterId, key }, 'ai:plan');
+            applied = true;
+            effects.push(`unequip p:${requesterId} ${key}`);
           }
 
           if (!applied) {
@@ -142,10 +153,30 @@ export function useGuideAgent({
               lastAtRef.current = Date.now();
             }
           } else {
-            // 3) Post brief narration
-            publishLobbyMessage('chat:append:request', { body: narrated, authorId: authorId }, 'ai:narrate');
-            pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${narrated}` }, fullPolicy.maxContext);
-            lastAtRef.current = Date.now();
+            // 3) Generate brief narration from Effects
+            try {
+              const narr = await requestAICommand({
+                manager,
+                actorId: authorId,
+                requestType: 'result.narrate',
+                persona: `${guideName}는 Greyfall 콘솔의 심판자다. 친근하게 말한다.`,
+                userInstruction: '',
+                sections: { effects },
+                locale,
+                temperature: 0.4,
+                maxTokens: fullPolicy.maxTokens,
+                fallbackChatText: '행동이 반영되었습니다.'
+              });
+              const text = String(narr.body ?? '').trim() || '행동이 반영되었습니다.';
+              publishLobbyMessage('chat:append:request', { body: text, authorId: authorId }, 'ai:narrate');
+              pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${text}` }, fullPolicy.maxContext);
+              lastAtRef.current = Date.now();
+            } catch {
+              const text = '행동이 반영되었습니다.';
+              publishLobbyMessage('chat:append:request', { body: text, authorId: authorId }, 'ai:narrate');
+              pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${text}` }, fullPolicy.maxContext);
+              lastAtRef.current = Date.now();
+            }
           }
         } catch (err) {
           console.warn('[guide] generate reply failed', err);
@@ -178,7 +209,7 @@ function shouldReply(text: string, name: string, policy: GuideAgentPolicy): bool
 function buildEligibilityFromLiveState(requesterParticipantId: string, participants: SessionParticipant[]): EligibilityInput {
   const positions = worldPositionsClient.getAll();
   const posById = new Map(positions.map((p) => [p.id, p]));
-  const actorsState = (worldActorsClient as any)?.getAll?.() as Array<{ id: string; hp?: { cur: number; max: number }; status?: string[]; inventory?: { key: string; count: number }[] }> | undefined;
+  const actorsState = worldActorsClient.getAll() as Array<{ id: string; hp?: { cur: number; max: number }; status?: string[]; inventory?: { key: string; count: number }[] }>;
   const invMap: Record<string, { key: string; count: number }[]> = {};
   if (Array.isArray(actorsState)) {
     for (const a of actorsState) {
@@ -199,4 +230,21 @@ function buildEligibilityFromLiveState(requesterParticipantId: string, participa
     };
   });
   return { requesterActorId: `p:${requesterParticipantId}`, actors, inventory: Object.keys(invMap).length ? invMap : undefined, rules: { sameFieldRequiredForGive: true, sameFieldRequiredForHeal: true } };
+}
+
+function resolveItemKey(raw: string, fromParticipantId: string): string {
+  const t = raw.trim().toLowerCase();
+  const aliases: Record<string, string> = {
+    '포션': 'potion_small',
+    '작은포션': 'potion_small',
+    'potion': 'potion_small',
+    'small potion': 'potion_small'
+  };
+  if (aliases[t]) return aliases[t];
+  // Try inventory fuzzy match
+  const inv = (worldActorsClient.getFor(fromParticipantId)?.inventory ?? []).map((i) => i.key);
+  const direct = inv.find((k) => k.toLowerCase() === t);
+  if (direct) return direct;
+  const contains = inv.find((k) => k.toLowerCase().includes(t));
+  return contains ?? t;
 }

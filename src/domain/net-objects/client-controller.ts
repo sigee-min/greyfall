@@ -2,6 +2,7 @@ import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../p
 import { parseLobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
+import { maybeDecompressValue } from './codec.js';
 import { CTX_OBJECT_ACK_PATCH, CTX_OBJECT_ACK_REPLACE, CTX_PATCH_FALLBACK_REQUEST, CTX_PATCH_STALLED_REQUEST } from './contexts.js';
 import {
   attachClientObject,
@@ -101,7 +102,8 @@ export class ClientNetController {
 
     switch (message.kind) {
       case 'object:replace': {
-        const { id, rev, value } = message.body as { id: string; rev: number; value: unknown };
+        const { id, rev } = message.body as { id: string; rev: number; value: unknown };
+        const value = maybeDecompressValue((message.body as any).value);
         const applied = this.store.applyReplace(id, rev, value);
         if (!applied) break;
         const obj = this.registry.get(id);

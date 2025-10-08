@@ -51,9 +51,38 @@ const actorsControl = defineSyncModel<VoidState>({
         actors?.ensure(toId);
         actors?.transferItem(fromId, toId, key, count);
       }
+    },
+    {
+      kind: 'actors:equip:request',
+      parse: (body: unknown) => {
+        if (!body || typeof body !== 'object') return null;
+        const { actorId, key } = body as { actorId?: unknown; key?: unknown };
+        if (typeof actorId !== 'string' || typeof key !== 'string') return null;
+        return { actorId, key };
+      },
+      handle: ({ payload }) => {
+        const { actorId, key } = payload as { actorId: string; key: string };
+        const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
+        actors?.ensure(actorId);
+        actors?.equipItem(actorId, key);
+      }
+    },
+    {
+      kind: 'actors:unequip:request',
+      parse: (body: unknown) => {
+        if (!body || typeof body !== 'object') return null;
+        const { actorId, key } = body as { actorId?: unknown; key?: unknown };
+        if (typeof actorId !== 'string' || typeof key !== 'string') return null;
+        return { actorId, key };
+      },
+      handle: ({ payload }) => {
+        const { actorId, key } = payload as { actorId: string; key: string };
+        const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
+        actors?.ensure(actorId);
+        actors?.unequipItem(actorId, key);
+      }
     }
   ]
 });
 
 registerSyncModel(actorsControl);
-
