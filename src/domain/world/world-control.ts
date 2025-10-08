@@ -1,8 +1,8 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { getHostObject } from '../net-objects/registry.js';
-import { WORLD_POSITIONS_OBJECT_ID } from '../net-objects/world-positions-host.js';
+import { WORLD_POSITIONS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostObject } from '../net-objects/types.js';
-import { SlidingWindowLimiter } from '../net-objects/rate-limit.js';
+import { getLimiter } from '../net-objects/policies.js';
 
 type VoidState = null;
 
@@ -10,7 +10,7 @@ type WorldPositionsHostApi = HostObject & {
   moveField: (playerId: string, mapId: string, fromFieldId: string, toFieldId: string) => boolean;
 };
 
-const moveLimiter = new SlidingWindowLimiter(10, 10_000);
+const moveLimiter = getLimiter('move');
 
 const worldControl = defineSyncModel<VoidState>({
   id: 'world:control',
@@ -54,4 +54,3 @@ const worldControl = defineSyncModel<VoidState>({
 });
 
 registerSyncModel(worldControl);
-

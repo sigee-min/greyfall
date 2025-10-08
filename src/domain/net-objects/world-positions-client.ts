@@ -1,6 +1,5 @@
 import type { ClientObject } from './types';
-
-export const WORLD_POSITIONS_OBJECT_ID = 'world:positions';
+import { WORLD_POSITIONS_OBJECT_ID } from './object-ids.js';
 
 export type PositionEntry = { id: string; mapId: string; fieldId: string };
 

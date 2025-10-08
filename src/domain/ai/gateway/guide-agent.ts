@@ -4,6 +4,9 @@ import type { RegisterLobbyHandler, PublishLobbyMessage } from '../../chat/use-l
 import type { SessionParticipant } from '../../session/types';
 import { executeAICommand } from '../ai-router';
 import { requestAICommand } from '../ai-gateway';
+import { worldPositionsClient } from '../../net-objects/world-positions-client';
+import { worldActorsClient } from '../../net-objects/world-actors-client';
+import type { EligibilityInput } from './eligibility';
 
 export type GuideAgentPolicy = {
   respondOnMention: boolean;
@@ -75,33 +78,73 @@ export function useGuideAgent({
             .slice(-fullPolicy.maxContext)
             .map((m) => `- ${m.role === 'assistant' ? '(심판자) ' : ''}${m.content}`)
             .join('\n');
-          const prompt = [
-            `${guideName}로서 아래 플레이어 발언에 응답해 주세요.`,
-            `플레이어 발언: ${entry.body}`
-          ].join('\n\n');
-          const parsed = await requestAICommand({
+          // 1) Try structured intent.plan using live eligibility
+          const requesterId = entry.authorId; // participant id
+          const elig = buildEligibilityFromLiveState(requesterId, _participants);
+          const planResp = await requestAICommand({
             manager,
-            actorId: authorId,
-            requestType: 'chat',
-            persona: `${guideName}는 Greyfall 콘솔의 심판자다. 친근하게 말한다.`,
-            userInstruction: prompt,
+            actorId: `p:${requesterId}`,
+            requestType: 'intent.plan',
+            persona: `${guideName}는 Greyfall 콘솔의 심판자다.`,
+            userInstruction: entry.body,
             contextText: context,
+            eligibility: elig,
             locale,
-            temperature: 0.4,
-            maxTokens: fullPolicy.maxTokens,
-            fallbackChatText: '요청하신 내용을 이해하지 못했습니다.'
+            temperature: 0.2,
+            maxTokens: 140,
+            fallbackChatText: ''
           });
+          const planText = String(planResp.body ?? '').trim();
+          let plan: { action?: string; targets?: string[]; item?: string } = {};
+          try { plan = JSON.parse(planText); } catch {}
 
-          const executed = await executeAICommand(parsed, {
-            manager,
-            publishLobbyMessage,
-            participants: _participants,
-            localParticipantId
-          });
+          const target = Array.isArray(plan.targets) && plan.targets[0] ? String(plan.targets[0]) : null; // 'p:bravo'
+          const toPid = target && target.startsWith('p:') ? target.slice(2) : target;
+          let narrated = '';
+          let applied = false;
+          if (plan.action === 'heal' && toPid) {
+            publishLobbyMessage('actors:hpAdd:request', { actorId: toPid, delta: 3 }, 'ai:plan');
+            applied = true;
+            narrated = '상대에게 치료를 적용했어요.';
+          } else if (plan.action === 'item.give' && toPid && typeof plan.item === 'string' && plan.item.trim()) {
+            publishLobbyMessage('actors:inventory:transfer:request', { fromId: requesterId, toId: toPid, key: plan.item.trim(), count: 1 }, 'ai:plan');
+            applied = true;
+            narrated = `${toPid}에게 아이템을 건넸어요.`;
+          }
 
-          const bodyText = typeof parsed.body === 'string' ? parsed.body : JSON.stringify(parsed.body);
-          if (executed && bodyText) {
-            pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${bodyText}` }, fullPolicy.maxContext);
+          if (!applied) {
+            // 2) Fallback to plain chat
+            const prompt = [
+              `${guideName}로서 아래 플레이어 발언에 응답해 주세요.`,
+              `플레이어 발언: ${entry.body}`
+            ].join('\n\n');
+            const parsed = await requestAICommand({
+              manager,
+              actorId: authorId,
+              requestType: 'chat',
+              persona: `${guideName}는 Greyfall 콘솔의 심판자다. 친근하게 말한다.`,
+              userInstruction: prompt,
+              contextText: context,
+              locale,
+              temperature: 0.4,
+              maxTokens: fullPolicy.maxTokens,
+              fallbackChatText: '요청하신 내용을 이해하지 못했습니다.'
+            });
+            const executed = await executeAICommand(parsed, {
+              manager,
+              publishLobbyMessage,
+              participants: _participants,
+              localParticipantId
+            });
+            const bodyText = typeof parsed.body === 'string' ? parsed.body : JSON.stringify(parsed.body);
+            if (executed && bodyText) {
+              pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${bodyText}` }, fullPolicy.maxContext);
+              lastAtRef.current = Date.now();
+            }
+          } else {
+            // 3) Post brief narration
+            publishLobbyMessage('chat:append:request', { body: narrated, authorId: authorId }, 'ai:narrate');
+            pushHistory(historyRef, { role: 'assistant', content: `${guideName}: ${narrated}` }, fullPolicy.maxContext);
             lastAtRef.current = Date.now();
           }
         } catch (err) {
@@ -130,4 +173,30 @@ function shouldReply(text: string, name: string, policy: GuideAgentPolicy): bool
     if (t.includes(a) || t.includes('@' + a)) return true;
   }
   return false;
+}
+
+function buildEligibilityFromLiveState(requesterParticipantId: string, participants: SessionParticipant[]): EligibilityInput {
+  const positions = worldPositionsClient.getAll();
+  const posById = new Map(positions.map((p) => [p.id, p]));
+  const actorsState = (worldActorsClient as any)?.getAll?.() as Array<{ id: string; hp?: { cur: number; max: number }; status?: string[]; inventory?: { key: string; count: number }[] }> | undefined;
+  const invMap: Record<string, { key: string; count: number }[]> = {};
+  if (Array.isArray(actorsState)) {
+    for (const a of actorsState) {
+      if (Array.isArray(a.inventory) && a.inventory.length) invMap[`p:${a.id}`] = a.inventory.map((i) => ({ key: String(i.key), count: Math.max(0, Math.floor(i.count || 0)) }));
+    }
+  }
+  const actors = participants.map((p) => {
+    const pos = posById.get(p.id) ?? null;
+    const stats = actorsState?.find((a) => a.id === p.id) ?? null;
+    return {
+      id: `p:${p.id}`,
+      role: 'player' as const,
+      name: p.name,
+      hp: stats?.hp,
+      status: stats?.status,
+      mapId: pos?.mapId,
+      fieldId: pos?.fieldId
+    };
+  });
+  return { requesterActorId: `p:${requesterParticipantId}`, actors, inventory: Object.keys(invMap).length ? invMap : undefined, rules: { sameFieldRequiredForGive: true, sameFieldRequiredForHeal: true } };
 }

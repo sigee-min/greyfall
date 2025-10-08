@@ -2,16 +2,18 @@ import { parseLobbyMessage, type LobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import type { CommonDeps, HostObject } from './types';
 import { CHAT_OBJECT_ID } from './chat.js';
-import { WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
+import { WORLD_POSITIONS_OBJECT_ID, PARTY_OBJECT_ID } from './object-ids.js';
 // LLM progress net-object removed
-import { PARTY_OBJECT_ID } from './party-host.js';
 // import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
+import { getLimiter } from './policies.js';
 import { PeerParticipantMap } from './peer-map.js';
 import type { NetObjectDescriptor } from './registry.js';
 import { dispatchSyncModelCommand } from './sync-model.js';
 import { removeCharacterLoadout } from '../character/character-sync.js';
 import { publishParticipantsSnapshot } from '../session/participants-sync.js';
+
+const DEBUG_NET = Boolean((import.meta as any)?.env?.VITE_NET_DEBUG);
 
 // Local minimal interfaces to decouple from concrete classes
 type HostChatApi = {
@@ -73,7 +75,7 @@ export class HostRouter {
     this.descriptors = [...args.descriptors];
     this.commonDeps = args.commonDeps;
     this.objects = args.objects;
-    this.limiter = args.limiter ?? new SlidingWindowLimiter(5, 10_000);
+    this.limiter = args.limiter ?? getLimiter('object:request');
     this.onAck = args.onAck;
     for (const object of this.objects.values()) {
       this.register(object);
@@ -143,38 +145,15 @@ export class HostRouter {
         case 'object:request': {
           const { id, sinceRev } = message.body;
           if (peerId && !this.limiter.allow(`request:${peerId}:${id}`)) {
-            console.warn('[object:request] rate limited', { peerId, id });
+            if (DEBUG_NET) console.warn('[object:request] rate limited', { peerId, id });
             break;
           }
           this.registry.get(id)?.onRequest(sinceRev);
           break;
         }
-        // field:move:request handled by world:control command
-        case 'map:travel:request': {
-          // handled by world:travel:control
-          break;
-        }
-        case 'map:travel:propose': {
-          // handled by world:travel:control
-          break;
-        }
-        case 'map:travel:vote': {
-          // handled by world:travel:control
-          break;
-        }
-        case 'map:travel:cancel': {
-          // handled by world:travel:control
-          break;
-        }
-        case 'interact:invite':
-        case 'interact:accept':
-        case 'interact:cancel': {
-          // handled by interactions control/model
-          break;
-        }
         case 'object:ack': {
-          const { id, rev } = message.body as any;
-          console.debug('[object:ack] recv', { id, rev, peerId });
+          const { id, rev } = message.body;
+          if (DEBUG_NET) console.debug('[object:ack] recv', { id, rev, peerId });
           this.onAck?.(peerId, String(id), Number(rev));
           break;
         }

@@ -1,11 +1,11 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { travelSync } from './travel-session.js';
 import { getHostObject } from '../net-objects/registry.js';
-import { PARTY_OBJECT_ID } from '../net-objects/party-host.js';
-import { WORLD_POSITIONS_OBJECT_ID } from '../net-objects/world-positions-host.js';
+import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
+import { WORLD_POSITIONS_OBJECT_ID, PARTY_OBJECT_ID } from '../net-objects/object-ids.js';
 import { getMap, getEntryField } from '../world/nav';
 import type { HostObject } from '../net-objects/types.js';
-import { SlidingWindowLimiter } from '../net-objects/rate-limit.js';
+import { getLimiter } from '../net-objects/policies.js';
 
 type VoidState = null;
 
@@ -22,8 +22,8 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-const proposeLimiter = new SlidingWindowLimiter(4, 10_000);
-const voteLimiter = new SlidingWindowLimiter(16, 10_000);
+const proposeLimiter = getLimiter('travel:propose');
+const voteLimiter = getLimiter('travel:vote');
 
 const control = defineSyncModel<VoidState>({
   id: 'world:travel:control',
@@ -58,12 +58,8 @@ const control = defineSyncModel<VoidState>({
         const members = party.getMembers();
         if (members.length === 0) return;
         // Precondition: all members at entry field of current map
-        const world = getHostObject<HostObject>(WORLD_POSITIONS_OBJECT_ID) as unknown as { replicator?: { get?: (id: string) => { value?: unknown } } } | null;
-        const posState = world?.replicator?.get?.('world:positions')?.value as unknown;
-        type Position = { id: string; mapId: string; fieldId: string };
-        const list: Position[] = Array.isArray((posState as { list?: Position[] } | null | undefined)?.list)
-          ? ((posState as { list: Position[] }).list)
-          : [];
+        const world = getHostObject<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
+        const list = world ? world.getList() : [];
         const first = list.find((e) => e.id === members[0]);
         if (!first) return;
         const map = getMap(first.mapId);
@@ -146,4 +142,3 @@ const control = defineSyncModel<VoidState>({
 });
 
 registerSyncModel(control);
-

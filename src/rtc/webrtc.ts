@@ -88,7 +88,8 @@ export async function startHostSession(
   events: RTCBridgeEvents,
   onIceCandidate?: (candidate: RTCIceCandidateInit) => void
 ): Promise<HostLobbySession> {
-  const { peer, channel } = createDataChannelPeer(events);
+  // Use the same host peer setup as other host paths to keep backpressure settings consistent
+  const { peer, channel } = createHostPeer(events);
   let appliedAnswerSdp: string | null = null;
 
   peer.addEventListener('icecandidate', (event) => {

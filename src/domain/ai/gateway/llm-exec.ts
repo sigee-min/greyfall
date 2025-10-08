@@ -49,7 +49,7 @@ export async function ensureRuntimeReady(manager: LlmManagerKind): Promise<void>
 
 export async function generateWithTimeout(
   user: string,
-  opts: { systemPrompt: string; temperature: number; maxTokens: number; timeoutMs: number; locale?: 'ko' | 'en' }
+  opts: { systemPrompt: string; temperature: number; maxTokens: number; timeoutMs: number; locale?: 'ko' | 'en'; task?: string }
 ): Promise<string> {
   const { generateChat } = await loadOps();
   const ctl = new AbortController();
@@ -59,6 +59,7 @@ export async function generateWithTimeout(
     const raw = (
       await generateChat(user, {
         systemPrompt: opts.systemPrompt,
+        task: opts.task,
         locale: opts.locale,
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
@@ -75,7 +76,7 @@ export async function generateWithTimeout(
 export async function transientRetryGenerate(
   manager: LlmManagerKind,
   user: string,
-  opts: { systemPrompt: string; temperature: number; maxTokens: number; timeoutMs: number; locale?: 'ko' | 'en' }
+  opts: { systemPrompt: string; temperature: number; maxTokens: number; timeoutMs: number; locale?: 'ko' | 'en'; task?: string }
 ): Promise<string> {
   try {
     return await generateWithTimeout(user, opts);
@@ -106,7 +107,7 @@ export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: stri
 export async function generateMessagesWithTimeout(
   manager: LlmManagerKind,
   messages: ChatMessage[],
-  opts: { temperature: number; maxTokens: number; timeoutMs: number; locale?: 'ko' | 'en' }
+  opts: { temperature: number; maxTokens: number; timeoutMs: number; locale?: 'ko' | 'en'; task?: string }
 ): Promise<string> {
   // Merge into (systemPrompt, user) pair for our current CPU (Transformers.js) adapter
   const systems = messages.filter((m) => m.role === 'system').map((m) => m.content.trim());
@@ -117,6 +118,7 @@ export async function generateMessagesWithTimeout(
   try {
     return await generateWithTimeout(user, {
       systemPrompt,
+      task: opts.task,
       locale: opts.locale,
       temperature: opts.temperature,
       maxTokens: opts.maxTokens,
@@ -126,6 +128,7 @@ export async function generateMessagesWithTimeout(
     if (DEBUG) console.warn(`[llm-exec] generate failed, retrying once reason=${formatError(err)}`);
     return transientRetryGenerate(manager, user, {
       systemPrompt,
+      task: opts.task,
       locale: opts.locale,
       temperature: opts.temperature,
       maxTokens: opts.maxTokens,

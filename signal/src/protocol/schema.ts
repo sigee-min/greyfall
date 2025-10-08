@@ -410,6 +410,17 @@ const lobbyInteractConfirmedSchema = lobbyEnvelopeSchema.extend({
   body: z.object({ inviteId: z.string().min(6), fromId: z.string().min(1), toId: z.string().min(1), verb: z.string().min(1) })
 });
 
+// Actors control (client -> host)
+const lobbyActorsHpAddRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:hpAdd:request'),
+  body: z.object({ actorId: z.string().min(1), delta: z.number().int().min(-20).max(20) })
+});
+
+const lobbyActorsInventoryTransferRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:inventory:transfer:request'),
+  body: z.object({ fromId: z.string().min(1), toId: z.string().min(1), key: z.string().min(1), count: z.number().int().min(1).max(99).optional() })
+});
+
 export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyHelloSchema,
   lobbyStateSchema,
@@ -437,6 +448,8 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyInteractAcceptSchema,
   lobbyInteractCancelSchema,
   lobbyInteractConfirmedSchema
+  ,lobbyActorsHpAddRequestSchema
+  ,lobbyActorsInventoryTransferRequestSchema
 ]);
 
 export type LobbyMessage = z.infer<typeof lobbyMessageSchema>;
@@ -469,6 +482,8 @@ export type LobbyMessageBodies = {
   'interact:accept': { inviteId: string; toId: string };
   'interact:cancel': { inviteId: string; byId: string };
   'interact:confirmed': { inviteId: string; fromId: string; toId: string; verb: string };
+  'actors:hpAdd:request': { actorId: string; delta: number };
+  'actors:inventory:transfer:request': { fromId: string; toId: string; key: string; count?: number };
 };
 
 export function createLobbyMessage<K extends LobbyMessageKind>(

@@ -1,0 +1,17 @@
+import type { NodeTemplate } from '../types';
+import { detailDirectives } from '../../spec/prompts';
+import { validateNarrate } from '../../validators/narrate';
+
+export const SceneDetailNode: NodeTemplate = {
+  id: 'scene.detail',
+  doc: '요소 1–2문장 확장',
+  prompt: { systemTpl: '${persona}\n\n${systemSuffix}\n\n${directive}', userTpl: '${userSuffix}' },
+  options: { temperature: 0.4, maxTokens: 140, timeoutMs: 20000 },
+  inputSpec: { directive: 'string' },
+  validate: async (raw) => validateNarrate(raw, { maxSentences: 2, maxChars: 180 })
+};
+
+export function makeSceneDetailParams(locale: 'ko' | 'en' = 'ko'): { directive: string } {
+  return { directive: detailDirectives(locale) };
+}
+

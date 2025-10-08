@@ -104,7 +104,7 @@ export async function probeTransformersActive(): Promise<boolean> {
 export async function generateTransformersChat(prompt: string, options: ChatOptions): Promise<string> {
   const w = ensureWorker();
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const { systemPrompt, temperature, topP, maxTokens, onToken, signal, locale } = options ?? {};
+  const { systemPrompt, temperature, topP, maxTokens, onToken, signal, locale, task } = options ?? {};
 
   // Open monitoring stream (tee) irrespective of consumer's onToken usage
   const streamId = openStream({
@@ -113,7 +113,7 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
     systemPreview: typeof systemPrompt === 'string' ? String(systemPrompt).slice(0, 200) : undefined,
     prompt: String(prompt || ''),
     system: typeof systemPrompt === 'string' ? String(systemPrompt) : undefined,
-    options: { temperature, topP, maxTokens, locale }
+    options: { temperature, topP, maxTokens, locale, task }
   });
 
   const listeners = new Set<(e: MessageEvent<unknown>) => void>();
@@ -154,7 +154,7 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
     listeners.add(onMsg);
     w.addEventListener('message', onMsg as EventListener);
     try {
-      w.postMessage({ type: 'run', id, prompt, systemPrompt, temperature, topP, maxTokens, locale });
+      w.postMessage({ type: 'run', id, prompt, systemPrompt, temperature, topP, maxTokens, locale, task });
     } catch (e) {
       cleanup();
       const errorMessage = e instanceof Error ? e.message : String(e);

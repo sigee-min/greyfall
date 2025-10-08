@@ -9,6 +9,8 @@ import { makeDefaultToolsHost } from '../../llm/tools';
 import { getToolsProviders } from '../../llm/tools/providers';
 import type { AIGatewayParams } from './gateway/types';
 import type { ChatHistoryIn, ChatHistoryOut } from '../../llm/tools/impl/chat-history';
+import { buildSystemFromSections, type SectionBundle, planDirectives, narrateDirectives } from '../../llm/spec/prompts';
+import { buildEligibilitySections } from './gateway/eligibility';
 
 const DEBUG = Boolean(import.meta.env?.VITE_LLM_DEBUG);
 
@@ -63,45 +65,142 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
     const ctx: PipelineCtx = {
       user: userInstruction,
       manager,
-      scratch: { overrides: { temperature, maxTokens: maxTok, timeoutMs: Math.min(60_000, Math.max(3_000, effectiveTimeout)) } },
+      scratch: { overrides: { temperature, maxTokens: maxTok, timeoutMs: Math.min(60_000, Math.max(3_000, effectiveTimeout)), locale: locale === 'en' ? 'en' : 'ko' } },
       tools: makeDefaultToolsHost({ manager, providers: getToolsProviders() })
     };
     try {
       const defaultPersona = persona ?? '너는 Greyfall TRPG 매니저이다.';
+      const buildSections = async (): Promise<SectionBundle> => {
+        let historyText = '';
+        try {
+          const res = await ctx.tools?.invoke<ChatHistoryIn, ChatHistoryOut>('chat.history', { limit: 10 });
+          if (res?.ok) historyText = formatHistory(res.data.items);
+        } catch (err) {
+          if (DEBUG) console.debug('[gw] chat.history failed', formatError(err));
+        }
+        let s: SectionBundle = { ...(params.sections ?? {}) };
+        if (params.eligibility) {
+          try {
+            const built = buildEligibilitySections(params.eligibility);
+            s = { ...built, ...s };
+          } catch (e) {
+            if (DEBUG) console.debug('[gw] eligibility build failed', formatError(e));
+          }
+        }
+        if (contextText && contextText.trim()) s.context = contextText;
+        if (historyText) s.recentChat = historyText;
+        if (!s.requester && params.actorId) s.requester = `actor=${params.actorId} (self)`;
+        return s;
+      };
+
       let start: Step;
       if (requestType === 'chat') {
         start = {
-          id: 'chat-step',
+          id: 'chat.basic',
           nodeId: 'chat.basic',
-          params: async (c) => {
-            let historyText = '';
-            try {
-              const res = await c.tools?.invoke<ChatHistoryIn, ChatHistoryOut>('chat.history', { limit: 10 });
-              if (res?.ok) {
-                historyText = formatHistory(res.data.items);
-              }
-            } catch (err) {
-              if (DEBUG) console.debug('[gw] chat.history failed', formatError(err));
-            }
-            const sysParts: string[] = [];
-            if (contextText && contextText.trim()) sysParts.push(`맥락\n${contextText}`);
-            if (historyText) sysParts.push(`최근 채팅(최대 10개)\n${historyText}`);
-            if (DEBUG) console.debug(`[gw] chat.params hasHistory=${Boolean(historyText)} hasContext=${Boolean(contextText)}`);
-            return {
-              persona: defaultPersona,
-              systemSuffix: sysParts.length ? sysParts.join('\n\n') : '',
-              userSuffix: ''
-            };
+          params: async () => {
+            const sections = await buildSections();
+            const systemSuffix = buildSystemFromSections('', sections); // persona provided separately
+            return { persona: defaultPersona, systemSuffix, userSuffix: '' };
           },
           next: null
         };
+      } else if (requestType === 'intent.plan') {
+        start = {
+          id: 'intent.plan',
+          nodeId: 'intent.plan',
+          params: async () => {
+            const sections = await buildSections();
+            const systemSuffix = buildSystemFromSections('', sections);
+            const directive = planDirectives(locale === 'en' ? 'en' : 'ko');
+            return { persona: defaultPersona, systemSuffix, userSuffix: '', directive };
+          },
+          next: null
+        };
+      } else if (requestType === 'result.narrate') {
+        start = {
+          id: 'result.narrate',
+          nodeId: 'result.narrate',
+          params: async () => {
+            const sections = await buildSections();
+            const systemSuffix = buildSystemFromSections('', sections);
+            const directive = narrateDirectives(locale === 'en' ? 'en' : 'ko');
+            return { persona: defaultPersona, systemSuffix, userSuffix: '', directive };
+          },
+          next: null
+        };
+      } else if (requestType === 'rules.extract') {
+        start = {
+          id: 'rules.extract', nodeId: 'rules.extract',
+          params: async () => {
+            const sections = await buildSections();
+            const systemSuffix = buildSystemFromSections('', sections);
+            const directive = planDirectives(locale === 'en' ? 'en' : 'ko'); // reuse minimal directive if needed; node adds own
+            return { persona: defaultPersona, systemSuffix, userSuffix: '', directive };
+          }, next: null
+        };
+      } else if (requestType === 'rules.narrate') {
+        start = {
+          id: 'rules.narrate', nodeId: 'rules.narrate',
+          params: async () => {
+            const sections = await buildSections();
+            const systemSuffix = buildSystemFromSections('', sections);
+            const directive = '규칙 발췌를 1–2문장으로 설명합니다.';
+            return { persona: defaultPersona, systemSuffix, userSuffix: '', directive };
+          }, next: null
+        };
+      } else if (requestType === 'scene.brief') {
+        start = { id: 'scene.brief', nodeId: 'scene.brief', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '장면 요약 1–3문장';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'scene.detail') {
+        start = { id: 'scene.detail', nodeId: 'scene.detail', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '지정된 요소를 1–2문장 확장';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'turn.summarize') {
+        start = { id: 'turn.summarize', nodeId: 'turn.summarize', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '핵심을 bullet 2–3개로 요약하고 JSON 한 줄로 내보냅니다.';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'session.summarize') {
+        start = { id: 'session.summarize', nodeId: 'session.summarize', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '세션 저장용 2–3문장 요약';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'npc.reply') {
+        start = { id: 'npc.reply', nodeId: 'npc.reply', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = 'NPC 말투로 1–2문장으로 답변합니다.';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'npc.name') {
+        start = { id: 'npc.name', nodeId: 'npc.name', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = 'JSON 한 줄 {"names":["..",".."]}';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'entity.link') {
+        start = { id: 'entity.link', nodeId: 'entity.link', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '지칭을 액터 ID로 매핑하고 JSON 한 줄로 출력';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'intent.disambiguate') {
+        start = { id: 'intent.disambiguate', nodeId: 'intent.disambiguate', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '확인 질문과 2–4개 선택지를 JSON 한 줄로 출력';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'turn.suggest') {
+        start = { id: 'turn.suggest', nodeId: 'turn.suggest', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '다음 전개 제안 2–3개를 JSON 한 줄로 출력';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'scene.hazard.tag') {
+        start = { id: 'scene.hazard.tag', nodeId: 'scene.hazard.tag', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = '위험을 최대 2개 선택하여 JSON 한 줄로 출력';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
+      } else if (requestType === 'safety.screen') {
+        start = { id: 'safety.screen', nodeId: 'safety.screen', params: async () => {
+          const sections = await buildSections(); const systemSuffix = buildSystemFromSections('', sections); const directive = 'JSON 한 줄 {"flag":true|false,"reasons":[".."],"suggest":".."}';
+          return { persona: defaultPersona, systemSuffix, userSuffix: '', directive }; }, next: null };
       } else {
         throw new Error(`Unsupported requestType: ${requestType}`);
       }
       if (DEBUG) console.debug(`[gw] pipeline.begin node=${start.nodeId}`);
+      const task = requestType; // tag stream meta with requestType for export mapping
       const exec: MessageExecutor = async (msgs, opts) => {
-        if (DEBUG) console.debug(`[gw.exec] run messages=${msgs.length} temp=${opts.temperature} maxTokens=${opts.maxTokens} timeout=${opts.timeoutMs}`);
-        const out = await generateMessagesWithTimeout(manager, msgs, { ...opts, locale });
+        if (DEBUG) console.debug(`[gw.exec] run messages=${msgs.length} temp=${opts.temperature} maxTokens=${opts.maxTokens} timeout=${opts.timeoutMs} task=${task}`);
+        const out = await generateMessagesWithTimeout(manager, msgs, { ...opts, locale, task });
         if (DEBUG) console.debug(`[gw.exec] done chars=${out.length}`);
         return out;
       };

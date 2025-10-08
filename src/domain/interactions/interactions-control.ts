@@ -81,7 +81,7 @@ const control = defineSyncModel<VoidState>({
           if (idx < 0) return state;
           const next = state.invites.slice();
           next[idx] = { ...next[idx], status: 'confirmed', expiresAt: null };
-          const acc = next[idx] as any;
+          const acc = next[idx] as Invite;
           accepted = { fromId: String(acc.fromId), toId: String(acc.toId), verb: String(acc.verb) };
           return { invites: next };
         }, 'interact:accept');

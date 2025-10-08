@@ -3,7 +3,7 @@ import { getHostObject } from '../net-objects/registry.js';
 import { CHAT_OBJECT_ID } from '../net-objects/chat.js';
 import type { HostObject } from '../net-objects/types.js';
 import type { LobbyParticipant } from '../../protocol/index.js';
-import { SlidingWindowLimiter } from '../net-objects/rate-limit.js';
+import { getLimiter } from '../net-objects/policies.js';
 import { requestAICommand } from '../ai/ai-gateway';
 
 type VoidState = null;
@@ -30,7 +30,7 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-const chatLimiter = new SlidingWindowLimiter(5, 10_000);
+const chatLimiter = getLimiter('chat');
 
 const chatControl = defineSyncModel<VoidState>({
   id: 'chat:control',

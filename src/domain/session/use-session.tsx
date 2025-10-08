@@ -749,6 +749,22 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
     [signalBridge]
   );
 
+  // DataChannel keep-alive: 주기적으로 작은 no-op 페이로드 전송
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const ch = sessionRef.current?.channel;
+      try {
+        if (ch && ch.readyState === 'open') {
+          // 비-JSON 페이로드는 컨트롤러에서 무시됩니다.
+          ch.send('\n');
+        }
+      } catch {
+        // ignore send errors
+      }
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, []);
+
   return {
     participants: lobbyStore.participants,
     localParticipantId: lobbyStore.localParticipantId,

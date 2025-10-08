@@ -13,6 +13,10 @@ import {
 } from './registry.js';
 import '../character/character-sync.js';
 import { publishParticipantsSnapshot } from '../session/participants-sync.js';
+import { netBus } from '../../bus/net-bus.js';
+import { getAckSchedulePolicy } from './policies.js';
+// Debug flag for network logs
+const DEBUG_NET = Boolean((import.meta as any)?.env?.VITE_NET_DEBUG);
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -105,6 +109,14 @@ export class HostNetController {
 
   bindChannel(channel: RTCDataChannel, peerId?: string) {
     const onMessage = (event: MessageEvent) => {
+      // Keep-alive response: reply to minimal non-JSON heartbeat ("\n")
+      if (typeof event.data === 'string') {
+        const s = event.data as string;
+        if (s === '\n') {
+          try { channel.send('\r'); } catch {}
+          return;
+        }
+      }
       let payload: unknown = event.data;
       try {
         payload = JSON.parse(event.data);
@@ -151,7 +163,9 @@ export class HostNetController {
     if (this.ackTimers.has(key)) {
       clearTimeout(this.ackTimers.get(key)!);
     }
-    const timeout = Math.min(5000, 1000 * attempt);
+    const ack = getAckSchedulePolicy();
+    const timeout = Math.min(ack.maxDelayMs, ack.baseDelayMs * attempt);
+    try { netBus.publish('net:ack:scheduled', { peerId, objectId: id, rev, attempt }); } catch {}
     const timer = setTimeout(() => {
       const last = this.lastSentPerPeer.get(`${peerId ?? ':global'}:${id}`);
       if (last !== rev) return;
@@ -176,6 +190,7 @@ export class HostNetController {
               const msg = createLobbyMessage('object:patch', { id, rev: entry.rev, ops: entry.ops } as any);
               this.sendToPeer(peerId, msg);
             }
+            try { netBus.publish('net:ack:fallback', { peerId, objectId: id, rev, strategy: 'incremental' }); } catch {}
             sentIncremental = true;
           }
         }
@@ -189,10 +204,13 @@ export class HostNetController {
             } else {
               hostObject.onRequest(undefined);
             }
+            try { netBus.publish('net:ack:fallback', { peerId, objectId: id, rev, strategy: 'snapshot' }); } catch {}
           } else if (fallback === HostAckFallback.OnRequest) {
             hostObject.onRequest(undefined);
+            try { netBus.publish('net:ack:fallback', { peerId, objectId: id, rev, strategy: 'onRequest' }); } catch {}
           } else if (fallback === HostAckFallback.None) {
             // no-op
+            try { netBus.publish('net:ack:fallback', { peerId, objectId: id, rev, strategy: 'none' }); } catch {}
           }
         }
       } else {
@@ -205,7 +223,7 @@ export class HostNetController {
           hostObject.onRequest(undefined);
         }
       }
-      if (attempt < 3) this.scheduleAck(peerId, id, rev, attempt + 1);
+      if (attempt < ack.maxAttempts) this.scheduleAck(peerId, id, rev, attempt + 1);
       else this.ackTimers.delete(key);
     }, timeout);
     this.ackTimers.set(key, timer);
@@ -217,10 +235,11 @@ export class HostNetController {
     if (t) {
       clearTimeout(t);
       this.ackTimers.delete(key);
-      console.debug('[object:ack] resolved', { id, rev });
+      if (DEBUG_NET) console.debug('[object:ack] resolved', { id, rev });
+      try { netBus.publish('net:ack:resolved', { peerId, objectId: id, rev }); } catch {}
     } else {
       // If timers were rotated due to newer rev, still log for diagnostics
-      console.debug('[object:ack] late or already resolved', { id, rev });
+      if (DEBUG_NET) console.debug('[object:ack] late or already resolved', { id, rev });
     }
     // record last acknowledged rev per peer/object
     if (peerId) this.ackedRevPerPeer.set(`${peerId}:${id}`, rev);
@@ -237,6 +256,11 @@ export class HostNetController {
 
   dispose() {
     this._descriptorUnsubscribe();
+    // Clear any pending ACK timers to avoid leaks
+    for (const t of this.ackTimers.values()) {
+      try { clearTimeout(t); } catch {}
+    }
+    this.ackTimers.clear();
   }
 
   private instantiateHostObject(descriptor: NetObjectDescriptor): HostObject {

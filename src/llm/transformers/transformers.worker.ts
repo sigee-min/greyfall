@@ -49,6 +49,8 @@ type RunMsg = {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
+  locale?: 'ko'|'en';
+  task?: string;
 };
 type AbortMsg = { type: 'abort'; id: string };
 type UnloadMsg = { type: 'unload' };

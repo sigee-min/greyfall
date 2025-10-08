@@ -1,52 +1,51 @@
 import type { HostObject, CommonDeps } from './types';
-import { HostReplicator } from './replicator';
+import { HostValueObject } from './base/value-object.js';
 import { getMap } from '../world/nav';
-import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-positions-host';
+import { HostWorldPositionsObject } from './world-positions-host';
+import { PARTY_OBJECT_ID, WORLD_POSITIONS_OBJECT_ID } from './object-ids.js';
 import { registerNetObject, HostAckFallback } from './registry.js';
 
-export const PARTY_OBJECT_ID = 'party';
+export { PARTY_OBJECT_ID } from './object-ids.js';
 
 export class HostPartyObject implements HostObject {
   readonly id = PARTY_OBJECT_ID;
-  private readonly replicator: HostReplicator;
+  private readonly value: HostValueObject<{ mapId: string; members: string[] }>;
   constructor(private deps: CommonDeps, private world: HostWorldPositionsObject) {
-    this.replicator = new HostReplicator((kind, body, ctx) => deps.publish(kind as any, body as any, ctx));
-    // initialize with default map and empty members
-    this.replicator.set(this.id, { mapId: 'LUMENFORD', members: [] }, 'party:init');
+    this.value = new HostValueObject<{ mapId: string; members: string[] }>(deps, this.id, { mapId: 'LUMENFORD', members: [] }, 'party:init');
   }
 
   onRequest(sinceRev?: number) {
-    return this.replicator.onRequest(this.id, sinceRev, 'object-request party');
+    return this.value.onRequest(sinceRev);
   }
 
   addMember(id: string) {
-    const base = this.replicator.get(this.id)?.value as any;
+    const base = this.value.getSnapshot()?.value as any;
     const members: string[] = Array.isArray(base?.members) ? base.members : [];
     if (members.includes(id)) return true;
-    return this.replicator.apply(this.id, [{ op: 'merge', path: 'members', value: [id] } as any], 'party:join');
+    return this.value.merge({ members: [...members, id] }, 'party:join');
   }
 
   removeMember(id: string) {
-    const base = this.replicator.get(this.id)?.value as any;
+    const base = this.value.getSnapshot()?.value as any;
     const members: string[] = Array.isArray(base?.members) ? base.members : [];
     if (!members.includes(id)) return true;
     const filtered = members.filter((m) => m !== id);
-    return this.replicator.set(this.id, { mapId: base?.mapId ?? 'LUMENFORD', members: filtered }, 'party:leave');
+    return this.value.set({ mapId: base?.mapId ?? 'LUMENFORD', members: filtered }, 'party:leave');
   }
 
   getMapId(): string {
-    const base = this.replicator.get(this.id)?.value as any;
+    const base = this.value.getSnapshot()?.value as any;
     return String(base?.mapId ?? 'LUMENFORD');
   }
 
   getMembers(): string[] {
-    const base = this.replicator.get(this.id)?.value as any;
+    const base = this.value.getSnapshot()?.value as any;
     const members: string[] = Array.isArray(base?.members) ? base.members : [];
     return members;
   }
 
   travel(direction?: 'next' | 'prev', toMapId?: string) {
-    const base = this.replicator.get(this.id)?.value as any;
+    const base = this.value.getSnapshot()?.value as any;
     const currentId: string = String(base?.mapId ?? 'LUMENFORD');
     let targetId = toMapId ?? currentId;
     if (direction) {
@@ -58,7 +57,7 @@ export class HostPartyObject implements HostObject {
     const members = this.getMembers();
     const ok = this.world.movePartyToMap(targetId, members);
     if (!ok) return false;
-    return this.replicator.apply(this.id, [{ op: 'merge', value: { mapId: targetId } } as any], 'party:travel');
+    return this.value.merge({ mapId: targetId }, 'party:travel');
   }
 }
 

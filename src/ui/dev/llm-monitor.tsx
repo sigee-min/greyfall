@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { listStreams, subscribeStreams, type StreamSnapshot, type StreamEvent } from '../../llm/stream-bus';
+import { requestAICommand } from '../../domain/ai/ai-gateway';
+import type { EligibilityInput } from '../../domain/ai/gateway/eligibility';
 import { subscribeProgress, getLastProgress, type ProgressReport } from '../../llm/progress-bus';
 
 export function LlmMonitor({ onClose }: { onClose?: () => void }) {
@@ -220,8 +222,71 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                       </div>
                     )}
                   </div>
-                  <div style={{ color: '#e5e7eb' }}>{current.tailText || '(no tokens yet)'}</div>
-                </div>
+                <div style={{ color: '#e5e7eb' }}>{current.tailText || '(no tokens yet)'}</div>
+              </div>
+              {/* Sample runners (dev) */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  onClick={async () => {
+                    try {
+                      await requestAICommand({
+                        manager: 'smart',
+                        requestType: 'chat',
+                        actorId: 'p:host',
+                        userInstruction: '다음 전개를 제안해줘',
+                        persona: '너는 Greyfall TRPG 매니저이다.',
+                        sections: { context: '테스트 맥락: 숲 가장자리에서 교전이 끝났습니다.', recentChat: '- 플레이어(user): 적 몰래 가시밭길로 도망간다' },
+                        locale: 'ko'
+                      });
+                    } catch (e) { console.warn('[llm-monitor] chat sample failed', e); }
+                  }}
+                  style={{ background: 'transparent', color: '#e5e7eb', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '6px 8px', fontSize: 12 }}
+                >Run Chat Sample</button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const eligibility: EligibilityInput = {
+                        requesterActorId: 'p:host',
+                        actors: [
+                          { id: 'p:host', role: 'player', name: '호스트', mapId: 'forests', fieldId: 'A1' },
+                          { id: 'p:bravo', role: 'ally', name: '브라보', mapId: 'forests', fieldId: 'A1', status: ['bleeding'] }
+                        ],
+                        inventory: { 'p:host': [{ key: 'potion_small', count: 2 }] },
+                        rules: { sameFieldRequiredForHeal: true, sameFieldRequiredForGive: true }
+                      };
+                      await requestAICommand({
+                        manager: 'smart',
+                        requestType: 'intent.plan',
+                        actorId: 'p:host',
+                        userInstruction: '브라보를 도와줄게',
+                        eligibility,
+                        persona: '너는 Greyfall TRPG 매니저이다.',
+                        locale: 'ko'
+                      });
+                    } catch (e) { console.warn('[llm-monitor] plan sample failed', e); }
+                  }}
+                  style={{ background: 'transparent', color: '#e5e7eb', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '6px 8px', fontSize: 12 }}
+                >Run Plan Sample</button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await requestAICommand({
+                        manager: 'smart',
+                        requestType: 'result.narrate',
+                        actorId: 'p:host',
+                        userInstruction: '',
+                        sections: {
+                          rolls: ['stealth d20+3 vs DC=14 → 12 (fail)'],
+                          effects: ['p:bravo hp.add 3 (by p:host)']
+                        },
+                        persona: '너는 Greyfall TRPG 매니저이다.',
+                        locale: 'ko'
+                      });
+                    } catch (e) { console.warn('[llm-monitor] narrate sample failed', e); }
+                  }}
+                  style={{ background: 'transparent', color: '#e5e7eb', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '6px 8px', fontSize: 12 }}
+                >Run Narrate Sample</button>
+              </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
                     onClick={async () => { try { await navigator.clipboard.writeText(`${current.meta.system ?? current.meta.systemPreview ?? ''}\n\n${current.meta.prompt ?? current.meta.promptPreview ?? ''}\n\n${current.tailText}`.trim()); } catch {} }}
@@ -265,14 +330,17 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                           const meta = s.meta.options ?? {};
                           const rawLocale = (meta as Record<string, unknown>).locale as unknown;
                           const locale = rawLocale === 'en' ? 'en' : 'ko';
+                          const task = typeof (meta as Record<string, unknown>).task === 'string' ? String((meta as Record<string, unknown>).task) : undefined;
+                          const request_type = task && typeof task === 'string' ? task : 'chat';
                           const rec = {
-                            request_type: 'chat',
+                            request_type,
                             system_prompt: system,
                             user_prompt: user,
                             target_response: text,
                             metadata: {
                               ...meta,
                               locale,
+                              task,
                               source: 'monitor',
                               started_at: s.meta.startedAt
                             }

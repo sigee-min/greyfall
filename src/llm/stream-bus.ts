@@ -8,7 +8,7 @@ export type StreamMeta = {
   // Optional full texts for richer monitor view
   prompt?: string;
   system?: string;
-  options?: { temperature?: number; topP?: number; maxTokens?: number; locale?: 'ko' | 'en' };
+  options?: { temperature?: number; topP?: number; maxTokens?: number; locale?: 'ko' | 'en'; task?: string };
 };
 
 export type StreamSnapshot = {

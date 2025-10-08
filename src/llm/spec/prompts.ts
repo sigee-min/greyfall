@@ -103,3 +103,50 @@ export function rulesExtractDirectives(locale: Locale = 'ko'): string {
   ].join('\n');
 }
 
+export function npcReplyDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: reply in 1–2 sentences in the NPC\'s voice.'
+    : '과업: NPC 말투로 1–2문장으로 답변합니다.';
+}
+
+export function npcNameDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: output one-line JSON {"names":["..",".."]} with 2–3 short names.'
+    : '과업: 이름 2–3개를 제시하고 한 줄 JSON으로 출력합니다: {"names":["..",".."]}';
+}
+
+export function summarizeDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: output one-line JSON {"bullets":["..",".."]} with 2–3 concise bullets.'
+    : '과업: 핵심 2–3개를 간결한 한 줄 JSON으로 출력합니다: {"bullets":["..",".."]}';
+}
+
+export function linkDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: map mentions to actor IDs. Output one-line JSON {"refs":[{"text":"..","actor":".."}]} (max 3).'
+    : '과업: 자연어 지칭을 액터 ID로 매핑합니다. 한 줄 JSON {"refs":[{"text":"..","actor":".."}]} (최대 3개).';
+}
+
+export function disambiguateDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: output a one-line JSON {"question":"..","options":["..",".."]} with 2–4 short options.'
+    : '과업: 한 줄 JSON {"question":"..","options":["..",".."]} (2–4개 옵션)으로 출력합니다.';
+}
+
+export function suggestDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: output one-line JSON {"bullets":["..",".."]} with 2–3 next-step suggestions.'
+    : '과업: 다음 전개 2–3개를 한 줄 JSON {"bullets":["..",".."]}로 출력합니다.';
+}
+
+export function hazardTagDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: output one-line JSON {"hazards":["..",".."]} with up to 2 hazards from the provided list.'
+    : '과업: 제공된 목록 중 위험을 최대 2개 선택하여 한 줄 JSON {"hazards":["..",".."]}로 출력합니다.';
+}
+
+export function safetyScreenDirectives(locale: Locale = 'ko'): string {
+  return locale === 'en'
+    ? 'Task: output one-line JSON {"flag":true|false,"reasons":[".."],"suggest":".."}.'
+    : '과업: 한 줄 JSON {"flag":true|false,"reasons":[".."],"suggest":".."}로 출력합니다.';
+}

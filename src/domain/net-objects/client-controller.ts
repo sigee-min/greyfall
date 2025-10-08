@@ -2,6 +2,7 @@ import type { LobbyMessage, LobbyMessageBodies, LobbyMessageKind } from '../../p
 import { parseLobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import { ClientNetObjectStore } from './client-store';
+import { CTX_OBJECT_ACK_PATCH, CTX_OBJECT_ACK_REPLACE, CTX_PATCH_FALLBACK_REQUEST, CTX_PATCH_STALLED_REQUEST } from './contexts.js';
 import {
   attachClientObject,
   getNetObjectDescriptors,
@@ -34,7 +35,7 @@ export class ClientNetController {
   private readonly publish: Publish;
   private readonly lobbyStore: LobbyStore;
   private readonly busPublish: (message: LobbyMessage) => void;
-  private readonly store = new ClientNetObjectStore();
+  private readonly store: ClientNetObjectStore;
   private readonly registry: Map<string, { onReplace: (rev: number, value: unknown) => void; onPatch?: (rev: number, ops: unknown[]) => void }>;
   private readonly snapshotRequests = new Map<string, string>();
   private readonly knownDescriptors = new Set<string>();
@@ -45,6 +46,12 @@ export class ClientNetController {
     this.lobbyStore = lobbyStore;
     this.busPublish = busPublish;
     this.registry = new Map();
+    this.store = new ClientNetObjectStore({
+      onStalled: (id, sinceRev) => {
+        if (typeof sinceRev === 'number') this.publish('object:request', { id, sinceRev }, CTX_PATCH_STALLED_REQUEST);
+        else this.publish('object:request', { id }, CTX_PATCH_STALLED_REQUEST);
+      }
+    });
 
     // Allow the caller to register descriptors up-front without global imports.
     // This keeps controller decoupled from concrete net-object modules.
@@ -63,6 +70,14 @@ export class ClientNetController {
 
   bindChannel(channel: RTCDataChannel) {
     const onMessage = (event: MessageEvent) => {
+      // Keep-alive response: reply to minimal non-JSON heartbeat ("\n")
+      if (typeof event.data === 'string') {
+        const s = event.data as string;
+        if (s === '\n') {
+          try { channel.send('\r'); } catch {}
+          return;
+        }
+      }
       let payload: unknown = event.data;
       try {
         payload = JSON.parse(event.data);
@@ -92,33 +107,28 @@ export class ClientNetController {
         const obj = this.registry.get(id);
         obj?.onReplace(rev, value);
         // acknowledge successful apply
-        this.publish('object:ack', { id, rev }, 'object-ack replace');
+        this.publish('object:ack', { id, rev }, CTX_OBJECT_ACK_REPLACE);
         break;
       }
       case 'object:patch': {
         const { id, rev, ops } = message.body as any;
-        const ok = this.store.applyPatch(id, rev, ops);
-        if (!ok) {
+        const status = this.store.applyPatch(id, rev, ops);
+        if (status === 'rejected') {
           // Fallback to request full snapshot if patch cannot be applied
           const cur = this.store.get(id);
           const sinceRev = cur?.rev;
-          if (typeof sinceRev === 'number') {
-            this.publish('object:request', { id, sinceRev }, 'patch-fallback-request');
-          } else {
-            this.publish('object:request', { id }, 'patch-fallback-request');
-          }
-        } else {
+          if (typeof sinceRev === 'number') this.publish('object:request', { id, sinceRev }, CTX_PATCH_FALLBACK_REQUEST);
+          else this.publish('object:request', { id }, CTX_PATCH_FALLBACK_REQUEST);
+        } else if (status === 'applied') {
           const obj = this.registry.get(id);
           obj?.onPatch?.(rev, ops);
-          this.publish('object:ack', { id, rev }, 'object-ack patch');
+          this.publish('object:ack', { id, rev }, CTX_OBJECT_ACK_PATCH);
+        } else {
+          // queued: wait for missing revs, do not ACK yet
         }
         break;
       }
-      case 'state': {
-        // Legacy fallback path
-        this.lobbyStore.replaceFromWire(message.body.participants);
-        break;
-      }
+      // 'state' legacy path removed: participants now sync via SyncModel
       default:
         break;
     }

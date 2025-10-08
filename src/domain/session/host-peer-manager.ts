@@ -1,5 +1,7 @@
 import type { RTCBridgeEvents } from '../../rtc/webrtc';
 import { applyAnswerCodeToPeer, createHostPeer, createOfferCodeForPeer } from '../../rtc/webrtc';
+import { netBus } from '../../bus/net-bus.js';
+import { getQueuePolicy } from '../net-objects/policies.js';
 
 export type HostPeer = {
   peerId: string;
@@ -15,7 +17,8 @@ export type HostPeerManagerEvents = RTCBridgeEvents & {
 export class HostPeerManager {
   private peers = new Map<string, HostPeer>();
   private pending = new Map<string, string[]>();
-  private readonly maxQueue = 256;
+  private readonly queuePolicy = getQueuePolicy();
+  private drains = new Map<string, EventListener>();
   constructor(private events: HostPeerManagerEvents) {}
 
   has(peerId: string) {
@@ -32,8 +35,9 @@ export class HostPeerManager {
     const entry: HostPeer = { peerId, peer, channel };
     this.peers.set(peerId, entry);
     // Attach backpressure listener to drain per-peer queue
-    const drain = () => this.flush(peerId);
-    channel.addEventListener?.('bufferedamountlow', drain as EventListener);
+    const drain: EventListener = () => this.flush(peerId);
+    try { channel.addEventListener('bufferedamountlow', drain); } catch { /* ignore */ }
+    this.drains.set(peerId, drain);
     this.events.onPeerCreated?.(entry);
     return entry;
   }
@@ -41,6 +45,12 @@ export class HostPeerManager {
   async close(peerId: string) {
     const entry = this.peers.get(peerId);
     if (!entry) return;
+    // detach backpressure handler if present
+    const drain = this.drains.get(peerId);
+    if (drain) {
+      try { entry.channel.removeEventListener('bufferedamountlow', drain); } catch {}
+      this.drains.delete(peerId);
+    }
     try {
       entry.channel.close();
     } catch {
@@ -98,15 +108,16 @@ export class HostPeerManager {
     const { channel } = entry;
     if (channel.readyState !== 'open') return; // do not queue closed channels for now
     const buffered = channel.bufferedAmount ?? 0;
-    const threshold = channel.bufferedAmountLowThreshold ?? 64 * 1024;
-    if (buffered > threshold * 4) {
+    const threshold = channel.bufferedAmountLowThreshold ?? this.queuePolicy.baseThreshold;
+    if (buffered > threshold * this.queuePolicy.highWaterFactor) {
       // queue
       const q = this.pending.get(peerId) ?? [];
-      if (q.length >= this.maxQueue) {
+      if (q.length >= this.queuePolicy.maxQueue) {
         q.shift();
       }
       q.push(data);
       this.pending.set(peerId, q);
+      try { netBus.publish('net:queue:enqueue', { peerId, size: q.length }); } catch {}
       return;
     }
     try {
@@ -114,11 +125,12 @@ export class HostPeerManager {
     } catch {
       // enqueue on failure
       const q = this.pending.get(peerId) ?? [];
-      if (q.length >= this.maxQueue) {
+      if (q.length >= this.queuePolicy.maxQueue) {
         q.shift();
       }
       q.push(data);
       this.pending.set(peerId, q);
+      try { netBus.publish('net:queue:enqueue', { peerId, size: q.length }); } catch {}
     }
   }
 
@@ -129,10 +141,10 @@ export class HostPeerManager {
     if (channel.readyState !== 'open') return;
     const q = this.pending.get(peerId);
     if (!q || q.length === 0) return;
-    const threshold = channel.bufferedAmountLowThreshold ?? 64 * 1024;
+    const threshold = channel.bufferedAmountLowThreshold ?? this.queuePolicy.baseThreshold;
     while (q.length > 0) {
       const buffered = channel.bufferedAmount ?? 0;
-      if (buffered > threshold * 2) break;
+      if (buffered > threshold * this.queuePolicy.flushFactor) break;
       const next = q.shift()!;
       try {
         channel.send(next);
@@ -143,5 +155,6 @@ export class HostPeerManager {
       }
     }
     if (q.length === 0) this.pending.delete(peerId);
+    try { netBus.publish('net:queue:flush', { peerId, size: q?.length ?? 0 }); } catch {}
   }
 }

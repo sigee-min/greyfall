@@ -3,13 +3,14 @@ import { makeParticipantsSnapshot, isParticipantsSnapshot, PARTICIPANTS_OBJECT_I
 import { defineSyncModel, registerSyncModel, useSyncModel } from '../net-objects/index.js';
 import { ClientParticipantsObject } from '../net-objects/participants-client.js';
 import { getHostObject } from '../net-objects/registry.js';
-import { WORLD_POSITIONS_OBJECT_ID, HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
-import { PARTY_OBJECT_ID, HostPartyObject } from '../net-objects/party-host.js';
-import { SlidingWindowLimiter } from '../net-objects/rate-limit.js';
+import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
+import { HostPartyObject } from '../net-objects/party-host.js';
+import { WORLD_POSITIONS_OBJECT_ID, PARTY_OBJECT_ID } from '../net-objects/object-ids.js';
+import { getLimiter } from '../net-objects/policies.js';
 import { removeCharacterLoadout } from '../character/character-sync.js';
 import type { LobbyStore } from './session-store.js';
 
-const readyLimiter = new SlidingWindowLimiter(5, 10_000);
+const readyLimiter = getLimiter('ready');
 
 const participantsModel = defineSyncModel<ParticipantsSnapshot>({
   id: PARTICIPANTS_OBJECT_ID,
