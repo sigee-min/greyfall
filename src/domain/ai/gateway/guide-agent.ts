@@ -6,6 +6,7 @@ import { executeAICommand } from '../ai-router';
 import { requestAICommand } from '../ai-gateway';
 import { worldPositionsClient } from '../../net-objects/world-positions-client';
 import { worldActorsClient } from '../../net-objects/world-actors-client';
+import { resolveItemAlias } from '../../world/item-alias';
 import type { EligibilityInput } from './eligibility';
 
 export type GuideAgentPolicy = {
@@ -107,17 +108,17 @@ export function useGuideAgent({
             applied = true;
             effects.push(`${target} hp.add 3 (by p:${requesterId})`);
           } else if (plan.action === 'item.give' && toPid && typeof plan.item === 'string' && plan.item.trim()) {
-            const key = resolveItemKey(plan.item.trim(), requesterId);
+            const key = resolveItemAlias(plan.item.trim(), (worldActorsClient.getFor(requesterId)?.inventory ?? []).map((i) => i.key));
             publishLobbyMessage('actors:inventory:transfer:request', { fromId: requesterId, toId: toPid, key, count: 1 }, 'ai:plan');
             applied = true;
             effects.push(`item.transfer ${key} from p:${requesterId} to ${target}`);
           } else if (plan.action === 'equip' && typeof plan.item === 'string' && plan.item.trim()) {
-            const key = resolveItemKey(plan.item.trim(), requesterId);
+            const key = resolveItemAlias(plan.item.trim(), (worldActorsClient.getFor(requesterId)?.inventory ?? []).map((i) => i.key));
             publishLobbyMessage('actors:equip:request', { actorId: requesterId, key }, 'ai:plan');
             applied = true;
             effects.push(`equip p:${requesterId} ${key}`);
           } else if (plan.action === 'unequip' && typeof plan.item === 'string' && plan.item.trim()) {
-            const key = resolveItemKey(plan.item.trim(), requesterId);
+            const key = resolveItemAlias(plan.item.trim(), (worldActorsClient.getFor(requesterId)?.inventory ?? []).map((i) => i.key));
             publishLobbyMessage('actors:unequip:request', { actorId: requesterId, key }, 'ai:plan');
             applied = true;
             effects.push(`unequip p:${requesterId} ${key}`);
@@ -232,19 +233,4 @@ function buildEligibilityFromLiveState(requesterParticipantId: string, participa
   return { requesterActorId: `p:${requesterParticipantId}`, actors, inventory: Object.keys(invMap).length ? invMap : undefined, rules: { sameFieldRequiredForGive: true, sameFieldRequiredForHeal: true } };
 }
 
-function resolveItemKey(raw: string, fromParticipantId: string): string {
-  const t = raw.trim().toLowerCase();
-  const aliases: Record<string, string> = {
-    '포션': 'potion_small',
-    '작은포션': 'potion_small',
-    'potion': 'potion_small',
-    'small potion': 'potion_small'
-  };
-  if (aliases[t]) return aliases[t];
-  // Try inventory fuzzy match
-  const inv = (worldActorsClient.getFor(fromParticipantId)?.inventory ?? []).map((i) => i.key);
-  const direct = inv.find((k) => k.toLowerCase() === t);
-  if (direct) return direct;
-  const contains = inv.find((k) => k.toLowerCase().includes(t));
-  return contains ?? t;
-}
+// resolveItemKey is now centralised in item-alias.ts

@@ -3,6 +3,9 @@ import { getHostObject } from '../net-objects/registry.js';
 import { WORLD_ACTORS_OBJECT_ID, WORLD_POSITIONS_OBJECT_ID } from '../net-objects/object-ids.js';
 import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
+import { requestAICommand } from '../ai/ai-gateway';
+import { CHAT_OBJECT_ID } from '../net-objects/chat.js';
+import type { HostObject } from '../net-objects/types';
 
 type VoidState = null;
 
@@ -26,6 +29,8 @@ const actorsControl = defineSyncModel<VoidState>({
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         actors?.ensure(actorId);
         actors?.hpAdd(actorId, delta);
+        // Optional: narrate minor heal
+        void narrateEffects([`p:${actorId} hp.add ${delta} (by system)`]);
       }
     },
     {
@@ -49,7 +54,8 @@ const actorsControl = defineSyncModel<VoidState>({
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         actors?.ensure(fromId);
         actors?.ensure(toId);
-        actors?.transferItem(fromId, toId, key, count);
+        const ok = actors?.transferItem(fromId, toId, key, count);
+        if (ok) void narrateEffects([`item.transfer ${key} from p:${fromId} to p:${toId}`]);
       }
     },
     {
@@ -64,7 +70,8 @@ const actorsControl = defineSyncModel<VoidState>({
         const { actorId, key } = payload as { actorId: string; key: string };
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         actors?.ensure(actorId);
-        actors?.equipItem(actorId, key);
+        const ok = actors?.equipItem(actorId, key);
+        if (ok) void narrateEffects([`equip p:${actorId} ${key}`]);
       }
     },
     {
@@ -79,10 +86,51 @@ const actorsControl = defineSyncModel<VoidState>({
         const { actorId, key } = payload as { actorId: string; key: string };
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         actors?.ensure(actorId);
-        actors?.unequipItem(actorId, key);
+        const ok = actors?.unequipItem(actorId, key);
+        if (ok) void narrateEffects([`unequip p:${actorId} ${key}`]);
       }
     }
   ]
 });
 
 registerSyncModel(actorsControl);
+
+async function narrateEffects(effects: string[]) {
+  try {
+    const resp = await requestAICommand({
+      manager: 'smart',
+      requestType: 'result.narrate',
+      actorId: 'system',
+      userInstruction: '',
+      sections: { effects },
+      persona: '너는 Greyfall 콘솔의 심판자이다. 간결하게 결과를 서술한다.',
+      locale: 'ko',
+      temperature: 0.3,
+      maxTokens: 160,
+      fallbackChatText: '행동이 반영되었습니다.'
+    });
+    const bodyText = String(resp.body ?? '').trim() || '행동이 반영되었습니다.';
+    const chat = getHostObject<{ append: (entry: any, context?: string) => void } & HostObject>(CHAT_OBJECT_ID);
+    if (!chat) return;
+    const entry = {
+      id: newId(),
+      authorId: 'assistant',
+      authorName: 'Assistant',
+      authorTag: '#LLM',
+      authorRole: 'guest' as const,
+      body: bodyText,
+      at: Date.now()
+    };
+    chat.append(entry, 'actors:narrate');
+  } catch (e) {
+    // no-op
+  }
+}
+
+function newId(): string {
+  try {
+    const c = (globalThis as { crypto?: Crypto }).crypto;
+    if (c && 'randomUUID' in c) return (c as Crypto & { randomUUID: () => string }).randomUUID();
+  } catch {}
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
