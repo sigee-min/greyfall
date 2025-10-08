@@ -20,11 +20,17 @@ export function createFogLayer(): FogLayer {
   const mask = new PIXI.Graphics();
   overlay.mask = mask;
 
-  // Some environments (WebGL1/ANGLE) may fail to init these filters. Guard and fallback to no filters.
-  try {
-    overlay.filters = [new KawaseBlurFilter(5, 3), new NoiseFilter(0.12)];
-  } catch {
-    try { overlay.filters = []; } catch {}
+  // Some environments (notably WebGL1/ANGLE on Windows) crash during filter bind.
+  // If WebGL2 is unavailable, or any failure occurs, disable filters entirely.
+  const supportsWebGL2 = typeof (globalThis as any).WebGL2RenderingContext !== 'undefined';
+  if (supportsWebGL2) {
+    try {
+      overlay.filters = [new KawaseBlurFilter(5, 3), new NoiseFilter(0.12)];
+    } catch {
+      try { overlay.filters = []; } catch {}
+    }
+  } else {
+    overlay.filters = [];
   }
 
   container.addChild(overlay);
