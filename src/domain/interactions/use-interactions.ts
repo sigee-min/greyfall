@@ -1,19 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import type { RegisterLobbyHandler } from '../chat/use-lobby-chat';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
+import { useInteractionsState } from './interactions-session';
 
 export type Publish = <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean;
 
-export type Invite = {
-  inviteId: string;
-  fromId: string;
-  toId: string;
-  mapId: string;
-  fieldId: string;
-  verb: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
-};
+// Invite type now comes from interactions-session
 
 export function useInteractions(args: {
   localParticipantId: string | null;
@@ -22,32 +15,8 @@ export function useInteractions(args: {
   publish: Publish;
   register: RegisterLobbyHandler;
 }) {
-  const { localParticipantId, mapId, fieldId, publish, register } = args;
-  const [invites, setInvites] = useState<Invite[]>([]);
-
-  useEffect(() => {
-    const unsubscribeInvite = register('interact:invite', (message) => {
-      const { inviteId, fromId, toId, mapId: mid, fieldId: fid, verb } = message.body;
-      setInvites((prev) => {
-        const next = prev.filter((x) => x.inviteId !== inviteId);
-        next.push({ inviteId, fromId, toId, mapId: String(mid), fieldId: String(fid), verb: String(verb), status: 'pending' });
-        return next;
-      });
-    });
-    const unsubscribeConfirmed = register('interact:confirmed', (message) => {
-      const { inviteId } = message.body;
-      setInvites((prev) => prev.map((x) => (x.inviteId === inviteId ? { ...x, status: 'confirmed' } : x)));
-    });
-    const unsubscribeCancel = register('interact:cancel', (message) => {
-      const { inviteId } = message.body;
-      setInvites((prev) => prev.map((x) => (x.inviteId === inviteId ? { ...x, status: 'cancelled' } : x)));
-    });
-    return () => {
-      unsubscribeInvite();
-      unsubscribeConfirmed();
-      unsubscribeCancel();
-    };
-  }, [register]);
+  const { localParticipantId, mapId, fieldId, publish } = args;
+  const invites = useInteractionsState((s) => s.invites);
 
   const sendInvite = useCallback(
     (toId: string, verb: string) => {

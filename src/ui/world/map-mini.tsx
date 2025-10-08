@@ -14,13 +14,13 @@ type Props = {
   register: RegisterLobbyHandler;
 };
 
-export function MapMini({ localParticipantId, participants, publish, register }: Props) {
+export function MapMini({ localParticipantId, participants, publish, register: _register }: Props) {
   const { t } = useI18n();
   const bus = useGlobalBus();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
   const travel = useTravelSession();
-  const vote = travel.status === 'idle' ? null : {
+  const vote = useMemo(() => (travel.status === 'idle' ? null : ({
     inviteId: travel.inviteId || '',
     targetMapId: travel.targetMapId || WORLD_STATIC.head,
     yes: travel.yes,
@@ -28,8 +28,7 @@ export function MapMini({ localParticipantId, participants, publish, register }:
     total: travel.total,
     quorum: travel.quorum,
     status: travel.status
-  } as const;
-  const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
+  } as const)), [travel]);
   const [now, setNow] = useState<number>(Date.now());
   const [policy, setPolicy] = useState<'majority' | 'all'>('majority');
   useEffect(() => {
@@ -47,21 +46,15 @@ export function MapMini({ localParticipantId, participants, publish, register }:
 
   useEffect(() => {
     if (!vote) return;
-    if (vote.status === 'proposed' && deadlineAt == null) {
-      setDeadlineAt(Date.now() + 60_000);
-    }
     if (vote.status === 'approved' || vote.status === 'rejected' || vote.status === 'cancelled') {
       const mapName = WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId;
       const statusTitle = vote.status === 'approved' ? t('map.travel.approved') : vote.status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
       const statusKind: 'success' | 'warning' | 'info' = vote.status === 'approved' ? 'success' : vote.status === 'rejected' ? 'warning' : 'info';
       bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind, durationMs: 2500 });
-      const id = window.setTimeout(() => {
-        setDeadlineAt(null);
-      }, 2000);
-      return () => window.clearTimeout(id);
+      return undefined;
     }
     return undefined;
-  }, [bus, t, vote, deadlineAt]);
+  }, [bus, t, vote]);
 
   const handleTravel = (dir: 'next' | 'prev') => {
     if (!localParticipantId) return;
@@ -122,7 +115,7 @@ export function MapMini({ localParticipantId, participants, publish, register }:
         <div className="mb-3 rounded-md border border-primary/60 bg-primary/10 px-3 py-2 text-xs">
           <div className="flex items-center justify-between">
             <span>{t('map.travel.vote')} → {WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId}</span>
-            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} {t('common.yes')}{deadlineAt ? ` · ${Math.max(0, Math.ceil((deadlineAt - now) / 1000))}s` : ''}</span>
+            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} {t('common.yes')}{travel.status === 'proposed' && travel.deadlineAt ? ` · ${Math.max(0, Math.ceil((travel.deadlineAt - now) / 1000))}s` : ''}</span>
           </div>
           {vote.status === 'proposed' && (
             <div className="mt-2 flex gap-2">

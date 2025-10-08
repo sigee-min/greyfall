@@ -11,6 +11,7 @@ export type TravelSession = {
   total: number;
   yes: number;
   no: number;
+  deadlineAt: number | null;
 };
 
 const initialTravel: TravelSession = {
@@ -20,7 +21,8 @@ const initialTravel: TravelSession = {
   quorum: 'majority',
   total: 0,
   yes: 0,
-  no: 0
+  no: 0,
+  deadlineAt: null
 };
 
 const travelModel = defineSyncModel<TravelSession>({
@@ -48,7 +50,8 @@ function isTravelSession(v: unknown): v is TravelSession {
     (o.quorum === 'majority' || o.quorum === 'all') &&
     typeof o.total === 'number' &&
     typeof o.yes === 'number' &&
-    typeof o.no === 'number'
+    typeof o.no === 'number' &&
+    (o.deadlineAt === null || typeof o.deadlineAt === 'number')
   );
 }
 

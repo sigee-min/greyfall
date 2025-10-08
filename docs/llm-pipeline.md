@@ -14,6 +14,12 @@
 > 핵심 철학: “명령 선택과 흐름 제어는 코드에서, 텍스트 생성은 LLM에서.”  
 > LLM은 최소한의 입력으로 단일 책임을 수행하도록 설계한다.
 
+실행 진입점 요약(현재 코드)
+- 요청 조립: `src/domain/ai/ai-gateway.ts:1` 의 `requestAICommand(params)`
+- 파이프라인 실행: `src/llm/pipeline/runner.ts:1` 의 `runPipeline({ start, ctx, registry, exec })`
+- 노드 레지스트리: `src/llm/pipeline/registry.ts:1` (`InMemoryNodeRegistry`)
+- 메시지 실행기: `src/domain/ai/gateway/llm-exec.ts:1` (Transformers.js 브릿지)
+
 ## 2. 현재 구현된 노드
 
 | 노드 ID      | 역할 요약                     | 입력 파라미터 (예시)                        |
@@ -22,6 +28,13 @@
 
 - `chat.basic`은 한국어로 간결한 텍스트를 생성하며, 파이프라인에서 전달한 `persona`/`userSuffix`만 활용한다.  
 - 향후 `rules.answer`, `mission.start` 등 추가 노드도 동일한 패턴으로 확장한다. (각 노드는 단일 책임)
+
+툴(도구) 통합
+- 파이프라인 컨텍스트에 MCP 유사 툴 호스트를 주입해 노드가 보조 데이터를 조회할 수 있다.
+- 현재 사용 예: `chat.history` 툴로 최근 10개의 채팅을 받아 system 섹션에 포함. 구현 위치:
+  - Tools Host: `src/llm/tools/index.ts:1`
+  - Providers: `src/llm/tools/providers.ts:1`
+  - History Impl: `src/llm/tools/impl/chat-history.ts:1`
 
 ## 3. 파이프라인 실행 구조
 
@@ -32,6 +45,10 @@
 1. 애플리케이션 로직이 현재 상황에 맞는 `request_type`을 결정한다.  
 2. `actor_id`, `user_instruction`, (필요 시) `context`를 포함한 요청을 구성해 노드를 호출한다.  
 3. 노드는 내부적으로 정의된 시스템/유저 프롬프트를 사용해 LLM을 호출하고, 결과를 `ctx.scratch`에 기록한다.
+
+오버라이드(런타임 조정)
+- `ctx.scratch.overrides = { temperature?, maxTokens?, timeoutMs? }`로 노드 기본값을 런타임에서 덮어쓴다.
+- 파서/검증기를 추가하면 노드 단위로 출력 보정을 수행할 수 있다(`NodeTemplate.validate`).
 
 ## 4. 파인튜닝을 위한 데이터 스키마
 
@@ -119,6 +136,7 @@
 
 데이터셋 태스크 필드
 - `task: 'plan' | 'narrate' | 'chat'`
+- 상호작용 메타데이터 권장: `requester_actor`, `targets`, `map_id`, `field_id`, `eligible_targets`, `eligible_items`
 
 ## 8. 데이터 통신 규칙(컨벤션/규격)
 
@@ -127,10 +145,15 @@
 - 섹션 제목
   - `맥락`: 장면/상황 요약(선택)
   - `최근 채팅(최대 10개)`: `- author(role): message` 형식 목록
+  - `요청자`: `actor=<actorId> (self) role=... hp=cur/max status=[...]` (peerID는 노출하지 않음)
   - `액터 목록`(선택): `id role=... name=... hp=cur/max status=[...]`
+  - `위치`(선택): `actorId map=<mapId> field=<fieldId> pos=<x,y>`
   - `지형/위험 요소`(선택): `hazardId: dice effect=hp.sub|status.add(...)
+  - `규칙`(선택): `same_field_required_for_heal=true`, `same_field_required_for_give=true`
+  - `인벤토리`(선택): `actorId items=[key(count), ...]`
+  - `대상 후보`(선택): `heal:[actorId,...]`, `item.give:[actorId,...]`
   - `Rolls`(코드 전용): `skill d20+mod vs DC=.. → total (pass|fail)`
-  - `Effects`(코드 전용): `actorId hp.sub N`, `status.add X (2r)`
+  - `Effects`(코드 전용): `actorId hp.sub N`, `status.add X (2r)`, `item.transfer key from A to B`
 
 의도(plan) 출력(한 줄 JSON 예시)
 ```
@@ -147,3 +170,22 @@
 실패/폴백
 - `plan` 파싱/검증 실패 → 1회 보정/축소 → `no_action`
 - `narrate` 위반 → 1회 축소 재생성 → 1문장 폴백
+
+---
+
+부록 A. API 요약(코드 스니펫)
+
+- `requestAICommand` 사용 예: `src/domain/chat/chat-control.ts:1`
+  - `manager`, `userInstruction`, `persona`, `contextText`(선택)으로 파이프라인 실행
+  - 반환 `AICommand`는 `{ cmd: 'chat', body: string }` 형태로, 채팅 append에 그대로 사용
+
+- 노드 추가 체크리스트
+  1) `src/llm/pipeline/nodes/<name>.ts`에 `NodeTemplate` 구현(`id`, `prompt`, `options`, `validate?`)
+  2) `src/llm/pipeline/registry.ts:1`에 레지스트리에 등록
+  3) 게이트웨이에서 `Step` 구성 시 `nodeId`와 `params(ctx)` 제공
+  4) 필요하면 툴(provider) 추가/주입
+
+- 디버깅 팁
+  - 실행 직전 system/user 메시지는 `src/llm/pipeline/runner.ts:1`에서 렌더링됨
+  - 엔진 호출 옵션(온도/토큰/타임아웃)은 노드 옵션과 `ctx.scratch.overrides`를 병합해 결정됨
+  - 실패 시 `onErrorNext`로 폴백 경로를 연결하거나, 게이트웨이 레벨의 `fallbackChatText`를 활용

@@ -9,3 +9,5 @@ import '../session/participants-sync.js';
 import '../world/world-control.js';
 import '../world/travel-session.js';
 import '../world/travel-control.js';
+import '../interactions/interactions-session.js';
+import '../interactions/interactions-control.js';

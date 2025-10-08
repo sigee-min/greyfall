@@ -166,31 +166,10 @@ export class HostRouter {
           // handled by world:travel:control
           break;
         }
-        case 'interact:invite': {
-          const { inviteId, fromId, toId, mapId, fieldId, verb } = message.body as any;
-          // Validate same field
-          const posState = (this.world as any).replicator?.get?.('world:positions')?.value as any;
-          const list: any[] = Array.isArray(posState?.list) ? posState.list : [];
-          const pf = list.find((e) => e.id === fromId);
-          const pt = list.find((e) => e.id === toId);
-          if (!pf || !pt) break;
-          if (!(pf.mapId === mapId && pt.mapId === mapId && pf.fieldId === fieldId && pt.fieldId === fieldId)) {
-            console.warn('[interact] invite rejected: not same field');
-            break;
-          }
-          // Broadcast invite as-is
-          this.send('interact:invite' as any, { inviteId, fromId, toId, mapId, fieldId, verb } as any, 'interact:invite');
-          break;
-        }
-        case 'interact:accept': {
-          const { inviteId, toId } = message.body as any;
-          // No further validation here; in a real system we would check invite store
-          this.send('interact:confirmed' as any, { inviteId, fromId: 'unknown', toId, verb: 'unknown' } as any, 'interact:confirmed');
-          break;
-        }
+        case 'interact:invite':
+        case 'interact:accept':
         case 'interact:cancel': {
-          const { inviteId, byId } = message.body as any;
-          this.send('interact:cancel' as any, { inviteId, byId } as any, 'interact:cancel');
+          // handled by interactions control/model
           break;
         }
         case 'object:ack': {

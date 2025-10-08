@@ -2,6 +2,8 @@ import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { travelSync } from './travel-session.js';
 import { getHostObject } from '../net-objects/registry.js';
 import { PARTY_OBJECT_ID } from '../net-objects/party-host.js';
+import { WORLD_POSITIONS_OBJECT_ID } from '../net-objects/world-positions-host.js';
+import { getMap, getEntryField } from '../world/nav';
 import type { HostObject } from '../net-objects/types.js';
 import { SlidingWindowLimiter } from '../net-objects/rate-limit.js';
 
@@ -44,8 +46,9 @@ const control = defineSyncModel<VoidState>({
         return { requesterId, direction, toMapId, quorum: q };
       },
       handle: ({ payload }) => {
-        const { requesterId, toMapId, quorum } = payload as {
+        const { requesterId, direction, toMapId, quorum } = payload as {
           requesterId: string;
+          direction?: 'next' | 'prev';
           toMapId?: string;
           quorum: 'majority' | 'all';
         };
@@ -54,9 +57,34 @@ const control = defineSyncModel<VoidState>({
         if (!party) return;
         const members = party.getMembers();
         if (members.length === 0) return;
-        const target = toMapId ?? null;
+        // Precondition: all members at entry field of current map
+        const world = getHostObject<HostObject>(WORLD_POSITIONS_OBJECT_ID) as unknown as { replicator?: { get?: (id: string) => { value?: unknown } } } | null;
+        const posState = world?.replicator?.get?.('world:positions')?.value as unknown;
+        type Position = { id: string; mapId: string; fieldId: string };
+        const list: Position[] = Array.isArray((posState as { list?: Position[] } | null | undefined)?.list)
+          ? ((posState as { list: Position[] }).list)
+          : [];
+        const first = list.find((e) => e.id === members[0]);
+        if (!first) return;
+        const map = getMap(first.mapId);
+        if (!map) return;
+        const entry = getEntryField(map);
+        const allOnSameMap = members.every((m) => {
+          const p = list.find((e) => e.id === m);
+          return p && p.mapId === first.mapId && p.fieldId === (entry?.id ?? '');
+        });
+        if (!allOnSameMap) {
+          console.warn('[travel] denied: not all at entry', { firstMap: first.mapId });
+          return;
+        }
+        // Resolve target from toMapId or direction
+        let target = toMapId ?? '';
+        if (!target && direction) {
+          target = direction === 'next' ? (map.next ?? map.id) : (map.prev ?? map.id);
+        }
+        if (!target || target === map.id) return;
         const inviteId = newId();
-        travelSync.host.set({ inviteId, targetMapId: target, status: 'proposed', quorum, total: members.length, yes: 0, no: 0 }, 'travel:propose');
+        travelSync.host.set({ inviteId, targetMapId: target, status: 'proposed', quorum, total: members.length, yes: 0, no: 0, deadlineAt: Date.now() + 60_000 }, 'travel:propose');
       }
     },
     {
@@ -88,7 +116,7 @@ const control = defineSyncModel<VoidState>({
           if (yes > Math.floor(total / 2)) status = 'approved';
           else if (no >= Math.ceil(total / 2)) status = 'rejected';
         }
-        travelSync.host.set({ ...current, yes, no, status }, 'travel:vote');
+        travelSync.host.set({ ...current, yes, no, status, deadlineAt: status === 'proposed' ? current.deadlineAt : null }, 'travel:vote');
         if (status === 'approved') {
           const target = current.targetMapId ?? undefined;
           party.travel(undefined, target);
@@ -111,10 +139,11 @@ const control = defineSyncModel<VoidState>({
         const { inviteId } = payload as { inviteId: string; byId: string };
         const current = travelSync.host.get();
         if (current.inviteId !== inviteId) return;
-        travelSync.host.set({ ...current, status: 'cancelled' }, 'travel:cancel');
+        travelSync.host.set({ ...current, status: 'cancelled', deadlineAt: null }, 'travel:cancel');
       }
     }
   ]
 });
 
 registerSyncModel(control);
+
