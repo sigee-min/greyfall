@@ -36,7 +36,6 @@ try {
   ort.env.wasm.numThreads = threads;
   ort.env.wasm.proxy = true;
   // Prefer SIMD path for CPU perf
-  // @ts-expect-error SIMD flag not typed in upstream definitions
   ort.env.wasm.simd = true;
   console.info('[llm-worker] ort.env.wasm.numThreads', { requested: threads, hardware: hc ?? null, sabOk });
 } catch {}
