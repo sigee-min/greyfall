@@ -1,7 +1,6 @@
 import { parseLobbyMessage, type LobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import type { CommonDeps, HostObject } from './types';
-import { HostParticipantsObject } from './participants-host.js';
 import { HostChatObject } from './chat-host.js';
 import { CHAT_OBJECT_ID } from './chat.js';
 import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
@@ -12,8 +11,10 @@ import { HostPartyObject, PARTY_OBJECT_ID } from './party-host.js';
 import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
-import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 import type { NetObjectDescriptor } from './registry.js';
+import { dispatchSyncModelCommand } from './sync-model.js';
+import { removeCharacterLoadout } from '../character/character-sync.js';
+import { publishParticipantsSnapshot } from '../session/participants-sync.js';
 
 type Publish = (message: LobbyMessage) => void;
 type Send = <K extends LobbyMessage['kind']>(kind: K, body: Extract<LobbyMessage, { kind: K }>['body'], context?: string) => boolean;
@@ -25,7 +26,6 @@ export class HostRouter {
   private readonly descriptors: NetObjectDescriptor[];
   private readonly commonDeps: CommonDeps;
   private readonly objects: Map<string, HostObject>;
-  private readonly participants: HostParticipantsObject;
   private readonly chat: HostChatObject;
   private readonly world: HostWorldPositionsObject;
   private readonly party: HostPartyObject;
@@ -63,7 +63,6 @@ export class HostRouter {
     for (const object of this.objects.values()) {
       this.register(object);
     }
-    this.participants = this.require<HostParticipantsObject>(PARTICIPANTS_OBJECT_ID);
     this.chat = this.require<HostChatObject>(CHAT_OBJECT_ID);
     // LLM progress removed
     this.world = this.require<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
@@ -107,24 +106,29 @@ export class HostRouter {
     if (!participantId) return;
     this.map.removeByPeer(peerId);
     this.lobbyStore.remove(participantId);
-    this.participants.remove(participantId, 'peer-disconnected');
+    publishParticipantsSnapshot(this.lobbyStore, 'participants:peer-disconnect');
+    removeCharacterLoadout(participantId, 'character:peer-disconnect');
   }
 
   updateParticipantReady(participantId: string, ready: boolean, context = 'ready:host-toggle') {
     const raw = this.lobbyStore.snapshotWire().map((p) => (p.id === participantId ? { ...p, ready } : p));
     this.lobbyStore.replaceFromWire(raw);
-    this.participants.update(participantId, { ready }, context);
+    publishParticipantsSnapshot(this.lobbyStore, context);
   }
 
   handle(payload: unknown, peerId?: string) {
     const message = parseLobbyMessage(payload);
     if (!message) return;
+    const senderId = peerId ? this.map.getParticipant(peerId) : this.lobbyStore.localParticipantIdRef.current;
+    if (dispatchSyncModelCommand(message, { peerId, senderId, lobbyStore: this.lobbyStore, router: this })) {
+      return;
+    }
     try {
       switch (message.kind) {
         case 'hello': {
           const p = message.body.participant;
           this.lobbyStore.upsertFromWire(p);
-          this.participants.upsert(p, 'hello:merge');
+          publishParticipantsSnapshot(this.lobbyStore, 'participants:hello');
           if (peerId) this.map.set(peerId, p.id);
           // Ensure world position at map head's entry field
           this.world.ensureParticipant(p.id, 'LUMENFORD');
@@ -140,15 +144,16 @@ export class HostRouter {
           }
           const raw = this.lobbyStore.snapshotWire().map((p) => (p.id === participantId ? { ...p, ready } : p));
           this.lobbyStore.replaceFromWire(raw);
-          this.participants.update(participantId, { ready }, 'ready:merge');
+          publishParticipantsSnapshot(this.lobbyStore, 'participants:ready');
           break;
         }
         case 'leave': {
           const id = message.body.participantId;
           this.lobbyStore.remove(id);
-          this.participants.remove(id, 'leave:remove');
+          publishParticipantsSnapshot(this.lobbyStore, 'participants:leave');
           this.map.removeByParticipant(id);
           this.party.removeMember(id);
+          removeCharacterLoadout(id, 'character:leave');
           break;
         }
         case 'object:request': {
@@ -199,6 +204,9 @@ export class HostRouter {
                 try { console.debug('[/llm] gateway.request start'); } catch {}
                 const ai = await requestAICommand({
                   manager: 'smart',
+                  requestType: 'chat',
+                  actorId: authorId,
+                  persona: '너는 Greyfall 콘솔 보조자이다. 한국어로만 말한다.',
                   userInstruction: prompt,
                   temperature: 0.5,
                   maxTokens: undefined,

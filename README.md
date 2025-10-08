@@ -169,6 +169,7 @@ npm run dev
 - `docs/story.md`: Greyfall 연표, 파벌, 핵심 NPC, 피날레 선택지를 정리한 스토리 바이블.
 - `docs/rulebook.md`: 전술 규칙과 시계 운용, Glow·타락 시스템, 휴식 절차.
 - `docs/scenes.md`: 임무 브리핑과 장면 전환에 활용할 수 있는 나레이션 예시.
+- `docs/llm-pipeline.md`: LLM 파이프라인 구조와 파인튜닝 전략 아키텍처 문서.
 - `docs/rtc-protocol.md`: 독자적인 시그널 서버를 운영하고 싶을 때 참고할 RTC 프로토콜 가이드.
 
 ### 라이선스

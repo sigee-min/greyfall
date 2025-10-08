@@ -10,10 +10,18 @@ import { useI18n } from '../../i18n';
 
 type Publish = <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean;
 
-const STAT_KEYS: readonly StatKey[] = ['근력', '운동신경', '공학', '손재주', '의술'] as const;
+const STAT_KEYS: readonly StatKey[] = ['Strength', 'Agility', 'Engineering', 'Dexterity', 'Medicine'] as const;
+const STAT_KEY_ALIASES: Record<string, StatKey> = {
+  근력: 'Strength',
+  운동신경: 'Agility',
+  공학: 'Engineering',
+  손재주: 'Dexterity',
+  의술: 'Medicine'
+};
 
-function isStatKey(value: string): value is StatKey {
-  return STAT_KEYS.includes(value as StatKey);
+function resolveStatKey(value: string): StatKey | null {
+  if (STAT_KEYS.includes(value as StatKey)) return value as StatKey;
+  return STAT_KEY_ALIASES[value] ?? null;
 }
 
 export function CommandConsole({ publish, localParticipantId }: { publish: Publish; localParticipantId: string | null }) {
@@ -56,8 +64,8 @@ export function CommandConsole({ publish, localParticipantId }: { publish: Publi
     const m2 = expr.match(/^([\S]+)(\s*([+-])\s*(\d+))?$/);
     if (!m2) return null;
     const keyCandidate = m2[1];
-    if (!isStatKey(keyCandidate)) return null;
-    const key = keyCandidate;
+    const key = resolveStatKey(keyCandidate);
+    if (!key) return null;
     const base = stats[key] ?? 0;
     const sign2 = m2[3] === '-' ? -1 : 1;
     const extra = m2[4] ? sign2 * parseInt(m2[4], 10) : 0;

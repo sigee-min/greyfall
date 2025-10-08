@@ -143,8 +143,10 @@ export function GameStartLobby({
     void (async () => {
       const parsed = await requestAICommand({
         manager: llmManager,
-        userInstruction:
-          '팀에 시작 인사를 전하세요. 반드시 JSON 한 줄로 {"cmd","body"}만 출력하세요. chat은 string 고정.',
+        requestType: 'chat',
+        actorId: localParticipantId ?? 'host',
+        persona: '너는 Greyfall Ready Room을 운영하는 심판자이다. 한국어로만 격려의 말을 건넨다.',
+        userInstruction: '랜턴 팀에게 임무 준비가 시작되었음을 알리고, 함께 준비하자는 인사를 건네라.',
         temperature: 0.5,
         maxTokens: 192,
         fallbackChatText: '채널에 합류했습니다.',
@@ -168,7 +170,8 @@ export function GameStartLobby({
         const last = getLastProgress();
         if (last?.text) setLlmPrewarmText(last.text === 'ready' ? '세팅 완료' : String(last.text));
         if (typeof last?.progress === 'number') {
-          setLlmPrewarmPct(Math.round(Math.max(0, Math.min(1, last.progress)) * 100));
+          const pct = Math.round(Math.max(0, Math.min(1, last.progress)) * 100);
+          setLlmPrewarmPct(pct >= 100 ? null : pct);
         }
         const unsub = subscribeProgress((report) => {
           if (typeof report.progress === 'number') {
@@ -184,7 +187,7 @@ export function GameStartLobby({
         await loadEngineByManager(llmManager);
         await ensureChatApiReady(llmManager, 180_000);
         setLlmPrewarmPct(null);
-        setLlmPrewarmText((prev) => (prev && prev !== '세팅 완료' ? '세팅 완료' : prev || '세팅 완료'));
+        setLlmPrewarmText('세팅 완료');
         unsub();
       } catch (error) {
         console.warn('[llm] prewarm failed', error);
@@ -193,9 +196,16 @@ export function GameStartLobby({
     })();
   }, [mode, llmManager]);
 
+  const prewarmComplete = useMemo(() => {
+    if (mode !== 'host') return true;
+    if (llmPrewarmPct !== null && llmPrewarmPct >= 100) return true;
+    if (llmPrewarmText && llmPrewarmText.includes('세팅 완료')) return true;
+    return false;
+  }, [llmPrewarmPct, llmPrewarmText, mode]);
+
   const canStartMission = useMemo(
-    () => (mode === 'host' ? everyoneReady && llmReady : everyoneReady),
-    [everyoneReady, llmReady, mode]
+    () => (mode === 'host' ? everyoneReady && llmReady && prewarmComplete : everyoneReady),
+    [everyoneReady, llmReady, mode, prewarmComplete]
   );
 
   useEffect(() => {

@@ -5,18 +5,12 @@ import { ensureRuntimeReady, generateMessagesWithTimeout } from './gateway/llm-e
 import { runPipeline } from '../../llm/pipeline/runner';
 import { InMemoryNodeRegistry } from '../../llm/pipeline/registry';
 import type { Step, PipelineCtx, MessageExecutor } from '../../llm/pipeline/types';
-import { summariseAllowed } from './gateway/prompts';
 import { makeDefaultToolsHost } from '../../llm/tools';
 import { getToolsProviders } from '../../llm/tools/providers';
 import type { AIGatewayParams } from './gateway/types';
 import type { ChatHistoryIn, ChatHistoryOut } from '../../llm/tools/impl/chat-history';
 
 const DEBUG = Boolean(import.meta.env?.VITE_LLM_DEBUG);
-
-function getChosenCommand(scratch: PipelineCtx['scratch']): string {
-  const raw = scratch.chosenCmd;
-  return typeof raw === 'string' && raw.trim() ? raw : 'chat';
-}
 
 function getLastOutputText(scratch: PipelineCtx['scratch']): string | null {
   const last = scratch.last;
@@ -43,7 +37,9 @@ function formatError(err: unknown): string {
 export async function requestAICommand(params: AIGatewayParams): Promise<AICommand> {
   const {
     manager,
+    requestType,
     userInstruction,
+    persona,
     contextText,
     temperature = 0.5,
     maxTokens,
@@ -63,15 +59,6 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
     await ensureRuntimeReady(manager);
     if (DEBUG) console.debug('[gw] ensureRuntimeReady.ok');
 
-    // 1) Choose command
-    const { allowedCmdsText, capabilitiesDoc } = summariseAllowed();
-    const choose: Step = {
-      id: 'choose-cmd',
-      nodeId: 'cmd.choose',
-      params: () => ({ allowedCmdsText, capabilitiesDoc }),
-      next: null
-    };
-
     const ctx: PipelineCtx = {
       user: userInstruction,
       manager,
@@ -85,19 +72,13 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
       return out;
     };
     try {
-      // run choose node
-      if (DEBUG) console.debug('[gw] choose.begin');
-      await runPipeline({ start: choose, ctx, registry: InMemoryNodeRegistry, exec });
-      const cmd = getChosenCommand(ctx.scratch);
-      if (DEBUG) console.debug(`[gw] choose.done cmd=${cmd}`);
-      // 2) Build pipeline per command (for now, only chat.basic)
+      const defaultPersona = persona ?? '너는 Greyfall TRPG 매니저이다. 한국어로만 말한다.';
       let start: Step;
-      if (cmd === 'chat') {
+      if (requestType === 'chat') {
         start = {
           id: 'chat-step',
           nodeId: 'chat.basic',
           params: async (c) => {
-            // chat.history 도구 호출
             let historyText = '';
             try {
               const res = await c.tools?.invoke<ChatHistoryIn, ChatHistoryOut>('chat.history', { limit: 10 });
@@ -112,27 +93,24 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
             if (historyText) parts.push(`최근 채팅(최대 10개):\n${historyText}`);
             if (DEBUG) console.debug(`[gw] chat.params hasHistory=${Boolean(historyText)} hasContext=${Boolean(contextText)}`);
             return {
-              persona: '너는 TRPG 매니저이다. 한국어로만 말한다.',
+              persona: defaultPersona,
               userSuffix: parts.length ? `\n${parts.join('\n\n')}` : ''
             };
           },
           next: null
         };
       } else {
-        // TODO: pipeline for other commands (mission.start, etc.)
-        start = {
-          id: 'chat-fallback', nodeId: 'chat.basic', params: () => ({ persona: '간결한 한국어 응답만 합니다.', userSuffix: '' }), next: null
-        };
+        throw new Error(`Unsupported requestType: ${requestType}`);
       }
       if (DEBUG) console.debug(`[gw] pipeline.begin node=${start.nodeId}`);
       const done = await runPipeline({ start, ctx, registry: InMemoryNodeRegistry, exec });
       if (DEBUG) console.debug('[gw] pipeline.done');
       const text = getLastOutputText(done.scratch) ?? fallbackChatText;
       if (DEBUG) console.debug(`[gw] out chars=${text.length}`);
-      return { cmd, body: text };
+      return { cmd: requestType, body: text };
     } catch (e) {
       if (DEBUG) console.debug('[gw] error', formatError(e));
-      return { cmd: 'chat', body: fallbackChatText };
+      return { cmd: requestType, body: fallbackChatText };
     }
   });
 }

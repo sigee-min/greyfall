@@ -9,10 +9,10 @@ import {
   type NetObjectDescriptor
 } from './registry.js';
 // Side-effect imports to ensure builtin net objects self-register before controller initialization.
-import './participants-host.js';
 import './chat-host.js';
 import './world-positions-host.js';
 import './party-host.js';
+import '../character/character-sync.js';
 // LLM progress net-object removed
 
 export type Publish = <K extends LobbyMessageKind>(

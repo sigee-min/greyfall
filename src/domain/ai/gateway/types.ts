@@ -2,8 +2,11 @@ import type { LlmManagerKind } from '../../../llm/llm-engine';
 
 export type AIGatewayParams = {
   manager: LlmManagerKind;
+  requestType: 'chat';
+  actorId: string;
   userInstruction: string;
   contextText?: string;
+  persona?: string;
   temperature?: number;
   maxTokens?: number;
   fallbackChatText?: string;

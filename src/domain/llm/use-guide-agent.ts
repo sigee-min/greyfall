@@ -85,10 +85,16 @@ export function useGuideAgent({
             .slice(-fullPolicy.maxContext)
             .map((m) => `- ${m.role === 'assistant' ? '(심판자) ' : ''}${m.content}`)
             .join('\n');
+          const prompt = [
+            `${guideName}로서 아래 플레이어 발언에 응답해 주세요.`,
+            `플레이어 발언: ${entry.body}`
+          ].join('\n\n');
           const parsed = await requestAICommand({
             manager,
-            userInstruction:
-              '사용자에게 응답하세요. 반드시 JSON 한 줄로 {"cmd":...,"body":...} 형식만 출력하세요. chat은 string 고정.',
+            actorId: authorId,
+            requestType: 'chat',
+            persona: `${guideName}는 Greyfall 콘솔의 심판자다. 한국어로만 친근하게 말한다.`,
+            userInstruction: prompt,
             contextText: context,
             temperature: 0.4,
             maxTokens: fullPolicy.maxTokens,

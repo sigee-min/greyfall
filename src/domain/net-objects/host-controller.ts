@@ -1,7 +1,5 @@
 import { createLobbyMessage, type LobbyMessage, type LobbyMessageBodies, type LobbyMessageKind } from '../../protocol';
-import { PARTICIPANTS_OBJECT_ID } from './participants.js';
 import type { LobbyStore } from '../session/session-store';
-import { HostParticipantsObject } from './participants-host.js';
 import type { CommonDeps, HostObject } from './types';
 import { HostRouter } from './host-router.js';
 import {
@@ -12,6 +10,8 @@ import {
   subscribeNetObjectDescriptors,
   type NetObjectDescriptor
 } from './registry.js';
+import '../character/character-sync.js';
+import { publishParticipantsSnapshot } from '../session/participants-sync.js';
 
 export type Publish = <K extends LobbyMessageKind>(
   kind: K,
@@ -113,8 +113,7 @@ export class HostNetController {
   // Message handling moved into HostRouter
 
   broadcastParticipants(context: string = 'participants-sync') {
-    const obj = this.hostObjects.get(PARTICIPANTS_OBJECT_ID) as HostParticipantsObject | undefined;
-    obj?.broadcast(context);
+    publishParticipantsSnapshot(this.lobbyStore, context);
   }
 
   register(object: HostObject) {

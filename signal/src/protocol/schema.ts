@@ -184,6 +184,84 @@ const lobbyChatSchema = lobbyEnvelopeSchema.extend({
   body: z.object({ entry: lobbyChatMessageSchema })
 });
 
+const statKeySchema = z.enum(['Strength', 'Agility', 'Engineering', 'Dexterity', 'Medicine']);
+
+const lobbyPassiveSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().min(1),
+  negative: z.boolean().optional()
+});
+
+const lobbyTraitSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  cost: z.number().int(),
+  statMods: z
+    .record(statKeySchema, z.number().int())
+    .optional()
+    .refine(
+      (value) => (value ? Object.keys(value).length > 0 : true),
+      'statMods cannot be empty when provided'
+    ),
+  passives: z.array(lobbyPassiveSchema).max(16).optional(),
+  description: z.string().min(1).optional()
+});
+
+const lobbyCharacterStatsSchema = z.object({
+  Strength: z.number().int(),
+  Agility: z.number().int(),
+  Engineering: z.number().int(),
+  Dexterity: z.number().int(),
+  Medicine: z.number().int()
+});
+
+const lobbyCharacterLoadoutSchema = z
+  .object({
+    playerId: z.string().min(1),
+    roll: z
+      .tuple([z.number().int().min(1).max(6), z.number().int().min(1).max(6), z.number().int().min(1).max(6)])
+      .refine((dice) => dice.length === 3, 'roll must contain exactly three dice'),
+    budget: z.number().int().min(3).max(18),
+    remaining: z.number().int(),
+    stats: lobbyCharacterStatsSchema,
+    passives: z.array(lobbyPassiveSchema).max(32),
+    traits: z.array(lobbyTraitSchema).max(16),
+    built: z.boolean(),
+    updatedAt: z.number().int().nonnegative()
+  })
+  .strict();
+
+export type LobbyCharacterLoadout = z.infer<typeof lobbyCharacterLoadoutSchema>;
+
+const lobbyCharacterSnapshotSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('character:snapshot'),
+  body: z.object({
+    revision: z.number().int().nonnegative(),
+    loadouts: z.array(lobbyCharacterLoadoutSchema).max(16)
+  })
+});
+
+const lobbyCharacterSetSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('character:set'),
+  body: z.object({
+    playerId: z.string().min(1),
+    loadout: lobbyCharacterLoadoutSchema
+  })
+});
+
+const lobbyCharacterResetSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('character:reset'),
+  body: z.object({ playerId: z.string().min(1) })
+});
+
+const lobbyCharacterRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('character:request'),
+  body: z.object({
+    sinceRevision: z.number().int().nonnegative().optional()
+  })
+});
+
 // LLM progress broadcast (host -> all guests)
 const lobbyLlmProgressSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('llm:progress'),
@@ -338,6 +416,10 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyReadySchema,
   lobbyLeaveSchema,
   lobbyChatSchema,
+  lobbyCharacterSnapshotSchema,
+  lobbyCharacterSetSchema,
+  lobbyCharacterResetSchema,
+  lobbyCharacterRequestSchema,
   lobbyLlmProgressSchema,
   lobbyLlmConfigSchema,
   lobbyObjectPatchSchema,
@@ -366,6 +448,10 @@ export type LobbyMessageBodies = {
   ready: { participantId: string; ready: boolean };
   leave: { participantId: string };
   chat: { entry: LobbyChatMessage };
+  'character:snapshot': { revision: number; loadouts: LobbyCharacterLoadout[] };
+  'character:set': { playerId: string; loadout: LobbyCharacterLoadout };
+  'character:reset': { playerId: string };
+  'character:request': { sinceRevision?: number };
   'llm:progress': { ready?: boolean; progress?: number | null; status?: string | null; error?: string | null };
   'llm:config': { modelId: string; backend: 'gpu' | 'cpu' };
   'object:patch': { id: string; rev: number; ops: { op: 'set' | 'merge' | 'insert' | 'remove'; path?: string; value?: unknown }[] };

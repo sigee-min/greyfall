@@ -4,11 +4,11 @@ export type CheckKind = 'evade' | 'triage' | 'precision' | 'engineering' | 'medi
 
 export function baseStatFor(kind: CheckKind): StatKey {
   switch (kind) {
-    case 'evade': return '운동신경';
-    case 'triage': return '의술';
-    case 'precision': return '손재주';
-    case 'engineering': return '공학';
-    case 'medicine': return '의술';
+    case 'evade': return 'Agility';
+    case 'triage': return 'Medicine';
+    case 'precision': return 'Dexterity';
+    case 'engineering': return 'Engineering';
+    case 'medicine': return 'Medicine';
   }
 }
 
@@ -43,4 +43,3 @@ export function computeModifiers(params: {
 
   return { mod, labels };
 }
-

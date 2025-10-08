@@ -43,14 +43,7 @@ jobs:
             echo "Image reference unavailable; skipping notification." >&2
             exit 0
           fi
-          payload=$(cat <<PAYLOAD
-{
-  "docker_registry_image_name": "${IMAGE_NAME}",
-  "docker_registry_image_tag": "${IMAGE_TAG}",
-  "instant_deploy": true
-}
-PAYLOAD
-)
+          payload=$(printf '{"docker_registry_image_name":"%s","docker_registry_image_tag":"%s","instant_deploy":true}' "$IMAGE_NAME" "$IMAGE_TAG")
           curl --fail --show-error --request PATCH \
             --url "${COOLIFY_BASE_URL%/}/api/v1/applications/${COOLIFY_APPLICATION_UUID}" \
             --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
