@@ -15,6 +15,9 @@ COPY public ./public
 COPY src ./src
 COPY index.html ./
 
+# Shared protocol schema used by both frontend and signal server
+COPY signal/src ./signal/src
+
 RUN npm ci
 
 # Build-time configurable signal server public URL (optional)
