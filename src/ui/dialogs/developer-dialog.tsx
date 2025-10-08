@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
-import { netBus } from '../../bus/net-bus';
 
 type DeveloperDialogProps = {
   open: boolean;
@@ -9,17 +7,6 @@ type DeveloperDialogProps = {
 
 export function DeveloperDialog({ open, onClose }: DeveloperDialogProps) {
   const { t } = useI18n();
-
-  const [acks, setAcks] = useState<{ scheduled: number; resolved: number; fallback: number }>(() => ({ scheduled: 0, resolved: 0, fallback: 0 }));
-  const [queues, setQueues] = useState<{ enqueued: number; flushed: number; maxSize: number }>({ enqueued: 0, flushed: 0, maxSize: 0 });
-  useEffect(() => {
-    const unsub1 = netBus.subscribe('net:ack:scheduled', () => setAcks((s) => ({ ...s, scheduled: s.scheduled + 1 })));
-    const unsub2 = netBus.subscribe('net:ack:resolved', () => setAcks((s) => ({ ...s, resolved: s.resolved + 1 })));
-    const unsub3 = netBus.subscribe('net:ack:fallback', () => setAcks((s) => ({ ...s, fallback: s.fallback + 1 })));
-    const unsub4 = netBus.subscribe('net:queue:enqueue', (e) => setQueues((q) => ({ ...q, enqueued: q.enqueued + 1, maxSize: Math.max(q.maxSize, e.size) })));
-    const unsub5 = netBus.subscribe('net:queue:flush', (e) => setQueues((q) => ({ ...q, flushed: q.flushed + 1 })));
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); };
-  }, []);
 
   if (!open) return null;
   return (
@@ -40,23 +27,6 @@ export function DeveloperDialog({ open, onClose }: DeveloperDialogProps) {
         </header>
 
         <section className="space-y-4 text-sm text-muted-foreground">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Network Metrics</h3>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
-              <div className="rounded-md border border-border/60 bg-background/70 p-3">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">ACK</p>
-                <p>scheduled: {acks.scheduled}</p>
-                <p>resolved: {acks.resolved}</p>
-                <p>fallbacks: {acks.fallback}</p>
-              </div>
-              <div className="rounded-md border border-border/60 bg-background/70 p-3">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Queue</p>
-                <p>enqueued: {queues.enqueued}</p>
-                <p>flushed: {queues.flushed}</p>
-                <p>max size: {queues.maxSize}</p>
-              </div>
-            </div>
-          </div>
           <div>
             <h3 className="text-sm font-semibold text-foreground">{t('dev.helloTitle')}</h3>
             <p>{t('dev.helloBody')}</p>

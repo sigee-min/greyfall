@@ -46,8 +46,14 @@
   "sfx.volume.desc": "Adjust the loudness of UI/interaction sounds.",
 
   "debug.enable": "Enable Debug Page",
-  "debug.enable.desc": "When enabled, press the ` key to open the developer debug page.",
+  "debug.enable.desc": "When enabled, press the ` key to open the Network Monitor.",
   "debug.enable.note": "Disabled by default. Use backquote (`) to open when enabled.",
+
+  "netmon.subtitle": "Network Monitor",
+  "netmon.title": "Network Status",
+  "netmon.ack": "ACK",
+  "netmon.queue": "Queue",
+  "netmon.note": "Summarises data channel activity between host and guests.",
 
   "lobby.brand": "Greyfall Initiative",
   "lobby.title.line1": "Greyfall",

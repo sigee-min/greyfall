@@ -46,8 +46,14 @@
   "sfx.volume.desc": "UI 효과음 및 상호작용 사운드의 크기를 조절합니다.",
 
   "debug.enable": "디버그 페이지 허용",
-  "debug.enable.desc": "옵션이 켜져 있으면 ` 키로 개발자 디버그 페이지를 열 수 있습니다.",
+  "debug.enable.desc": "옵션이 켜져 있으면 ` 키로 네트워크 모니터를 열 수 있습니다.",
   "debug.enable.note": "기본은 꺼져 있습니다. 활성화 시 단축키(`)로 열립니다.",
+
+  "netmon.subtitle": "Network Monitor",
+  "netmon.title": "네트워크 상태",
+  "netmon.ack": "ACK",
+  "netmon.queue": "Queue",
+  "netmon.note": "호스트-게스트 데이터 채널 교환량을 간단히 요약합니다.",
 
   "lobby.brand": "Greyfall Initiative",
   "lobby.title.line1": "Greyfall",

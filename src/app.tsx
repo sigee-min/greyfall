@@ -6,6 +6,7 @@ import { ControlDock } from './ui/controls/control-dock';
 import { SettingsOverlay } from './ui/settings/settings-overlay';
 import { OptionsDialog } from './ui/dialogs/options-dialog';
 import { DeveloperDialog } from './ui/dialogs/developer-dialog';
+import { NetworkMonitorDialog } from './ui/dialogs/network-monitor-dialog';
 import { ErrorDialog } from './ui/dialogs/error-dialog';
 import { GameLobby } from './scenes/game-lobby';
 import { GameStartLobby } from './scenes/game-start-lobby';
@@ -52,6 +53,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [developerOpen, setDeveloperOpen] = useState(false);
+  const [netmonOpen, setNetmonOpen] = useState(false);
   const [llmMonitorOpen, setLlmMonitorOpen] = useState(false);
   // Manager selection UI removed; default manager handled inside loaders/components
   const [playerName, setPlayerName] = useState('');
@@ -206,17 +208,20 @@ function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [scene]);
 
-  // Backquote(`)로 개발자 디버그 페이지 토글 (옵션에서 허용 시)
+  // Backquote(`) → 네트워크 모니터 토글 (옵션에서 허용 시)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // Ctrl+` → LLM 모니터 토글, 단일 ` → 개발자 다이얼로그(옵션 허용 시)
+      // Ctrl+` → LLM 모니터 토글, 단일 ` → 네트워크 모니터(옵션 허용 시)
       if ((event.code === 'Backquote' || event.key === '`') && event.ctrlKey) {
         event.preventDefault();
         setLlmMonitorOpen((v) => !v);
         return;
       }
       if ((event.code === 'Backquote' || event.key === '`') && !event.ctrlKey) {
-        if (debugPageEnabled) setDeveloperOpen(true);
+        if (debugPageEnabled) {
+          event.preventDefault();
+          setNetmonOpen((v) => !v);
+        }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -517,6 +522,7 @@ function App() {
         onPreviewMusicVolume={previewMusicVolume}
       />
       <DeveloperDialog open={developerOpen} onClose={() => setDeveloperOpen(false)} />
+      <NetworkMonitorDialog open={netmonOpen} onClose={() => setNetmonOpen(false)} />
       {llmMonitorOpen && <LlmMonitor onClose={() => setLlmMonitorOpen(false)} />}
       {/* 매니저 선택 다이얼로그 제거됨 */}
       <ErrorDialog open={Boolean(errorMessage)} message={errorMessage ?? ''} onClose={dismissError} />
