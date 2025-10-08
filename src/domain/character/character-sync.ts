@@ -44,9 +44,10 @@ function sanitizeLobbyLoadout(playerId: string, payload: LobbyCharacterLoadout):
     canonicalTraits.push(canonical);
   }
 
-  const budget = payload.roll.reduce((sum, die) => sum + die, 0);
-  if (budget !== payload.budget) {
-    console.warn('[character] budget mismatch', { budget, reported: payload.budget });
+  // Dice removed; enforce fixed budget of 10
+  const budget = 10;
+  if (payload.budget !== budget) {
+    console.warn('[character] budget mismatch', { expected: budget, reported: payload.budget });
     return null;
   }
 
@@ -99,7 +100,6 @@ function sanitizeLobbyLoadout(playerId: string, payload: LobbyCharacterLoadout):
 
   return {
     playerId,
-    roll: [...payload.roll] as [number, number, number],
     budget,
     remaining,
     stats,
@@ -213,10 +213,8 @@ export function clearCharacterLoadouts(context = 'character:clear') {
 }
 
 export function createLobbyLoadoutFromSummary(playerId: string, summary: CharacterSummary): LobbyCharacterLoadout | null {
-  if (!summary.roll) return null;
   return {
     playerId,
-    roll: [...summary.roll] as [number, number, number],
     budget: summary.budget,
     remaining: summary.remaining,
     stats: { ...summary.stats },
@@ -224,5 +222,5 @@ export function createLobbyLoadoutFromSummary(playerId: string, summary: Charact
     traits: summary.traits.map(cloneTrait),
     built: summary.built,
     updatedAt: Date.now()
-  };
+  } as LobbyCharacterLoadout;
 }

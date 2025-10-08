@@ -3,7 +3,6 @@ import { CharacterLoadout, type CharacterLoadoutSnapshot } from './types';
 function cloneLoadout(loadout: CharacterLoadout): CharacterLoadout {
   return {
     ...loadout,
-    roll: [...loadout.roll] as [number, number, number],
     stats: { ...loadout.stats },
     passives: loadout.passives.map((passive) => ({ ...passive })),
     traits: loadout.traits.map((trait) => ({
@@ -88,4 +87,3 @@ export class CharacterLoadoutRegistry {
     return participantIds.every((id) => this.map.get(id)?.built === true);
   }
 }
-

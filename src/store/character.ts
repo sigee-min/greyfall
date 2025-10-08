@@ -15,7 +15,6 @@ export type TraitSpec = {
 
 export type CharacterSnapshot = {
   built: boolean;
-  roll: [number, number, number] | null;
   budget: number;
   remaining: number;
   stats: Record<StatKey, number>;
@@ -24,7 +23,6 @@ export type CharacterSnapshot = {
 };
 
 export type CharacterState = CharacterSnapshot & {
-  setRolled: (dice: [number, number, number]) => void;
   selectTrait: (trait: TraitSpec) => void;
   deselectTrait: (traitId: string) => void;
   finalize: () => void;
@@ -43,9 +41,8 @@ const defaultStats: Record<StatKey, number> = {
 
 const createInitialState = (): CharacterSnapshot => ({
   built: false,
-  roll: null,
-  budget: 0,
-  remaining: 0,
+  budget: 10,
+  remaining: 10,
   stats: { ...defaultStats },
   passives: [],
   traits: []
@@ -92,7 +89,6 @@ function deriveFromTraits(budget: number, traits: TraitSpec[]): DerivedState {
 function cloneSnapshot(snapshot: CharacterSnapshot): CharacterSnapshot {
   return {
     built: snapshot.built,
-    roll: snapshot.roll ? ([...snapshot.roll] as [number, number, number]) : null,
     budget: snapshot.budget,
     remaining: snapshot.remaining,
     stats: mergeStats(defaultStats, snapshot.stats),
@@ -107,15 +103,6 @@ function cloneSnapshot(snapshot: CharacterSnapshot): CharacterSnapshot {
 
 export const useCharacterStore = create<CharacterState>((set, get) => ({
   ...createInitialState(),
-  setRolled: (dice) => {
-    const budget = dice[0] + dice[1] + dice[2];
-    set({
-      roll: dice,
-      budget,
-      built: false,
-      ...deriveFromTraits(budget, [])
-    });
-  },
   selectTrait: (trait) => {
     const state = get();
     if (state.traits.some((current) => current.id === trait.id)) return;

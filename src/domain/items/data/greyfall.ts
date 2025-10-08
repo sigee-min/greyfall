@@ -92,6 +92,20 @@ export const GREYFALL_ITEMS: ItemDef[] = [
   { id: 'signal_lamp_arc', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아크텍 시그널 램프' }, { locale: 'en', text: 'Arc‑Tech Signal Lamp' }], synonyms: ['램프','lamp'], tags: ['arc','lantern'], rarity: 'uncommon' },
   { id: 'folio_archive', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아카이브 폴리오' }, { locale: 'en', text: 'Archive Folio' }], synonyms: ['서책','book','folio'], tags: ['scholar'], rarity: 'uncommon' },
 
+  // OFFHAND — further additions (common/uncommon)
+  { id: 'shield_tower_riot', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '치안국 타워 실드' }, { locale: 'en', text: 'Riot Tower Shield' }], synonyms: ['타워실드','tower shield','실드'], tags: ['riot','shield'], rarity: 'uncommon' },
+  { id: 'buckler_guild_engraved', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '길드 문양 버클러' }, { locale: 'en', text: 'Guild Engraved Buckler' }], synonyms: ['버클러','buckler'], tags: ['guild','shield'], rarity: 'uncommon' },
+  { id: 'lamp_signal_lantern', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '등불단 시그널 램프' }, { locale: 'en', text: 'Lantern Signal Lamp' }], synonyms: ['시그널램프','signal lamp','램프'], tags: ['lantern','signal'], rarity: 'common' },
+  { id: 'lamp_quickmount_arc', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아크텍 퀵마운트 램프' }, { locale: 'en', text: 'Arc‑Tech Quick‑Mount Lamp' }], synonyms: ['퀵마운트','lamp'], tags: ['arc','industrial','lantern'], rarity: 'uncommon' },
+  { id: 'tome_field_manual_archive', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아카이브 현장 매뉴얼' }, { locale: 'en', text: 'Archive Field Manual' }], synonyms: ['매뉴얼','manual','book'], tags: ['scholar'], rarity: 'common' },
+  { id: 'compass_nav_guild', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '길드 항법 컴퍼스' }, { locale: 'en', text: 'Guild Navigation Compass' }], synonyms: ['컴퍼스','compass'], tags: ['guild','utility'], rarity: 'common' },
+  { id: 'scanner_handheld_arc', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아크텍 핸드 스캐너' }, { locale: 'en', text: 'Arc‑Tech Hand Scanner' }], synonyms: ['스캐너','scanner'], tags: ['arc','industrial','utility'], rarity: 'uncommon' },
+  { id: 'tether_hook_industrial', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '인더스트리 테더 훅' }, { locale: 'en', text: 'Industrial Tether Hook' }], synonyms: ['훅','hook','tether'], tags: ['industrial','utility'], rarity: 'common' },
+  { id: 'mirror_ward_void', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '보이드 워드 미러' }, { locale: 'en', text: 'Void Ward Mirror' }], synonyms: ['거울','mirror'], tags: ['void','occult','utility'], rarity: 'uncommon' },
+  { id: 'banner_resistance', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '레지스탕스 배너' }, { locale: 'en', text: 'Resistance Banner' }], synonyms: ['배너','banner','깃발'], tags: ['resistance','signal'], rarity: 'common' },
+  { id: 'siren_hand_riot', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '치안국 핸드 사이렌' }, { locale: 'en', text: 'Riot Hand Siren' }], synonyms: ['사이렌','siren'], tags: ['riot','signal'], rarity: 'uncommon' },
+  { id: 'torch_mag_lantern', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '등불단 매그 토치' }, { locale: 'en', text: 'Lantern Mag Torch' }], synonyms: ['토치','torch'], tags: ['lantern','utility'], rarity: 'common' },
+
   // ACCESSORY (61–70)
   { id: 'ring_signal', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '길드 시그널 링' }, { locale: 'en', text: 'Guild Signal Ring' }], synonyms: ['반지','ring'], tags: ['comms','guild'], rarity: 'uncommon' },
   { id: 'amulet_void', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '보이드 아뮬렛' }, { locale: 'en', text: 'Void Amulet' }], synonyms: ['목걸이','amulet'], tags: ['void','occult'], rarity: 'epic' },

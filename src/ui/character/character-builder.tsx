@@ -22,22 +22,16 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
   const { t: tt } = useI18n();
   const bus = useGlobalBus();
   const {
-    roll,
     budget,
     remaining,
     stats,
     passives,
     traits,
-    ensureRoll,
     addTrait,
     removeTrait,
     finalizeCharacter,
     getSummary
   } = useCharacterAssembly();
-
-  useEffect(() => {
-    ensureRoll();
-  }, [ensureRoll]);
 
   const add = (trait: TraitSpec) => addTrait(trait);
   const remove = (id: string) => removeTrait(id);
@@ -68,7 +62,6 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
             <h3 className="text-xl font-semibold">{tt('char.title')}</h3>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="rounded-md border border-border/60 px-2 py-1">{tt('char.roll')}: {roll ? roll.join(' / ') : '—'}</span>
             <span className="rounded-md border border-border/60 px-2 py-1">{tt('char.budget')}: {budget}</span>
             <span className={cn('rounded-md border px-2 py-1', remaining >= 0 ? 'border-primary text-primary' : 'border-destructive text-destructive')}>{tt('char.remaining')}: {remaining}</span>
           </div>

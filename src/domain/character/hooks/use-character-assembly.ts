@@ -1,22 +1,11 @@
 import { useCallback, useMemo } from 'react';
-import {
-  useCharacterStore,
-  type TraitSpec,
-  type Passive,
-  type StatKey,
-  type CharacterSnapshot
-} from '../../../store/character';
+import { useCharacterStore, type TraitSpec, type Passive, type StatKey, type CharacterSnapshot } from '../../../store/character';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../../../protocol';
 import type { CharacterLoadout } from '../types';
-
-function rollD6(): number {
-  return Math.floor(Math.random() * 6) + 1;
-}
 
 export type Publish = <K extends LobbyMessageKind>(kind: K, body: LobbyMessageBodies[K], context?: string) => boolean;
 
 export type CharacterSummary = {
-  roll: [number, number, number] | null;
   stats: Record<StatKey, number>;
   passives: Passive[];
   traits: TraitSpec[];
@@ -26,25 +15,17 @@ export type CharacterSummary = {
 };
 
 export function useCharacterAssembly() {
-  const roll = useCharacterStore((state) => state.roll);
   const budget = useCharacterStore((state) => state.budget);
   const remaining = useCharacterStore((state) => state.remaining);
   const stats = useCharacterStore((state) => state.stats);
   const passives = useCharacterStore((state) => state.passives);
   const traits = useCharacterStore((state) => state.traits);
   const built = useCharacterStore((state) => state.built);
-  const setRolled = useCharacterStore((state) => state.setRolled);
   const selectTrait = useCharacterStore((state) => state.selectTrait);
   const deselectTrait = useCharacterStore((state) => state.deselectTrait);
   const finalize = useCharacterStore((state) => state.finalize);
   const hydrate = useCharacterStore((state) => state.hydrate);
   const reset = useCharacterStore((state) => state.reset);
-
-  const ensureRoll = useCallback(() => {
-    if (!roll) {
-      setRolled([rollD6(), rollD6(), rollD6()]);
-    }
-  }, [roll, setRolled]);
 
   const addTrait = useCallback(
     (trait: TraitSpec) => {
@@ -61,16 +42,8 @@ export function useCharacterAssembly() {
   );
 
   const getSummary = useCallback(
-    (): CharacterSummary => ({
-      roll,
-      stats,
-      passives,
-      traits,
-      remaining,
-      budget,
-      built
-    }),
-    [built, budget, passives, remaining, roll, stats, traits]
+    (): CharacterSummary => ({ stats, passives, traits, remaining, budget, built }),
+    [built, budget, passives, remaining, stats, traits]
   );
 
   const finalizeCharacter = useCallback(
@@ -91,7 +64,6 @@ export function useCharacterAssembly() {
     (snapshot: CharacterSnapshot | CharacterLoadout) => {
       hydrate({
         built: snapshot.built,
-        roll: snapshot.roll,
         budget: snapshot.budget,
         remaining: snapshot.remaining,
         stats: snapshot.stats,
@@ -107,27 +79,17 @@ export function useCharacterAssembly() {
   }, [reset]);
 
   const summary = useMemo(
-    () => ({
-      roll,
-      stats,
-      passives,
-      traits,
-      remaining,
-      budget,
-      built
-    }),
-    [built, budget, passives, remaining, roll, stats, traits]
+    () => ({ stats, passives, traits, remaining, budget, built }),
+    [built, budget, passives, remaining, stats, traits]
   );
 
   return {
-    roll,
     budget,
     remaining,
     stats,
     passives,
     traits,
     built,
-    ensureRoll,
     addTrait,
     removeTrait,
     finalizeCharacter,

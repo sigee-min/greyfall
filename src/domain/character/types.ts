@@ -2,7 +2,6 @@ import type { Passive, StatKey, TraitSpec } from '../../store/character';
 
 export type CharacterLoadout = {
   playerId: string;
-  roll: [number, number, number];
   budget: number;
   remaining: number;
   stats: Record<StatKey, number>;
@@ -17,4 +16,3 @@ export type CharacterLoadoutSnapshot = {
   entries: CharacterLoadout[];
   byId: Record<string, CharacterLoadout>;
 };
-
