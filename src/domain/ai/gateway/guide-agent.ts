@@ -48,7 +48,7 @@ export function useGuideAgent({
       mentionAliases: ['게임 매니저', '매니저', '안내인', '가이드', 'guide', 'bot'],
       cooldownMs: 3500,
       maxContext: 8,
-      maxTokens: 320,
+      maxTokens: 120,
       ...policy
     }),
     [policy]

@@ -4,8 +4,7 @@ import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/llm-engine';
 import { useGuideLoader } from '../domain/llm/use-guide-loader';
-import { executeAICommand } from '../domain/ai/ai-router';
-import { requestAICommand } from '../domain/ai/ai-gateway';
+// Removed auto AI greeting on LLM ready
 import { loadEngineByManager, ensureChatApiReady } from '../llm/llm-engine';
 import { subscribeProgress, getLastProgress } from '../llm/progress-bus';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
@@ -156,29 +155,12 @@ export function GameStartLobby({
     if (!llmReady) return;
     if (!localParticipantId) return;
     if (guideAnnouncedRef.current) return;
-
     guideAnnouncedRef.current = true;
-
-    void (async () => {
-      const parsed = await requestAICommand({
-        manager: llmManager,
-        requestType: 'chat',
-        actorId: localParticipantId ?? 'host',
-        persona: '너는 Greyfall Ready Room을 운영하는 게임 매니저이다. 한국어로만 격려의 말을 건넨다.',
-        userInstruction: '랜턴 팀에게 임무 준비가 시작되었음을 알리고, 함께 준비하자는 인사를 건네라.',
-        temperature: 0.5,
-        maxTokens: 384,
-        fallbackChatText: '채널에 합류했습니다.',
-        timeoutMs: 45000
-      });
-      await executeAICommand(parsed, {
-        manager: llmManager,
-        publishLobbyMessage,
-        participants,
-        localParticipantId
-      });
-    })();
-  }, [llmReady, llmManager, localParticipantId, mode, participants, publishLobbyMessage]);
+    // Simply append a join message without invoking LLM
+    try {
+      publishLobbyMessage('chat:append:request', { body: '채팅창에 참가했습니다만', authorId: localParticipantId }, 'llm-ready-announce');
+    } catch {}
+  }, [llmReady, localParticipantId, mode, publishLobbyMessage]);
 
   useEffect(() => {
     if (mode !== 'host') return;
