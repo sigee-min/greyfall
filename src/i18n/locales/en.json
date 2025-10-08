@@ -181,5 +181,9 @@
   "char.pts": "pts",
   "char.note": "Some traits may be replaced mid-session.",
   "char.broadcast": "Character finalised — {playerName}\nStats: {stats}\nTraits: {traits}\nPassives: {passives}",
+  "char.modify": "Modify Character",
+  "char.confirm.title": "Confirm Character",
+  "char.confirm.desc": "Finalize this build and mark as ready?",
+  "char.confirm.approve": "Approve",
   "char.ready": "Character Ready"
 }

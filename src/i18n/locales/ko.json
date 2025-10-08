@@ -181,5 +181,9 @@
   "char.pts": "점",
   "char.note": "일부 특성은 세션 중 교체 기회가 있을 수 있습니다.",
   "char.broadcast": "캐릭터 확정 — {playerName}\n스탯: {stats}\n특성: {traits}\n패시브: {passives}",
-  "char.ready": "캐릭터 준비 완료"
+  "char.ready": "캐릭터 준비 완료",
+  "char.modify": "캐릭터 수정",
+  "char.confirm.title": "캐릭터 확정 재확인",
+  "char.confirm.desc": "이 구성으로 캐릭터를 확정하고 준비 상태로 전환할까요?",
+  "char.confirm.approve": "승인"
 }

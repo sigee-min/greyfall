@@ -10,6 +10,9 @@ import { loadEngineByManager, ensureChatApiReady } from '../llm/llm-engine';
 import { subscribeProgress, getLastProgress } from '../llm/progress-bus';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../protocol';
 import { getStartLobbyLayout } from '../ui/layouts/start-lobby';
+import { CharacterBuilder } from '../ui/character/character-builder';
+import { ConfirmDialog } from '../ui/dialogs/confirm-dialog';
+import { useI18n } from '../i18n';
 import { useAspectCategory } from '../ui/layouts/use-aspect-category';
 
 type GameStartLobbyProps = {
@@ -59,6 +62,7 @@ export function GameStartLobby({
   publishLobbyMessage,
   probeChannel
 }: GameStartLobbyProps) {
+  const { t } = useI18n();
   const [answerInput, setAnswerInput] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
@@ -69,11 +73,26 @@ export function GameStartLobby({
   });
   const everyoneReady = participants.length > 0 && participants.every((participant) => participant.ready);
   const localParticipant = participants.find((participant) => participant.id === localParticipantId);
+  const playerName = localParticipant?.name ?? 'Player';
   const chatListRef = useRef<HTMLDivElement | null>(null);
   const [llmPrewarmText, setLlmPrewarmText] = useState<string | null>(null);
   const [llmPrewarmPct, setLlmPrewarmPct] = useState<number | null>(null);
   const guideAnnouncedRef = useRef(false);
   const prewarmedRef = useRef(false);
+
+  // Character builder + confirm flow
+  const [charBuilderOpen, setCharBuilderOpen] = useState(false);
+  const [wasReadyWhenOpened, setWasReadyWhenOpened] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmStats, setConfirmStats] = useState<string>('');
+  const [confirmTraits, setConfirmTraits] = useState<string>('');
+  const [confirmPassives, setConfirmPassives] = useState<string>('');
+  const pendingProceedRef = useRef<(() => void) | null>(null);
+
+  const handleOpenCharacterBuilder = useCallback(() => {
+    setWasReadyWhenOpened(Boolean(localParticipant?.ready));
+    setCharBuilderOpen(true);
+  }, [localParticipant?.ready]);
 
   const submitChat = useCallback(() => {
     if (!canSendChat) return false;
@@ -250,6 +269,7 @@ export function GameStartLobby({
         onLeave={onLeave}
         onStartGame={onStartGame}
         onToggleReady={onToggleReady}
+        onOpenCharacterBuilder={handleOpenCharacterBuilder}
         onAnswerInputChange={setAnswerInput}
         onAnswerSubmit={onAcceptAnswer ? handleAnswerSubmit : undefined}
         onChatInputChange={setChatInput}
@@ -259,6 +279,57 @@ export function GameStartLobby({
         onChatKeyDown={handleChatKeyDown}
         chatListRef={chatListRef}
       />
+
+      {charBuilderOpen && (
+        <CharacterBuilder
+          onClose={() => setCharBuilderOpen(false)}
+          playerName={playerName}
+          localParticipantId={localParticipantId}
+          publish={publishLobbyMessage}
+          onBeforeFinalize={({ summary, proceed }) => {
+            const statsLine = Object.entries(summary.stats)
+              .map(([k, v]) => `${k}:${v}`)
+              .join(', ');
+            const traitNames = summary.traits.map((t) => t.name).join(', ') || '—';
+            const passiveNames = summary.passives.map((p) => p.name).join(', ') || '—';
+            setConfirmStats(statsLine);
+            setConfirmTraits(traitNames);
+            setConfirmPassives(passiveNames);
+            pendingProceedRef.current = () => {
+              proceed();
+              // After character is finalised and sent, set ready if it was not ready
+              if (!wasReadyWhenOpened && localParticipantId) {
+                onToggleReady(localParticipantId);
+              }
+              pendingProceedRef.current = null;
+              setConfirmOpen(false);
+            };
+            setConfirmOpen(true);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={t('char.confirm.title')}
+        message={t('char.confirm.desc')}
+        confirmText={t('char.confirm.approve')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => pendingProceedRef.current?.()}
+        onCancel={() => setConfirmOpen(false)}
+      >
+        <div className="space-y-2 text-xs">
+          <div>
+            <span className="font-semibold">{t('char.stats')}:</span> {confirmStats || '—'}
+          </div>
+          <div>
+            <span className="font-semibold">{t('char.traits')}:</span> {confirmTraits || '—'}
+          </div>
+          <div>
+            <span className="font-semibold">{t('char.passives')}:</span> {confirmPassives || '—'}
+          </div>
+        </div>
+      </ConfirmDialog>
     </Suspense>
   );
 }

@@ -300,18 +300,43 @@ function StartLobbyLayoutBase({
                   </h3>
                   <div className="mt-4 space-y-3">
                     {activeParticipant && (
-                      <button
-                        type="button"
-                        className={cn(
-                          'w-full rounded-md border px-3 py-2 text-sm font-semibold uppercase tracking-[0.3em] transition',
-                          activeParticipant.ready
-                            ? 'border-destructive/60 bg-destructive/15 text-destructive hover:bg-destructive/25'
-                            : 'border-primary bg-primary/90 text-primary-foreground hover:bg-primary'
+                      <div className="flex w-full flex-col gap-3">
+                        {!activeParticipant.ready ? (
+                          <button
+                            type="button"
+                            className={cn(
+                              'w-full rounded-md border px-3 py-2 text-sm font-semibold uppercase tracking-[0.3em] transition',
+                              'border-primary bg-primary/90 text-primary-foreground hover:bg-primary'
+                            )}
+                            onClick={() => onOpenCharacterBuilder?.()}
+                          >
+                            {t('ready.set')}
+                          </button>
+                        ) : (
+                          <div className="flex w-full gap-3">
+                            <button
+                              type="button"
+                              className={cn(
+                                'flex-1 rounded-md border px-3 py-2 text-sm font-semibold uppercase tracking-[0.3em] transition',
+                                'border-border/60 bg-background/70 text-foreground hover:border-primary hover:text-primary'
+                              )}
+                              onClick={() => onOpenCharacterBuilder?.()}
+                            >
+                              {t('char.modify')}
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                'flex-1 rounded-md border px-3 py-2 text-sm font-semibold uppercase tracking-[0.3em] transition',
+                                'border-destructive/60 bg-destructive/15 text-destructive hover:bg-destructive/25'
+                              )}
+                              onClick={() => onToggleReady(activeParticipant.id)}
+                            >
+                              {t('ready.cancel')}
+                            </button>
+                          </div>
                         )}
-                        onClick={() => onToggleReady(activeParticipant.id)}
-                      >
-                        {activeParticipant.ready ? t('ready.cancel') : t('ready.set')}
-                      </button>
+                      </div>
                     )}
 
                     {mode === 'host' && (

@@ -24,6 +24,7 @@ export type StartLobbyLayoutProps = {
   onLeave: () => void;
   onStartGame: () => void;
   onToggleReady: (participantId: string) => void;
+  onOpenCharacterBuilder?: () => void;
   onAnswerInputChange: (value: string) => void;
   onAnswerSubmit?: (value: string) => void;
   onChatInputChange: (value: string) => void;

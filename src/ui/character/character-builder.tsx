@@ -4,7 +4,7 @@ import { useGlobalBus } from '../../bus/global-bus';
 import { TRAITS } from '../../domain/character/traits';
 import { cn } from '../../lib/utils';
 import { useI18n } from '../../i18n';
-import { useCharacterAssembly, type Publish } from '../../domain/character/hooks/use-character-assembly';
+import { useCharacterAssembly, type Publish, type CharacterSummary } from '../../domain/character/hooks/use-character-assembly';
 import { useCharacterNetwork } from '../../domain/character/hooks/use-character-network';
 
 type FilterOption = 'all' | 'positive' | 'negative';
@@ -14,9 +14,10 @@ type Props = {
   playerName?: string;
   localParticipantId: string | null;
   publish: Publish;
+  onBeforeFinalize?: (args: { summary: CharacterSummary; proceed: () => void; cancel: () => void }) => void;
 };
 
-export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish }: Props) {
+export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish, onBeforeFinalize }: Props) {
   const { t: tt } = useI18n();
   const bus = useGlobalBus();
   const {
@@ -160,21 +161,28 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
               disabled={!canFinalize}
               className={cn('rounded-md border px-3 py-2 text-xs', canFinalize ? 'border-primary text-primary hover:bg-primary/10' : 'cursor-not-allowed opacity-50')}
               onClick={() => {
-                try {
-                  const summary = getSummary();
-                  const statsLine = Object.entries(summary.stats).map(([k, v]) => `${k}:${v}`).join(', ');
-                  const traitNames = summary.traits.map((t) => t.name).join(', ') || '—';
-                  const passiveNames = summary.passives.map((p) => p.name).join(', ') || '—';
-                  const body = tt('char.broadcast', { playerName, stats: statsLine, traits: traitNames, passives: passiveNames });
-                  finalizeCharacter({
-                    publish,
-                    localParticipantId,
-                    body
-                  });
-                  sendLoadout();
-                  bus.publish('toast:show', { title: tt('char.ready'), message: playerName, status: 'success', durationMs: 2500 });
-                } catch {}
-                onClose();
+                const summary = getSummary();
+                const performFinalize = () => {
+                  try {
+                    const statsLine = Object.entries(summary.stats).map(([k, v]) => `${k}:${v}`).join(', ');
+                    const traitNames = summary.traits.map((t) => t.name).join(', ') || '—';
+                    const passiveNames = summary.passives.map((p) => p.name).join(', ') || '—';
+                    const body = tt('char.broadcast', { playerName, stats: statsLine, traits: traitNames, passives: passiveNames });
+                    finalizeCharacter({
+                      publish,
+                      localParticipantId,
+                      body
+                    });
+                    sendLoadout();
+                    bus.publish('toast:show', { title: tt('char.ready'), message: playerName, status: 'success', durationMs: 2500 });
+                  } catch {}
+                  onClose();
+                };
+                if (onBeforeFinalize) {
+                  onBeforeFinalize({ summary, proceed: performFinalize, cancel: () => {} });
+                  return;
+                }
+                performFinalize();
               }}
             >
               {tt('common.confirm')}
