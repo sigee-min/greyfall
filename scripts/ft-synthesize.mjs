@@ -78,12 +78,33 @@ function parseInventoryMap(sections) {
 }
 
 const SLOT_HINTS = [
-  { slot: 'head', kws: ['모자','헬멧','후드','helmet','hood','cap','visor','고글','goggles','mask','마스크'] },
-  { slot: 'offhand', kws: ['방패','실드','shield','buckler','램프','lamp','lantern','토치','torch','책','book','tome'] },
-  { slot: 'mainhand', kws: ['검','sword','칼','knife','dagger','봉','지팡이','staff','창','spear','파이크','pike','망치','hammer','총','gun','rifle','pistol','smg'] },
-  { slot: 'body', kws: ['코트','coat','갑옷','armor','재킷','jacket','베스트','vest','망토','cloak','슈트','suit'] },
-  { slot: 'accessory', kws: ['반지','ring','목걸이','amulet','necklace','pendant','브레이스','bracelet','armband'] }
+  { slot: 'head', kws: ['모자','헬멧','후드','helmet','hood','cap','visor','고글','goggles','mask','마스크','바이저','바라클라바','balaclava','face shield','페이스실드'] },
+  { slot: 'offhand', kws: ['방패','실드','shield','buckler','램프','lamp','lantern','토치','torch','책','book','tome','manual','매뉴얼','미러','mirror','배너','banner','컴퍼스','compass'] },
+  { slot: 'mainhand', kws: ['검','sword','칼','knife','dagger','봉','지팡이','staff','창','spear','파이크','pike','망치','hammer','곤봉','baton','truncheon','렌치','wrench','리벳','rivet','볼트','driver','총','gun','rifle','pistol','smg','carbine','bow','machete'] },
+  { slot: 'body', kws: ['코트','coat','갑옷','armor','재킷','jacket','베스트','vest','망토','cloak','슈트','suit','오버올','overalls','앞치마','apron','소프트쉘','softshell'] },
+  { slot: 'accessory', kws: ['반지','ring','목걸이','amulet','necklace','pendant','브레이스','bracelet','armband','호루라기','whistle','염주','beads','패치','patch'] }
 ];
+
+// Optional external registry (JSON) loader: docs/fine-tuning/items.index.json
+// Structure: { items: [{ id, names: string[], synonyms?: string[], slot?: 'head'|'body'|'mainhand'|'offhand'|'accessory' }] }
+let REGISTRY = null;
+try {
+  const p = 'docs/fine-tuning/items.index.json';
+  if (fs.existsSync(p)) {
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const byToken = new Map();
+    for (const it of raw.items || []) {
+      const tokens = [it.id, ...(it.names||[]), ...(it.synonyms||[])];
+      for (const t of tokens) {
+        const key = String(t||'').toLowerCase().trim();
+        if (!key) continue;
+        if (!byToken.has(key)) byToken.set(key, []);
+        byToken.get(key).push({ id: it.id, slot: it.slot || null });
+      }
+    }
+    REGISTRY = { byToken };
+  }
+} catch {}
 
 function guessSlotFromInstruction(inst) {
   const lc = String(inst || '').toLowerCase();
@@ -100,6 +121,25 @@ function pickFirstInventoryKey(invMap, actorId, slotHint = null) {
   const idx = list.findIndex((i) => SLOT_HINTS.find((h) => h.slot === slotHint)?.kws.some((kw) => i.key.toLowerCase().includes(kw)));
   if (idx >= 0) return list[idx].key;
   return list[0]?.key || null;
+}
+
+function resolveItemFromRegistry(inst, invMap, actorId, slotHint) {
+  if (!REGISTRY) return null;
+  const candidates = new Set();
+  const lc = String(inst||'').toLowerCase();
+  // Tokenize by space/punct and try direct lookup
+  const toks = lc.split(/[^\p{L}\p{N}_]+/u).filter(Boolean);
+  for (const t of toks) {
+    const rows = REGISTRY.byToken.get(t);
+    if (rows) for (const r of rows) candidates.add(JSON.stringify(r));
+  }
+  // If we have slot hint, filter
+  let items = [...candidates].map((s) => JSON.parse(s));
+  if (slotHint) items = items.filter((r) => !r.slot || r.slot === slotHint);
+  // Prefer inventory items
+  const inv = new Set((invMap.get(actorId)||[]).map((i) => i.key));
+  const inInv = items.find((r) => inv.has(r.id))?.id || null;
+  return inInv || items[0]?.id || null;
 }
 
 function firstInventoryKey(sections, actor = 'p:host') {
@@ -142,11 +182,12 @@ function synth(sample) {
         const tgt = give.find((t) => !rules.sameFieldRequiredForGive || sameField(posMap, requester, t)) || give[0];
         out.action = 'item.give'; out.targets = [tgt];
         const slotHint = guessSlotFromInstruction(inst);
-        const key = pickFirstInventoryKey(invMap, requester, slotHint) || firstInventoryKey(sec) || 'potion_small';
+        const key = resolveItemFromRegistry(inst, invMap, requester, slotHint) || pickFirstInventoryKey(invMap, requester, slotHint) || firstInventoryKey(sec) || 'potion_small';
         out.item = key; out.meta = { reason: 'auto' };
       } else if (wantsEquip) {
         out.action = 'equip';
-        const key = pickFirstInventoryKey(invMap, requester, guessSlotFromInstruction(inst)) || firstInventoryKey(sec) || 'hat_simple';
+        const slotHint = guessSlotFromInstruction(inst);
+        const key = resolveItemFromRegistry(inst, invMap, requester, slotHint) || pickFirstInventoryKey(invMap, requester, slotHint) || firstInventoryKey(sec) || 'hat_simple';
         out.item = key;
       } else if (wantsUnequip) {
         out.action = 'unequip';

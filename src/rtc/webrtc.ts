@@ -201,10 +201,16 @@ export async function joinHostSession(
       channel.addEventListener('error', (ev) => events.onError?.(ev));
       channel.addEventListener('message', (messageEvent) => {
         try {
-          const payload = JSON.parse(messageEvent.data);
+          let payload: unknown = messageEvent.data;
+          if (typeof payload === 'string') {
+            const s = payload.trim();
+            if (!s) return; // ignore empty
+            if (!(s.startsWith('{') || s.startsWith('['))) return; // ignore non-JSON keep-alives
+            try { payload = JSON.parse(s); } catch { return; }
+          }
           events.onMessage(payload, channel);
-        } catch (error) {
-          console.error('Failed to parse message', error);
+        } catch {
+          // ignore non-JSON frames
         }
       });
       const resolveWhenOpen = () => resolve(channel);
