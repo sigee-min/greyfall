@@ -5,8 +5,9 @@
 import '../character/character-sync.js';
 import './chat-host.js';
 import '../chat/chat-control.js';
-import './party-host.js';
+// World positions must be registered before party (party depends on it)
 import './world-positions-host.js';
+import './party-host.js';
 import '../session/participants-sync.js';
 import '../world/world-control.js';
 import '../world/travel-session.js';

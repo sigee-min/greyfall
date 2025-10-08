@@ -386,6 +386,8 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
           onError: handleChannelError
         });
         hostPeersRef.current = hostPeerManager;
+        // Mark mode as host early so host net-object init publishes don't try guest path
+        modeRef.current = 'host';
         hostControllerRef.current = new HostNetController({
           publish: (kind, body, context) => publishLobbyMessage(kind as any, body as any, context),
           lobbyStore,
@@ -458,7 +460,7 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       const session = await startHost(events, relayIceCandidate);
       attachPeerWatchers(session.peer, 'host');
 
-      modeRef.current = 'host';
+      // mode already set before creating HostNetController
       sessionRef.current = session;
       lobbyStore.setLocalParticipantId(id);
 
