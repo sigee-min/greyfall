@@ -2,6 +2,7 @@ export type LlmManagerKind = 'fast' | 'smart';
 
 export type ChatOptions = {
   systemPrompt?: string;
+  locale?: 'ko' | 'en';
   temperature?: number;
   topP?: number;
   maxTokens?: number;

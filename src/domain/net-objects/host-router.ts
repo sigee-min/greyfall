@@ -1,13 +1,12 @@
 import { parseLobbyMessage, type LobbyMessage } from '../../protocol/index.js';
 import type { LobbyStore } from '../session/session-store';
 import type { CommonDeps, HostObject } from './types';
-import { HostChatObject } from './chat-host.js';
 import { CHAT_OBJECT_ID } from './chat.js';
-import { HostWorldPositionsObject, WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
+import { WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
 // LLM progress net-object removed
 import { requestAICommand } from '../ai/ai-gateway';
 import { executeAICommand } from '../ai/ai-router';
-import { HostPartyObject, PARTY_OBJECT_ID } from './party-host.js';
+import { PARTY_OBJECT_ID } from './party-host.js';
 import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
 import { PeerParticipantMap } from './peer-map.js';
@@ -15,6 +14,27 @@ import type { NetObjectDescriptor } from './registry.js';
 import { dispatchSyncModelCommand } from './sync-model.js';
 import { removeCharacterLoadout } from '../character/character-sync.js';
 import { publishParticipantsSnapshot } from '../session/participants-sync.js';
+
+// Local minimal interfaces to decouple from concrete classes
+type HostChatApi = {
+  id: string;
+  append: (entry: any, context?: string) => void;
+  onRequest: (sinceRev?: number) => boolean;
+};
+
+type HostWorldPositionsApi = {
+  id: string;
+  ensureParticipant: (participantId: string, mapId: string) => boolean;
+  movePartyToMap: (mapId: string, memberIds: string[]) => boolean;
+  onRequest: (sinceRev?: number) => boolean;
+};
+
+type HostPartyApi = {
+  id: string;
+  addMember: (id: string) => boolean;
+  removeMember: (id: string) => boolean;
+  onRequest: (sinceRev?: number) => boolean;
+};
 
 type Publish = (message: LobbyMessage) => void;
 type Send = <K extends LobbyMessage['kind']>(kind: K, body: Extract<LobbyMessage, { kind: K }>['body'], context?: string) => boolean;
@@ -26,9 +46,9 @@ export class HostRouter {
   private readonly descriptors: NetObjectDescriptor[];
   private readonly commonDeps: CommonDeps;
   private readonly objects: Map<string, HostObject>;
-  private readonly chat: HostChatObject;
-  private readonly world: HostWorldPositionsObject;
-  private readonly party: HostPartyObject;
+  private readonly chat: HostChatApi;
+  private readonly world: HostWorldPositionsApi;
+  private readonly party: HostPartyApi;
   // private readonly llm: HostLlmProgressObject;
   private readonly limiter: SlidingWindowLimiter;
   private readonly onAck?: (peerId: string | undefined, id: string, rev: number) => void;
@@ -63,10 +83,10 @@ export class HostRouter {
     for (const object of this.objects.values()) {
       this.register(object);
     }
-    this.chat = this.require<HostChatObject>(CHAT_OBJECT_ID);
+    this.chat = this.require<HostChatApi>(CHAT_OBJECT_ID);
     // LLM progress removed
-    this.world = this.require<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
-    this.party = this.require<HostPartyObject>(PARTY_OBJECT_ID);
+    this.world = this.require<HostWorldPositionsApi>(WORLD_POSITIONS_OBJECT_ID);
+    this.party = this.require<HostPartyApi>(PARTY_OBJECT_ID);
   }
 
   register(object: HostObject) {

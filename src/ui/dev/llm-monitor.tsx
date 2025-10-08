@@ -263,6 +263,8 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                           const text = (s.tailText ?? '').trim();
                           if (!system || !user || !text) continue;
                           const meta = s.meta.options ?? {};
+                          const rawLocale = (meta as Record<string, unknown>).locale as unknown;
+                          const locale = rawLocale === 'en' ? 'en' : 'ko';
                           const rec = {
                             request_type: 'chat',
                             system_prompt: system,
@@ -270,7 +272,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                             target_response: text,
                             metadata: {
                               ...meta,
-                              locale: 'ko',
+                              locale,
                               source: 'monitor',
                               started_at: s.meta.startedAt
                             }

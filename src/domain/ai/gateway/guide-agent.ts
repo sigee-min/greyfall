@@ -20,6 +20,7 @@ export type UseGuideAgentOptions = {
   publishLobbyMessage: PublishLobbyMessage;
   localParticipantId: string | null;
   participants: SessionParticipant[];
+  locale?: 'ko' | 'en';
   policy?: Partial<GuideAgentPolicy>;
 };
 
@@ -30,6 +31,7 @@ export function useGuideAgent({
   publishLobbyMessage,
   localParticipantId,
   participants: _participants,
+  locale = 'ko',
   policy
 }: UseGuideAgentOptions) {
   const guideName = useMemo(() => '심판자', []);
@@ -81,9 +83,10 @@ export function useGuideAgent({
             manager,
             actorId: authorId,
             requestType: 'chat',
-            persona: `${guideName}는 Greyfall 콘솔의 심판자다. 한국어로만 친근하게 말한다.`,
+            persona: `${guideName}는 Greyfall 콘솔의 심판자다. 친근하게 말한다.`,
             userInstruction: prompt,
             contextText: context,
+            locale,
             temperature: 0.4,
             maxTokens: fullPolicy.maxTokens,
             fallbackChatText: '요청하신 내용을 이해하지 못했습니다.'
@@ -109,7 +112,7 @@ export function useGuideAgent({
       })();
     });
     return unsubscribe;
-  }, [authorId, enabled, fullPolicy, guideName, publishLobbyMessage, registerLobbyHandler, _participants, localParticipantId, manager]);
+  }, [authorId, enabled, fullPolicy, guideName, publishLobbyMessage, registerLobbyHandler, _participants, localParticipantId, manager, locale]);
 }
 
 function pushHistory(ref: { current: { role: 'user' | 'assistant'; content: string }[] }, item: { role: 'user' | 'assistant'; content: string }, max: number) {
@@ -128,4 +131,3 @@ function shouldReply(text: string, name: string, policy: GuideAgentPolicy): bool
   }
   return false;
 }
-

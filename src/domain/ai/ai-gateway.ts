@@ -40,6 +40,7 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
     requestType,
     userInstruction,
     persona,
+    locale,
     contextText,
     temperature = 0.5,
     maxTokens,
@@ -65,14 +66,8 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
       scratch: { overrides: { temperature, maxTokens: maxTok, timeoutMs: Math.min(60_000, Math.max(3_000, effectiveTimeout)) } },
       tools: makeDefaultToolsHost({ manager, providers: getToolsProviders() })
     };
-    const exec: MessageExecutor = async (msgs, opts) => {
-      if (DEBUG) console.debug(`[gw.exec] run messages=${msgs.length} temp=${opts.temperature} maxTokens=${opts.maxTokens} timeout=${opts.timeoutMs}`);
-      const out = await generateMessagesWithTimeout(manager, msgs, opts);
-      if (DEBUG) console.debug(`[gw.exec] done chars=${out.length}`);
-      return out;
-    };
     try {
-      const defaultPersona = persona ?? '너는 Greyfall TRPG 매니저이다. 한국어로만 말한다.';
+      const defaultPersona = persona ?? '너는 Greyfall TRPG 매니저이다.';
       let start: Step;
       if (requestType === 'chat') {
         start = {
@@ -103,6 +98,12 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
         throw new Error(`Unsupported requestType: ${requestType}`);
       }
       if (DEBUG) console.debug(`[gw] pipeline.begin node=${start.nodeId}`);
+      const exec: MessageExecutor = async (msgs, opts) => {
+        if (DEBUG) console.debug(`[gw.exec] run messages=${msgs.length} temp=${opts.temperature} maxTokens=${opts.maxTokens} timeout=${opts.timeoutMs}`);
+        const out = await generateMessagesWithTimeout(manager, msgs, { ...opts, locale });
+        if (DEBUG) console.debug(`[gw.exec] done chars=${out.length}`);
+        return out;
+      };
       const done = await runPipeline({ start, ctx, registry: InMemoryNodeRegistry, exec });
       if (DEBUG) console.debug('[gw] pipeline.done');
       const text = getLastOutputText(done.scratch) ?? fallbackChatText;

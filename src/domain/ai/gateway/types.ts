@@ -7,6 +7,7 @@ export type AIGatewayParams = {
   userInstruction: string;
   contextText?: string;
   persona?: string;
+  locale?: 'ko' | 'en';
   temperature?: number;
   maxTokens?: number;
   fallbackChatText?: string;
