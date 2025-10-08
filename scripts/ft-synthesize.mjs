@@ -31,6 +31,77 @@ function parseEligible(sections, key) {
   return [];
 }
 
+function parseRules(sections) {
+  const lines = Array.isArray(sections?.rules) ? sections.rules : [];
+  const rules = { sameFieldRequiredForHeal: false, sameFieldRequiredForGive: false };
+  for (const l of lines) {
+    if (/same_field_required_for_heal\s*=\s*true/i.test(l)) rules.sameFieldRequiredForHeal = true;
+    if (/same_field_required_for_give\s*=\s*true/i.test(l)) rules.sameFieldRequiredForGive = true;
+  }
+  return rules;
+}
+
+function parsePositions(sections) {
+  const map = new Map();
+  const arr = Array.isArray(sections?.positions) ? sections.positions : [];
+  for (const line of arr) {
+    const id = (/(p:[^\s]+)/.exec(line) || [])[1];
+    const mapId = (/map=([^\s]+)/.exec(line) || [])[1];
+    const fieldId = (/field=([^\s]+)/.exec(line) || [])[1];
+    if (id) map.set(id, { mapId, fieldId });
+  }
+  return map;
+}
+
+function sameField(posMap, a, b) {
+  const pa = posMap.get(a); const pb = posMap.get(b);
+  if (!pa || !pb) return false;
+  return pa.mapId && pb.mapId && pa.fieldId && pb.fieldId && pa.mapId === pb.mapId && pa.fieldId === pb.fieldId;
+}
+
+function parseInventoryMap(sections) {
+  const out = new Map();
+  const arr = Array.isArray(sections?.inventory) ? sections.inventory : [];
+  for (const line of arr) {
+    const id = (/(p:[^\s]+)/.exec(line) || [])[1];
+    const items = [];
+    const m = /items=\[([^\]]+)\]/.exec(line);
+    if (m) {
+      for (const part of m[1].split(',')) {
+        const mm = /([^\(\)]+)\((\d+)\)/.exec(part.trim());
+        if (mm) items.push({ key: mm[1], count: Number(mm[2]) });
+      }
+    }
+    if (id) out.set(id, items);
+  }
+  return out;
+}
+
+const SLOT_HINTS = [
+  { slot: 'head', kws: ['모자','헬멧','후드','helmet','hood','cap','visor','고글','goggles','mask','마스크'] },
+  { slot: 'offhand', kws: ['방패','실드','shield','buckler','램프','lamp','lantern','토치','torch','책','book','tome'] },
+  { slot: 'mainhand', kws: ['검','sword','칼','knife','dagger','봉','지팡이','staff','창','spear','파이크','pike','망치','hammer','총','gun','rifle','pistol','smg'] },
+  { slot: 'body', kws: ['코트','coat','갑옷','armor','재킷','jacket','베스트','vest','망토','cloak','슈트','suit'] },
+  { slot: 'accessory', kws: ['반지','ring','목걸이','amulet','necklace','pendant','브레이스','bracelet','armband'] }
+];
+
+function guessSlotFromInstruction(inst) {
+  const lc = String(inst || '').toLowerCase();
+  for (const h of SLOT_HINTS) {
+    if (h.kws.some((kw) => lc.includes(kw))) return h.slot;
+  }
+  return null;
+}
+
+function pickFirstInventoryKey(invMap, actorId, slotHint = null) {
+  const list = invMap.get(actorId) || [];
+  if (!slotHint) return list[0]?.key || null;
+  // Heuristic mapping by keywords in key
+  const idx = list.findIndex((i) => SLOT_HINTS.find((h) => h.slot === slotHint)?.kws.some((kw) => i.key.toLowerCase().includes(kw)));
+  if (idx >= 0) return list[idx].key;
+  return list[0]?.key || null;
+}
+
 function firstInventoryKey(sections, actor = 'p:host') {
   const arr = Array.isArray(sections?.inventory) ? sections.inventory : [];
   const line = arr.find((l) => l.startsWith(actor + ' '));
@@ -52,12 +123,38 @@ function synth(sample) {
     case 'intent.plan': {
       const heal = parseEligible(sec, 'heal');
       const give = parseEligible(sec, 'item.give');
-      if (heal.length) {
-        out.action = 'heal'; out.targets = [heal[0]]; out.meta = { reason: 'auto' };
-      } else if (give.length) {
-        out.action = 'item.give'; out.targets = [give[0]];
-        const key = firstInventoryKey(sec) || 'potion_small';
+      const rules = parseRules(sec);
+      const posMap = parsePositions(sec);
+      const invMap = parseInventoryMap(sec);
+      const requester = (String(sec?.requester || '').match(/actor=(p:[^\s]+)/) || [])[1] || 'p:host';
+      const inst = String(user?.instruction || '').toLowerCase();
+
+      // Decide action based on instruction hints and eligibility
+      const wantsEquip = /(장착|equip|wear)/i.test(inst);
+      const wantsUnequip = /(해제|벗|unequip|remove)/i.test(inst);
+      const wantsGive = /(줘|건네|give)/i.test(inst);
+      const wantsHeal = /(치료|heal)/i.test(inst) || heal.length > 0;
+
+      if (wantsHeal && heal.length) {
+        const tgt = heal.find((t) => !rules.sameFieldRequiredForHeal || sameField(posMap, requester, t)) || heal[0];
+        out.action = 'heal'; out.targets = [tgt]; out.meta = { reason: 'auto' };
+      } else if (wantsGive && give.length) {
+        const tgt = give.find((t) => !rules.sameFieldRequiredForGive || sameField(posMap, requester, t)) || give[0];
+        out.action = 'item.give'; out.targets = [tgt];
+        const slotHint = guessSlotFromInstruction(inst);
+        const key = pickFirstInventoryKey(invMap, requester, slotHint) || firstInventoryKey(sec) || 'potion_small';
         out.item = key; out.meta = { reason: 'auto' };
+      } else if (wantsEquip) {
+        out.action = 'equip';
+        const key = pickFirstInventoryKey(invMap, requester, guessSlotFromInstruction(inst)) || firstInventoryKey(sec) || 'hat_simple';
+        out.item = key;
+      } else if (wantsUnequip) {
+        out.action = 'unequip';
+        // no item specified; code side can choose first equipped (out of scope here)
+      } else if (heal.length) {
+        out.action = 'heal'; out.targets = [heal[0]];
+      } else if (give.length) {
+        out.action = 'item.give'; out.targets = [give[0]]; out.item = firstInventoryKey(sec) || 'potion_small';
       } else {
         out.action = 'no_action';
       }
@@ -66,7 +163,9 @@ function synth(sample) {
     case 'result.narrate': {
       const eff = Array.isArray(sec.effects) ? sec.effects : [];
       if (eff.length) {
-        out.output = `${eff[0]} — 처치가 반영됩니다.`;
+        const e = eff[0];
+        const ko = /[가-힣]/.test(String(user?.persona || 'ko'));
+        out.output = ko ? `${e} — 효과가 반영되었습니다.` : `${e} — effect applied.`;
       }
       break;
     }
@@ -90,7 +189,8 @@ function synth(sample) {
       return sample;
     }
     case 'npc.reply': {
-      sample.output = '알겠다. 길을 서둘러라.'; return sample;
+      const ko = /[가-힣]/.test(String(user?.persona || 'ko'));
+      sample.output = ko ? '알겠다. 길을 서둘러라.' : 'Understood. Move quickly.'; return sample;
     }
     case 'npc.name': {
       sample.output = { names: ['이안','레아'] }; return sample;
@@ -99,13 +199,16 @@ function synth(sample) {
       sample.output = { bullets: ['상태 점검','다음 목표 확인'] }; return sample;
     }
     case 'session.summarize': {
-      sample.output = '팀은 합류 후 시장을 정찰했고 치료를 마쳤다. 다음은 아카이브 허가다.'; return sample;
+      const ko = /[가-힣]/.test(String(user?.persona || 'ko'));
+      sample.output = ko ? '팀은 합류 후 시장을 정찰했고 치료를 마쳤다. 다음은 아카이브 허가다.' : 'The team regrouped, scouted the market, and treated minor wounds. Next: archive access.'; return sample;
     }
     case 'scene.brief': {
-      sample.output = '네온과 비, 낮은 전류음이 흐른다.'; return sample;
+      const ko = /[가-힣]/.test(String(user?.persona || 'ko'));
+      sample.output = ko ? '네온과 비, 낮은 전류음이 흐른다.' : 'Neon and rain, a faint hum of current.'; return sample;
     }
     case 'scene.detail': {
-      sample.output = '현수막이 젖어 무겁게 흔들린다.'; return sample;
+      const ko = /[가-힣]/.test(String(user?.persona || 'ko'));
+      sample.output = ko ? '현수막이 젖어 무겁게 흔들린다.' : 'A soaked banner sways with weight.'; return sample;
     }
     case 'rules.extract': {
       sample.output = { keys: ['heal.same_field'] }; return sample;
@@ -147,4 +250,3 @@ function main() {
 }
 
 main();
-
