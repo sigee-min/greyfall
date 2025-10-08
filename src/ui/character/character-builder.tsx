@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { TraitSpec } from '../../store/character';
 import { useGlobalBus } from '../../bus/global-bus';
 import { TRAITS } from '../../domain/character/traits';

@@ -22,7 +22,7 @@ export function createFogLayer(): FogLayer {
 
   // Some environments (notably WebGL1/ANGLE on Windows) crash during filter bind.
   // If WebGL2 is unavailable, or any failure occurs, disable filters entirely.
-  const supportsWebGL2 = typeof (globalThis as any).WebGL2RenderingContext !== 'undefined';
+  const supportsWebGL2 = 'WebGL2RenderingContext' in globalThis;
   if (supportsWebGL2) {
     try {
       overlay.filters = [new KawaseBlurFilter(5, 3), new NoiseFilter(0.12)];

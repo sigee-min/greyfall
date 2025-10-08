@@ -4,7 +4,7 @@ import { WORLD_ACTORS_OBJECT_ID, WORLD_POSITIONS_OBJECT_ID } from '../net-object
 import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
 import { requestAICommand } from '../ai/ai-gateway';
-import { CHAT_OBJECT_ID } from '../net-objects/chat.js';
+import { CHAT_OBJECT_ID, type ChatEntry } from '../net-objects/chat.js';
 import type { HostObject } from '../net-objects/types';
 
 type VoidState = null;
@@ -110,7 +110,7 @@ async function narrateEffects(effects: string[]) {
       fallbackChatText: '행동이 반영되었습니다.'
     });
     const bodyText = String(resp.body ?? '').trim() || '행동이 반영되었습니다.';
-    const chat = getHostObject<{ append: (entry: any, context?: string) => void } & HostObject>(CHAT_OBJECT_ID);
+    const chat = getHostObject<{ append: (entry: ChatEntry, context?: string) => void } & HostObject>(CHAT_OBJECT_ID);
     if (!chat) return;
     const entry = {
       id: newId(),

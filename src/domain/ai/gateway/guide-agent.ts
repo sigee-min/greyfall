@@ -190,7 +190,7 @@ export function useGuideAgent({
       })();
     });
     return unsubscribe;
-  }, [authorId, enabled, fullPolicy, guideName, publishLobbyMessage, registerLobbyHandler, _participants, localParticipantId, manager, locale]);
+  }, [authorId, enabled, fullPolicy, guideName, publishLobbyMessage, registerLobbyHandler, _participants, localParticipantId, manager, locale, charSync.byId]);
 }
 
 function pushHistory(ref: { current: { role: 'user' | 'assistant'; content: string }[] }, item: { role: 'user' | 'assistant'; content: string }, max: number) {
@@ -224,12 +224,10 @@ function buildEligibilityFromLiveState(
       if (Array.isArray(a.inventory) && a.inventory.length) invMap[`p:${a.id}`] = a.inventory.map((i) => ({ key: String(i.key), count: Math.max(0, Math.floor(i.count || 0)) }));
     }
   }
-  const actors = participants.map((p) => {
+  const actors: EligibilityInput['actors'] = participants.map((p) => {
     const pos = posById.get(p.id) ?? null;
     const stats = actorsState?.find((a) => a.id === p.id) ?? null;
-    const lo = loadoutsById?.[p.id];
-    const passiveIds = lo?.passives?.map((x) => x.id) ?? [];
-    const traitNames = lo?.traits?.map((t) => t.name) ?? [];
+    // loadout info is used to annotate requester later
     return {
       id: `p:${p.id}`,
       role: 'player' as const,
@@ -254,7 +252,7 @@ function buildEligibilityFromLiveState(
     const selfIdx = elig.actors?.findIndex((a) => a.id === `p:${requesterParticipantId}`) ?? -1;
     if (selfIdx >= 0) {
       // augment name with compact traits/passives marker via status for minimal intrusion
-      const a = elig.actors![selfIdx] as any;
+      const a: EligibilityInput['actors'][number] = elig.actors![selfIdx]!;
       const meta: string[] = [];
       if (traitsLabel) meta.push(`traits=[${traitsLabel}]`);
       if (passivesLabel) meta.push(`passives=[${passivesLabel}]`);

@@ -304,7 +304,7 @@ function App() {
 
     if (scene !== 'game') changeScene('game');
     setSettingsOpen(false);
-  }, [changeScene, fullscreenEnabled, publishLobbyMessage, scene, startMissionReady]);
+  }, [changeScene, fullscreenEnabled, publishLobbyMessage, resumeMusic, scene, startMissionReady]);
 
   const handleOptionsClose = useCallback(() => {
     dismissError();

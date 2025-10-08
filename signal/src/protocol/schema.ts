@@ -483,7 +483,7 @@ export type LobbyMessageBodies = {
   'character:reset': { playerId: string };
   'character:request': { sinceRevision?: number };
   'llm:progress': { ready?: boolean; progress?: number | null; status?: string | null; error?: string | null };
-  'mission:start': {};
+  'mission:start': Record<string, never>;
   'llm:config': { modelId: string; backend: 'gpu' | 'cpu' };
   'object:patch': { id: string; rev: number; ops: { op: 'set' | 'merge' | 'insert' | 'remove'; path?: string; value?: unknown }[] };
   'object:replace': { id: string; rev: number; value: unknown };
