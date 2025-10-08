@@ -1,6 +1,6 @@
 import { normalizeQuery } from './normalize';
 import { similarity } from './fuzzy';
-import { candidatesForToken, getItem, listItems, search, type SearchResult } from './registry';
+import { candidatesForToken, getItem, listItems, search, searchByLocale, type SearchResult } from './registry';
 import type { EquipmentSlot } from '../world/equipment-rules';
 
 export type ResolveOptions = {
@@ -8,6 +8,7 @@ export type ResolveOptions = {
   slotHint?: EquipmentSlot | 'any';
   threshold?: number; // similarity threshold for fuzzy
   limit?: number;
+  localeHint?: string; // prefer names/synonyms of this locale
 };
 
 export type ResolveResult = {
@@ -22,6 +23,7 @@ export function resolveItem(raw: string, opts?: ResolveOptions): ResolveResult {
   const inventory = (opts?.inventory ?? []).slice();
   const slotHint = opts?.slotHint ?? 'any';
   const threshold = typeof opts?.threshold === 'number' ? opts!.threshold! : 0.66;
+  const locale = opts?.localeHint;
   if (!q) return { id: null, score: 0, reason: 'none', candidates: [] };
 
   const applySlotFilter = (ids: string[]): string[] => {
@@ -45,12 +47,12 @@ export function resolveItem(raw: string, opts?: ResolveOptions): ResolveResult {
   }
 
   // 3) Registry search (exact/synonym/contains)
-  const base = search(q, { limit: opts?.limit ?? 10 });
-  const filtered = base.filter((c) => applySlotFilter([c.id]).length);
+  const base = locale ? searchByLocale(q, locale, { limit: opts?.limit ?? 10 }) : search(q, { limit: opts?.limit ?? 10 });
+  const filtered: SearchResult[] = base.filter((c: SearchResult) => applySlotFilter([c.id]).length);
   if (filtered.length) {
     // If an inventory item appears among candidates, boost it
-    const boosted = filtered.map((c) => (inventory.includes(c.id) ? { ...c, score: Math.max(c.score, 0.9) } : c));
-    boosted.sort((a, b) => b.score - a.score);
+    const boosted: SearchResult[] = filtered.map((c: SearchResult) => (inventory.includes(c.id) ? { ...c, score: Math.max(c.score, 0.9) } : c));
+    boosted.sort((a: SearchResult, b: SearchResult) => b.score - a.score);
     const top = boosted[0];
     return { id: top.id, score: top.score, reason: top.reason, candidates: boosted };
   }
@@ -74,4 +76,3 @@ export function resolveItem(raw: string, opts?: ResolveOptions): ResolveResult {
 
   return { id: null, score: 0, reason: 'none', candidates: [] };
 }
-

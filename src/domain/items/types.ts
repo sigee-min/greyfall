@@ -3,7 +3,8 @@ import type { EquipmentSlot } from '../world/equipment-rules';
 export type ItemId = string;
 
 export type ItemLocaleName = {
-  locale: 'ko' | 'en';
+  // BCP-47 language tag (e.g., 'ko', 'ko-KR', 'en', 'ja')
+  locale: string;
   text: string;
 };
 
@@ -26,4 +27,3 @@ export type ItemDef = {
   stackable?: boolean;
   weight?: number; // grams or abstract units
 };
-

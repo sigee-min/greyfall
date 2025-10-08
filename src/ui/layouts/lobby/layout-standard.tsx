@@ -47,7 +47,7 @@ function LobbyStandardLayout({
             onAbout={onAbout}
             classes={{
               container:
-                'w-full max-w-md rounded-3xl border border-slate-100/12 bg-slate-950/78 px-6 py-6 shadow-[0_22px_45px_rgba(2,6,23,0.5)] backdrop-blur-lg transition sm:max-w-lg sm:px-8 sm:py-7 lg:max-w-xl'
+                'w-full max-w-[22rem] rounded-3xl border border-slate-100/12 bg-slate-950/78 px-6 py-6 shadow-[0_22px_45px_rgba(2,6,23,0.5)] backdrop-blur-lg transition sm:max-w-[26rem] sm:px-8 sm:py-7 lg:max-w-[29rem]'
             }}
           />
         </div>

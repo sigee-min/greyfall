@@ -15,9 +15,10 @@ type Props = {
   localParticipantId: string | null;
   publish: Publish;
   onBeforeFinalize?: (args: { summary: CharacterSummary; proceed: () => void; cancel: () => void }) => void;
+  preserveOnCancel?: boolean;
 };
 
-export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish, onBeforeFinalize }: Props) {
+export function CharacterBuilder({ onClose, playerName = 'Player', localParticipantId, publish, onBeforeFinalize, preserveOnCancel = false }: Props) {
   const { t: tt } = useI18n();
   const bus = useGlobalBus();
   const {
@@ -149,8 +150,10 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
             <button
               className="rounded-md border border-border/60 px-3 py-2 text-xs hover:border-destructive hover:text-destructive"
               onClick={() => {
-                if (localParticipantId) {
-                  sendReset();
+                if (!preserveOnCancel) {
+                  if (localParticipantId) {
+                    sendReset();
+                  }
                 }
                 onClose();
               }}

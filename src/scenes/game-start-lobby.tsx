@@ -286,6 +286,7 @@ export function GameStartLobby({
           playerName={playerName}
           localParticipantId={localParticipantId}
           publish={publishLobbyMessage}
+          preserveOnCancel={wasReadyWhenOpened}
           onBeforeFinalize={({ summary, proceed }) => {
             const statsLine = Object.entries(summary.stats)
               .map(([k, v]) => `${k}:${v}`)

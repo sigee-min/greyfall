@@ -34,6 +34,7 @@ function StartLobbyLayoutBase({
   onLeave,
   onStartGame,
   onToggleReady,
+  onOpenCharacterBuilder,
   onAnswerInputChange,
   onAnswerSubmit,
   onChatInputChange,
