@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { SessionParticipant, SessionRole } from '../domain/session/types';
 import type { SessionChatLogEntry } from '../domain/chat/types';
 import type { LlmManagerKind } from '../llm/llm-engine';
@@ -116,7 +116,7 @@ export function GameStartLobby({
   }, []);
 
   const handleChatKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key !== 'Enter' || event.shiftKey) return;
       const native = event.nativeEvent as unknown as { isComposing?: boolean };
       if (native?.isComposing) return;
@@ -200,7 +200,7 @@ export function GameStartLobby({
 
   useEffect(() => {
     if (!chatOpen) return;
-    const handleKey = (event: KeyboardEvent) => {
+    const handleKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') setChatOpen(false);
     };
     window.addEventListener('keydown', handleKey);

@@ -329,9 +329,21 @@ function StartLobbyLayoutBase({
                         <span className="inline-flex items-center gap-2">
                           {t('ready.startMission')}
                           {llmPrewarmPct != null && (
-                            <span className="flex items-center gap-1 text-[11px] font-normal text-emerald-950/80">
-                              <span className="inline-block h-3 w-3 animate-spin rounded-full border border-emerald-900/60 border-b-transparent" />
-                              {llmPrewarmPct}%
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold transition',
+                                canStartMission
+                                  ? 'bg-emerald-950/25 text-emerald-50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                                  : 'bg-slate-950/35 text-slate-200 shadow-inner shadow-black/30'
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  'inline-block h-3 w-3 animate-spin rounded-full border border-b-transparent',
+                                  canStartMission ? 'border-emerald-100/85' : 'border-slate-200/75'
+                                )}
+                              />
+                              <span className="leading-none">{llmPrewarmPct}%</span>
                             </span>
                           )}
                         </span>

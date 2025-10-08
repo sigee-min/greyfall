@@ -2,24 +2,30 @@ import { useEffect, useState } from 'react';
 
 export type AspectCategory = 'tall' | 'standard' | 'wide';
 
-function categorizeAspect(ratio: number): AspectCategory {
+function categorizeAspect(width: number, height: number): AspectCategory {
+  const ratio = width / Math.max(height, 1);
   if (!Number.isFinite(ratio) || ratio <= 0) return 'standard';
-  if (ratio < 1.3) return 'tall'; // 4:3, 5:4 등 세로에 가까운 화면
-  if (ratio > 1.9) return 'wide'; // 18:9 이상, 21:9 등 초광폭
-  return 'standard'; // 3:2 ~ 16:9 일반 비율
+
+  // Portrait or square-ish -> tall layout with stacked content
+  if (height >= width || ratio <= 1.25 || width < 960) return 'tall';
+
+  // Ultra wide monitors or very large canvases -> wide layout
+  if ((width >= 1600 && ratio >= 1.75) || ratio >= 2.05) return 'wide';
+
+  return 'standard';
 }
 
 export function useAspectCategory(): AspectCategory {
   const [category, setCategory] = useState<AspectCategory>(() => {
     if (typeof window === 'undefined') return 'standard';
-    return categorizeAspect(window.innerWidth / window.innerHeight);
+    return categorizeAspect(window.innerWidth, window.innerHeight);
   });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const update = () => {
-      setCategory(categorizeAspect(window.innerWidth / window.innerHeight));
+      setCategory(categorizeAspect(window.innerWidth, window.innerHeight));
     };
 
     update();

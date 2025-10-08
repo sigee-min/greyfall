@@ -20,31 +20,32 @@ function LobbyWideLayout({
 
   return (
     <div className="relative flex h-screen min-h-screen w-screen overflow-hidden bg-slate-950 text-foreground">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/70 to-slate-950" />
-      <FallbackBackground src={background} objectFit="contain" objectPosition="center" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-950/30 via-slate-900/45 to-slate-950/75" />
+      <FallbackBackground src={background} objectFit="cover" objectPosition="center" />
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/38 mix-blend-multiply" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-950/55 via-slate-900/45 to-slate-950/82" />
 
-      <section className="relative z-10 mx-auto flex h-full w-full max-w-[1600px] flex-col justify-between px-10 py-14">
-        <div className="flex items-start justify-between gap-8">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-primary/80">{t('lobby.brand')}</p>
-            <h1 className="mt-2 text-4xl font-semibold uppercase tracking-[0.26em] text-slate-100 drop-shadow-lg">
+      <section className="relative z-10 flex h-full w-full">
+        <div className="mx-auto flex h-full w-full max-w-[1920px] flex-col justify-between gap-10 px-8 py-12 lg:px-16 xl:flex-row xl:items-center xl:gap-24">
+          <article className="flex w-full max-w-2xl flex-col gap-5 text-left xl:max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.38em] text-primary/70 lg:text-sm lg:tracking-[0.42em]">
+              {t('lobby.brand')}
+            </p>
+            <h1 className="text-5xl font-semibold uppercase tracking-[0.22em] text-slate-100 drop-shadow-[0_24px_48px_rgba(2,6,23,0.7)] lg:text-6xl lg:tracking-[0.28em] xl:text-7xl xl:tracking-[0.34em]">
               {t('lobby.title.line1')}
             </h1>
-            <p className="mt-1 text-sm uppercase tracking-[0.4em] text-primary/85">{t('lobby.title.line2')}</p>
-          </div>
-          <p className="max-w-md text-right text-sm text-slate-200/85">{t('lobby.description')}</p>
-        </div>
-
-        <div className="flex items-end justify-between gap-12 pb-6">
-          <div className="flex flex-1 flex-col gap-6">
-            <div className="h-[2px] w-24 bg-primary/60" />
-            <p className="max-w-sm text-xs uppercase tracking-[0.3em] text-slate-200/70">
+            <p className="text-base uppercase tracking-[0.38em] text-primary/80 lg:text-lg lg:tracking-[0.48em]">
+              {t('lobby.title.line2')}
+            </p>
+            <p className="mt-2 max-w-xl text-base text-slate-200/90 lg:text-lg xl:text-xl xl:text-slate-100/85">
+              {t('lobby.description')}
+            </p>
+            <div className="mt-6 hidden h-[2px] w-32 bg-primary/50 lg:block" />
+            <p className="hidden max-w-sm text-xs uppercase tracking-[0.3em] text-slate-200/70 lg:block">
               {t('lobby.joinCode.help')}
             </p>
-          </div>
+          </article>
 
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-xl rounded-3xl border border-slate-100/12 bg-slate-950/78 px-6 py-6 shadow-[0_24px_50px_rgba(2,6,23,0.48)] backdrop-blur-lg sm:px-8 sm:py-8 lg:max-w-2xl xl:max-w-xl">
             <LobbyForm
               playerName={playerName}
               joinCode={joinCode}
@@ -57,13 +58,12 @@ function LobbyWideLayout({
               onOptions={onOptions}
               onAbout={onAbout}
               classes={{
-                container:
-                  'rounded-3xl border border-slate-100/12 bg-slate-950/70 p-6 shadow-[0_0_40px_-10px_rgba(15,23,42,0.9)] backdrop-blur-md sm:p-8',
-                button: 'tracking-[0.26em]',
-                input: 'bg-slate-900/60',
-                label: 'tracking-[0.28em]',
-                meta: 'justify-between',
-                help: 'hidden'
+                container: 'space-y-8 max-w-none sm:max-w-none xl:max-w-none',
+                button: 'tracking-[0.26em] text-sm lg:text-base',
+                input: 'bg-slate-900/55 text-base',
+                label: 'tracking-[0.28em] text-xs text-slate-200/80',
+                meta: 'justify-between text-[11px] text-slate-300/80',
+                help: 'text-[11px] text-slate-300/70'
               }}
             />
           </div>

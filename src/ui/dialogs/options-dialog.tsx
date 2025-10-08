@@ -17,8 +17,8 @@ import { purgeLocalModels, type WebLLMProgress } from '../../llm/llm-engine';
 
 const TABS = [
   { key: 'music', label: '음악' },
-  { key: 'controls', label: '컨트롤' },
-  { key: 'display', label: '화면' }
+  { key: 'display', label: '화면' },
+  { key: 'controls', label: '기타' }
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -244,7 +244,11 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
                   )}
                   onClick={() => setActiveTab(tab.key)}
                 >
-                  {tab.key === 'music' ? t('tabs.music') : tab.key === 'controls' ? t('tabs.controls') : t('tabs.display')}
+                  {tab.key === 'music'
+                    ? t('tabs.music')
+                    : tab.key === 'display'
+                      ? t('tabs.display')
+                      : t('tabs.controls')}
                 </button>
               ))}
             </nav>

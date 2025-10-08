@@ -21,21 +21,25 @@ function LobbyStandardLayout({
   return (
     <div className="relative flex h-screen min-h-screen w-screen overflow-hidden bg-slate-950 text-foreground">
       <FallbackBackground src={background} objectFit="cover" objectPosition="center 32%" />
-      <div className="pointer-events-none absolute inset-0 bg-slate-950/18" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-950/15 via-slate-900/35 to-slate-950/65" />
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/38 mix-blend-multiply" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-950/55 via-slate-900/45 to-slate-950/82" />
 
-      <section className="relative z-10 flex h-full w-full flex-col">
-        <div className="absolute left-6 right-6 top-10 flex flex-col items-end gap-4 text-right sm:right-16 sm:top-16 sm:max-w-sm">
-          <h1 className="text-4xl font-semibold uppercase tracking-[0.24em] text-slate-100 drop-shadow-xl sm:text-5xl sm:tracking-[0.3em]">
-            {t('lobby.title.line1')}
-          </h1>
-          <p className="text-xs uppercase tracking-[0.4em] text-primary/85 sm:text-sm">
-            {t('lobby.title.line2')}
-          </p>
-          <p className="mt-2 max-w-sm text-sm text-slate-200/85 sm:text-base">{t('lobby.description')}</p>
-        </div>
+      <section className="relative z-10 flex h-full w-full flex-col justify-between gap-10 px-6 py-12 sm:px-10 md:px-14 lg:px-16 xl:px-20">
+        <header className="flex flex-col items-center gap-5 text-center sm:items-end sm:text-right">
+          <div className="flex flex-col items-center gap-5 sm:items-end">
+            <h1 className="max-w-3xl text-4xl font-semibold uppercase tracking-[0.2em] text-slate-100 drop-shadow-[0_22px_45px_rgba(2,6,23,0.7)] sm:text-5xl sm:tracking-[0.24em] lg:text-6xl lg:tracking-[0.3em]">
+              {t('lobby.title.line1')}
+            </h1>
+            <p className="text-xs uppercase tracking-[0.4em] text-primary/80 sm:text-sm sm:tracking-[0.46em] lg:text-base lg:tracking-[0.5em]">
+              {t('lobby.title.line2')}
+            </p>
+            <p className="max-w-2xl text-sm text-slate-200/85 sm:text-base lg:text-lg lg:text-slate-100/85">
+              {t('lobby.description')}
+            </p>
+          </div>
+        </header>
 
-        <div className="absolute bottom-10 left-6 right-6 sm:left-14 sm:right-auto sm:bottom-16">
+        <div className="flex w-full justify-center sm:justify-start">
           <LobbyForm
             playerName={playerName}
             joinCode={joinCode}
@@ -48,7 +52,8 @@ function LobbyStandardLayout({
             onOptions={onOptions}
             onAbout={onAbout}
             classes={{
-              container: 'rounded-3xl border border-slate-100/12 bg-slate-950/65 p-6 shadow-2xl backdrop-blur-md transition sm:max-w-lg sm:p-8'
+              container:
+                'w-full max-w-md rounded-3xl border border-slate-100/12 bg-slate-950/78 px-6 py-6 shadow-[0_22px_45px_rgba(2,6,23,0.5)] backdrop-blur-lg transition sm:max-w-lg sm:px-8 sm:py-7 lg:max-w-xl'
             }}
           />
         </div>

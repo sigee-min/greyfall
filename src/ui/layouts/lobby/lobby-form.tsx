@@ -36,7 +36,7 @@ export function LobbyForm({
     'w-full rounded-md border border-slate-100/20 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/70';
 
   return (
-    <div className={cn('w-full max-w-md space-y-6', classes?.container)}>
+    <div className={cn('w-full max-w-sm space-y-6 sm:max-w-sm', classes?.container)}>
       <div className={cn('space-y-2', classes?.panel)}>
         <label htmlFor="player-name" className={cn(baseLabel, classes?.label)}>
           {t('lobby.callsign')}
