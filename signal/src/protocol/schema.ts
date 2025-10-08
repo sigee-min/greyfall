@@ -276,6 +276,12 @@ const lobbyLlmProgressSchema = lobbyEnvelopeSchema.extend({
     .strict()
 });
 
+// Mission start (host -> all guests)
+const lobbyMissionStartSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('mission:start'),
+  body: z.object({}).strict()
+});
+
 // LLM config broadcast (host -> all guests, once per session)
 const lobbyLlmConfigSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('llm:config'),
@@ -442,6 +448,7 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyCharacterResetSchema,
   lobbyCharacterRequestSchema,
   lobbyLlmProgressSchema,
+  lobbyMissionStartSchema,
   lobbyLlmConfigSchema,
   lobbyObjectPatchSchema,
   lobbyObjectReplaceSchema,
@@ -478,6 +485,7 @@ export type LobbyMessageBodies = {
   'character:reset': { playerId: string };
   'character:request': { sinceRevision?: number };
   'llm:progress': { ready?: boolean; progress?: number | null; status?: string | null; error?: string | null };
+  'mission:start': {};
   'llm:config': { modelId: string; backend: 'gpu' | 'cpu' };
   'object:patch': { id: string; rev: number; ops: { op: 'set' | 'merge' | 'insert' | 'remove'; path?: string; value?: unknown }[] };
   'object:replace': { id: string; rev: number; value: unknown };

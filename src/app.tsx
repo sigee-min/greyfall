@@ -122,6 +122,21 @@ function App() {
     };
   }, [globalBus]);
 
+  // Remote mission start → transition for all clients
+  useEffect(() => {
+    const unsub = registerLobbyHandler('mission:start', () => {
+      try {
+        if (fullscreenEnabled && typeof document !== 'undefined') {
+          const current = getFullscreenElement();
+          if (!current) void requestFullscreen(document.documentElement, 'mission-start-remote');
+        }
+      } catch {}
+      if (scene !== 'game') changeScene('game');
+      setSettingsOpen(false);
+    });
+    return unsub;
+  }, [changeScene, fullscreenEnabled, registerLobbyHandler, scene]);
+
   const dismissError = useCallback(() => {
     setErrorMessage(null);
     globalBus.publish('error:clear', undefined);
@@ -267,6 +282,11 @@ function App() {
   const startMission = useCallback(() => {
     if (!startMissionReady) return;
 
+    // Broadcast mission start to guests; host also echoes locally via lobbyBus
+    try {
+      publishLobbyMessage('mission:start', {}, 'mission-start');
+    } catch {}
+
     if (fullscreenEnabled && typeof document !== 'undefined') {
       const current = getFullscreenElement();
       if (!current) {
@@ -274,9 +294,9 @@ function App() {
       }
     }
 
-    changeScene('game');
+    if (scene !== 'game') changeScene('game');
     setSettingsOpen(false);
-  }, [changeScene, fullscreenEnabled, startMissionReady]);
+  }, [changeScene, fullscreenEnabled, publishLobbyMessage, scene, startMissionReady]);
 
   const handleOptionsClose = useCallback(() => {
     dismissError();
