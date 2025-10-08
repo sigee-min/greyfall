@@ -299,6 +299,9 @@ function App() {
       }
     }
 
+    // Try to resume background music on user action
+    try { resumeMusic('start-mission'); } catch {}
+
     if (scene !== 'game') changeScene('game');
     setSettingsOpen(false);
   }, [changeScene, fullscreenEnabled, publishLobbyMessage, scene, startMissionReady]);

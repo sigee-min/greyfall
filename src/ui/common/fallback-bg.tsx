@@ -1,12 +1,17 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib/utils';
 
-function computeCandidates(src: string) {
-  const gif = src.endsWith('.gif')
-    ? src
-    : src.replace(/\.(png|webp|jpg|jpeg)$/i, '.gif');
-  const png = gif.replace(/\.gif$/i, '.png');
-  return { gif, png };
+function computeCandidateList(src: string): string[] {
+  const list: string[] = [];
+  const push = (s: string) => { if (!list.includes(s)) list.push(s); };
+  const addVariants = (base: string) => {
+    push(base);
+    const ext = base.match(/\.(png|webp|jpg|jpeg|gif)$/i)?.[0] || '';
+    const stem = ext ? base.slice(0, -ext.length) : base;
+    ['.webp', '.png', '.gif', '.jpg', '.jpeg'].forEach((e) => push(stem + e));
+  };
+  addVariants(src);
+  return list;
 }
 
 type Props = {
@@ -30,29 +35,17 @@ export function FallbackBackground({
   objectPosition,
   style
 }: Props) {
-  const { gif, png } = useMemo(() => computeCandidates(src), [src]);
-  const { gif: fbGif, png: fbPng } = useMemo(() => computeCandidates(fallbackSrc), [fallbackSrc]);
-  const [current, setCurrent] = useState<string>(gif);
+  const primaryList = useMemo(() => computeCandidateList(src), [src]);
+  const fallbackList = useMemo(() => computeCandidateList(fallbackSrc), [fallbackSrc]);
+  const candidates = useMemo(() => [...primaryList, ...fallbackList], [primaryList, fallbackList]);
+  const [index, setIndex] = useState<number>(0);
+  const current = candidates[Math.min(index, candidates.length - 1)];
 
-  useEffect(() => {
-    setCurrent(gif);
-  }, [gif]);
+  useEffect(() => { setIndex(0); }, [src, fallbackSrc]);
 
   const handleError = useCallback(() => {
-    const lower = current.toLowerCase();
-    if (lower === gif.toLowerCase()) {
-      setCurrent(png);
-      return;
-    }
-    if (lower === png.toLowerCase()) {
-      setCurrent(fbGif);
-      return;
-    }
-    if (lower === fbGif.toLowerCase()) {
-      setCurrent(fbPng);
-      return;
-    }
-  }, [current, fbGif, fbPng, gif, png]);
+    setIndex((i) => Math.min(i + 1, candidates.length - 1));
+  }, [candidates.length]);
 
   return (
     <img
