@@ -1,8 +1,9 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { interactionsSync, type Invite } from './interactions-session.js';
 import { getHostObject } from '../net-objects/registry.js';
-import { WORLD_POSITIONS_OBJECT_ID } from '../net-objects/world-positions-host.js';
-import type { HostObject } from '../net-objects/types.js';
+import { WORLD_POSITIONS_OBJECT_ID, WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
+import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
+import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 
 type VoidState = null;
 
@@ -29,11 +30,8 @@ const control = defineSyncModel<VoidState>({
         // Validate that both users exist and are on the same map/field
         const okParticipants = [invite.fromId, invite.toId].every((id) => context.lobbyStore.participantsRef.current.some((p) => p.id === id));
         if (!okParticipants) return;
-        const world = getHostObject<HostObject>(WORLD_POSITIONS_OBJECT_ID) as unknown as { replicator?: { get?: (id: string) => { value?: unknown } } } | null;
-        const posState = world?.replicator?.get?.('world:positions')?.value as unknown;
-        const list: Position[] = Array.isArray((posState as { list?: Position[] } | null | undefined)?.list)
-          ? ((posState as { list: Position[] }).list)
-          : [];
+        const world = getHostObject<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID);
+        const list: Position[] = world ? world.getList() : [];
         const pf = list.find((e) => e.id === invite.fromId);
         const pt = list.find((e) => e.id === invite.toId);
         if (!pf || !pt) return;
@@ -76,17 +74,40 @@ const control = defineSyncModel<VoidState>({
       },
       handle: ({ payload }) => {
         const { inviteId, toId } = payload as { inviteId: string; toId: string };
+        // Capture the accepted invite for side-effects after state update
+        let accepted: { fromId: string; toId: string; verb: string } | null = null;
         interactionsSync.host.update((state) => {
           const idx = state.invites.findIndex((i) => i.inviteId === inviteId && i.toId === toId);
           if (idx < 0) return state;
           const next = state.invites.slice();
           next[idx] = { ...next[idx], status: 'confirmed', expiresAt: null };
+          const acc = next[idx] as any;
+          accepted = { fromId: String(acc.fromId), toId: String(acc.toId), verb: String(acc.verb) };
           return { invites: next };
         }, 'interact:accept');
         const t = inviteTimers.get(inviteId);
         if (t) {
           clearTimeout(t);
           inviteTimers.delete(inviteId);
+        }
+        // Apply minimal semantics for common verbs after acceptance.
+        try {
+          const a = accepted as { fromId: string; toId: string; verb: string } | null;
+          if (!a) return;
+          const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
+          // Ensure both actors exist
+          actors?.ensure(a.fromId);
+          actors?.ensure(a.toId);
+          if (a.verb === 'assist') {
+            // Simple assist: heal target for +3 HP
+            actors?.hpAdd(a.toId, 3);
+          } else if (a.verb === 'trade') {
+            // Simple trade: transfer first available item
+            actors?.transferFirstAvailableItem(a.fromId, a.toId);
+          }
+        } catch (e) {
+          // best-effort; avoid throwing from control plane
+          console.warn('[interact] effect apply failed', e);
         }
       }
     },
