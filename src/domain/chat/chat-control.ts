@@ -72,7 +72,7 @@ const chatControl = defineSyncModel<VoidState>({
               manager: 'smart',
               requestType: 'chat',
               actorId: authorId,
-              persona: '너는 Greyfall 콘솔 보조자이다. 한국어로만 말한다.',
+              persona: '너는 Greyfall TRPG 보조자이다. 한국어로만 말한다.',
               userInstruction: prompt,
               temperature: 0.5,
               maxTokens: undefined,

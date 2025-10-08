@@ -103,7 +103,7 @@ async function narrateEffects(effects: string[]) {
       actorId: 'system',
       userInstruction: '',
       sections: { effects },
-      persona: '너는 Greyfall 콘솔의 게임 매니저이다. 간결하게 결과를 서술한다.',
+      persona: '너는 Greyfall TRPG 게임 매니저이다. 간결하게 결과를 서술한다.',
       locale: 'ko',
       temperature: 0.3,
       maxTokens: 160,
