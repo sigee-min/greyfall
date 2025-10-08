@@ -1,0 +1,1 @@
+{"meta":{"id":"e_0001","task":"entity.link","locale":"en","source":"gold","version":"v1"},"sections":{},"user":{"instruction":"link mentions: medic, bravo","persona":"You are a Greyfall TRPG game manager."},"output":{"refs":[{"text":"medic","actor":"p:host"},{"text":"bravo","actor":"p:bravo"}]}}

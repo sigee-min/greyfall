@@ -59,12 +59,12 @@ const chatControl = defineSyncModel<VoidState>({
         if (!chat) return;
         const self = context.lobbyStore.participantsRef.current.find((p) => p.id === authorId);
 
-        // Slash command: /llm <prompt> → post prompt, then assistant reply
-        const llmMatch = /^\s*\/llm\s+([\s\S]+)$/i.exec(trimmed);
-        if (llmMatch) {
-          const prompt = llmMatch[1].trim();
+        // Slash command: /gm <prompt> → post prompt, then assistant reply
+        const gmMatch = /^\s*\/gm\s+([\s\S]+)$/i.exec(trimmed);
+        if (gmMatch) {
+          const prompt = gmMatch[1].trim();
           if (!prompt) return;
-          // Echo user prompt (without /llm)
+          // Echo user prompt (without /gm)
           chat.append({ id: newId(), authorId, authorName: self?.name ?? 'Host', authorTag: self?.tag ?? '#HOST', authorRole: self?.role ?? 'guest', body: prompt, at: Date.now() }, 'chat-append');
           // Ask LLM asynchronously and append reply
           try {

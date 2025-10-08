@@ -1,0 +1,1 @@
+{"meta":{"id":"d_0001","task":"intent.disambiguate","locale":"ko","source":"gold","version":"v1"},"sections":{"context":"두 목표가 근접함"},"user":{"instruction":"그에게 줘","persona":"너는 Greyfall TRPG 게임 매니저이다."},"output":{"question":"누구에게 줄까요?","options":["p:host","p:bravo"]}}

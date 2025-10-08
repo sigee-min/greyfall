@@ -55,10 +55,17 @@ export function createDataChannelPeer(events: RTCBridgeEvents, iceServers: RTCIc
   channel.addEventListener('error', (event) => events.onError?.(event));
   channel.addEventListener('message', (event) => {
     try {
-      const payload = JSON.parse(event.data);
+      let payload: unknown = event.data;
+      if (typeof payload === 'string') {
+        const s = payload.trim();
+        // Ignore empty and non-JSON keep-alives
+        if (!s) return;
+        if (!(s.startsWith('{') || s.startsWith('['))) return;
+        try { payload = JSON.parse(s); } catch { return; }
+      }
       events.onMessage(payload, channel);
-    } catch (error) {
-      console.error('Failed to parse message', error);
+    } catch {
+      // Ignore non-JSON frames
     }
   });
 
@@ -255,10 +262,16 @@ export function createHostPeer(events: RTCBridgeEvents, iceServers: RTCIceServer
   channel.addEventListener('error', (ev) => events.onError?.(ev));
   channel.addEventListener('message', (messageEvent) => {
     try {
-      const payload = JSON.parse(messageEvent.data);
+      let payload: unknown = messageEvent.data;
+      if (typeof payload === 'string') {
+        const s = payload.trim();
+        if (!s) return;
+        if (!(s.startsWith('{') || s.startsWith('['))) return;
+        try { payload = JSON.parse(s); } catch { return; }
+      }
       events.onMessage(payload, channel);
-    } catch (error) {
-      console.error('Failed to parse message', error);
+    } catch {
+      // Ignore non-JSON frames
     }
   });
   return { peer, channel };
