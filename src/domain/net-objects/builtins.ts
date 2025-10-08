@@ -7,3 +7,5 @@ import './party-host.js';
 import './world-positions-host.js';
 import '../session/participants-sync.js';
 import '../world/world-control.js';
+import '../world/travel-session.js';
+import '../world/travel-control.js';

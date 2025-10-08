@@ -91,6 +91,15 @@
 
 이 원칙을 따르면 현재 파이프라인 구조를 유지하면서도 튜닝/확장에 필요한 문서화가 완성됩니다.
 
+### Request Type 카탈로그 요약
+- Core: `chat`, `intent.plan`, `result.narrate`
+- Scene: `scene.brief`, `scene.detail`
+- Rules: `rules.extract`, `rules.narrate`
+- Summary: `turn.summarize`, `session.summarize`
+- NPC: `npc.reply`, `npc.name`
+
+각 타입의 상세 입출력/검증 규격과 JSON 예시는 `docs/llm-usage-spec.md` 8–10장을 참조하세요.
+
 ---
 
 ## 7. TRPG 의도/판정/효과/서술 아키텍처(1B 최적화)

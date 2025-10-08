@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { WORLD_STATIC } from '../../domain/world/data';
 import { worldPositionsClient } from '../../domain/net-objects/world-positions-client';
 import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/chat/use-lobby-chat';
+import { useTravelSession } from '../../domain/world/travel-session';
 import { useGlobalBus } from '../../bus/global-bus';
 import type { SessionParticipant } from '../../domain/session/types';
 import { useI18n } from '../../i18n';
@@ -18,7 +19,16 @@ export function MapMini({ localParticipantId, participants, publish, register }:
   const bus = useGlobalBus();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
-  const [vote, setVote] = useState<{ inviteId: string; targetMapId: string; yes: number; no: number; total: number; quorum: 'majority' | 'all'; status: 'proposed' | 'approved' | 'rejected' | 'cancelled' } | null>(null);
+  const travel = useTravelSession();
+  const vote = travel.status === 'idle' ? null : {
+    inviteId: travel.inviteId || '',
+    targetMapId: travel.targetMapId || WORLD_STATIC.head,
+    yes: travel.yes,
+    no: travel.no,
+    total: travel.total,
+    quorum: travel.quorum,
+    status: travel.status
+  } as const;
   const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
   const [policy, setPolicy] = useState<'majority' | 'all'>('majority');
@@ -36,25 +46,22 @@ export function MapMini({ localParticipantId, participants, publish, register }:
   const localRole = useMemo(() => participants.find((p) => p.id === localParticipantId)?.role ?? 'guest', [participants, localParticipantId]);
 
   useEffect(() => {
-    const unsubscribe = register('map:travel:update', (msg) => {
-      const { inviteId, targetMapId, yes, no, total, quorum, status } = msg.body;
-      setVote({ inviteId, targetMapId, yes, no, total, quorum, status });
-      if (status === 'proposed' && deadlineAt == null) {
-        setDeadlineAt(Date.now() + 60_000);
-      }
-      if (status === 'approved' || status === 'rejected' || status === 'cancelled') {
-        const mapName = WORLD_STATIC.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId;
-        const statusTitle = status === 'approved' ? t('map.travel.approved') : status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
-        const statusKind: 'success' | 'warning' | 'info' = status === 'approved' ? 'success' : status === 'rejected' ? 'warning' : 'info';
-        bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind, durationMs: 2500 });
-        setTimeout(() => {
-          setVote(null);
-          setDeadlineAt(null);
-        }, 2000);
-      }
-    });
-    return unsubscribe;
-  }, [bus, deadlineAt, register, t]);
+    if (!vote) return;
+    if (vote.status === 'proposed' && deadlineAt == null) {
+      setDeadlineAt(Date.now() + 60_000);
+    }
+    if (vote.status === 'approved' || vote.status === 'rejected' || vote.status === 'cancelled') {
+      const mapName = WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId;
+      const statusTitle = vote.status === 'approved' ? t('map.travel.approved') : vote.status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
+      const statusKind: 'success' | 'warning' | 'info' = vote.status === 'approved' ? 'success' : vote.status === 'rejected' ? 'warning' : 'info';
+      bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind, durationMs: 2500 });
+      const id = window.setTimeout(() => {
+        setDeadlineAt(null);
+      }, 2000);
+      return () => window.clearTimeout(id);
+    }
+    return undefined;
+  }, [bus, t, vote, deadlineAt]);
 
   const handleTravel = (dir: 'next' | 'prev') => {
     if (!localParticipantId) return;
