@@ -2,6 +2,8 @@
 
 import '../character/character-sync.js';
 import './chat-host.js';
+import '../chat/chat-control.js';
 import './party-host.js';
 import './world-positions-host.js';
 import '../session/participants-sync.js';
+import '../world/world-control.js';

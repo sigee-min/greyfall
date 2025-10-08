@@ -4,8 +4,6 @@ import type { CommonDeps, HostObject } from './types';
 import { CHAT_OBJECT_ID } from './chat.js';
 import { WORLD_POSITIONS_OBJECT_ID } from './world-positions-host.js';
 // LLM progress net-object removed
-import { requestAICommand } from '../ai/ai-gateway';
-import { executeAICommand } from '../ai/ai-router';
 import { PARTY_OBJECT_ID } from './party-host.js';
 import { getEntryField, getMap } from '../world/nav';
 import { SlidingWindowLimiter } from './rate-limit.js';
@@ -148,37 +146,6 @@ export class HostRouter {
     }
     try {
       switch (message.kind) {
-        case 'hello': {
-          const p = message.body.participant;
-          this.lobbyStore.upsertFromWire(p);
-          publishParticipantsSnapshot(this.lobbyStore, 'participants:hello');
-          if (peerId) this.map.set(peerId, p.id);
-          // Ensure world position at map head's entry field
-          this.world.ensureParticipant(p.id, 'LUMENFORD');
-          this.party.addMember(p.id);
-          break;
-        }
-        // case 'llm:progress': { /* removed */ break; }
-        case 'ready': {
-          const { participantId, ready } = message.body;
-          if (!this.limiter.allow(`ready:${participantId}`)) {
-            console.warn('[ready] rate limited', { participantId });
-            break;
-          }
-          const raw = this.lobbyStore.snapshotWire().map((p) => (p.id === participantId ? { ...p, ready } : p));
-          this.lobbyStore.replaceFromWire(raw);
-          publishParticipantsSnapshot(this.lobbyStore, 'participants:ready');
-          break;
-        }
-        case 'leave': {
-          const id = message.body.participantId;
-          this.lobbyStore.remove(id);
-          publishParticipantsSnapshot(this.lobbyStore, 'participants:leave');
-          this.map.removeByParticipant(id);
-          this.party.removeMember(id);
-          removeCharacterLoadout(id, 'character:leave');
-          break;
-        }
         case 'object:request': {
           const { id, sinceRev } = message.body;
           if (peerId && !this.limiter.allow(`request:${peerId}:${id}`)) {
@@ -188,106 +155,7 @@ export class HostRouter {
           this.registry.get(id)?.onRequest(sinceRev);
           break;
         }
-        case 'chat:append:request': {
-          const authorId = String((message.body as any).authorId ?? this.lobbyStore.localParticipantIdRef.current ?? 'host');
-          const rawBody = String((message.body as any).body ?? '');
-          const trimmed = rawBody.trim();
-          try { console.debug('[/llm] chat:append:request recv', { authorId, body: trimmed.slice(0, 120) }); } catch {}
-          if (!trimmed) break;
-          if (!this.limiter.allow(`chat:${authorId}`)) {
-            console.warn('[chat] rate limited', { authorId });
-            break;
-          }
-          const self = this.lobbyStore.participantsRef.current.find((p) => p.id === authorId);
-
-          // Slash command: /llm <prompt> → route to LLM and post assistant reply
-          const llmMatch = /^\s*\/llm\s+([\s\S]+)$/i.exec(trimmed);
-          if (llmMatch) {
-            const prompt = llmMatch[1].trim();
-            if (!prompt) break;
-            try { console.debug('[/llm] prompt parsed', { len: prompt.length, preview: prompt.slice(0, 120) }); } catch {}
-            // 1) Echo user's prompt (without the /llm prefix)
-            this.chat.append(
-              {
-                id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                authorId,
-                authorName: self?.name ?? 'Host',
-                authorTag: self?.tag ?? '#HOST',
-                authorRole: self?.role ?? 'guest',
-                body: prompt,
-                at: Date.now()
-              },
-              'chat-append'
-            );
-            try { console.debug('[/llm] prompt echoed'); } catch {}
-
-            // 2) Ask LLM asynchronously and publish its reply via AI command handler
-            void (async () => {
-              try {
-                try { console.debug('[/llm] gateway.request start'); } catch {}
-                const ai = await requestAICommand({
-                  manager: 'smart',
-                  requestType: 'chat',
-                  actorId: authorId,
-                  persona: '너는 Greyfall 콘솔 보조자이다. 한국어로만 말한다.',
-                  userInstruction: prompt,
-                  temperature: 0.5,
-                  maxTokens: undefined,
-                  timeoutMs: 45_000,
-                  fallbackChatText: '답변을 생성하지 못했습니다.'
-                });
-                try { console.debug('[/llm] gateway.request done', { cmd: ai?.cmd }); } catch {}
-                try { console.debug('[/llm] execAI start'); } catch {}
-                await executeAICommand(ai, {
-                  manager: 'smart',
-                  publishLobbyMessage: (k: any, b: any, c?: string) => this.send(k, b, c),
-                  participants: this.lobbyStore.participantsRef.current,
-                  localParticipantId: this.lobbyStore.localParticipantIdRef.current
-                });
-                try { console.debug('[/llm] execAI done'); } catch {}
-              } catch (err) {
-                console.error('[chat]/llm failed', err);
-                // Surface as assistant chat so users know why it failed
-                await executeAICommand({ cmd: 'chat', body: '로컬 LLM이 준비되지 않았어요. 네트워크 또는 모델 설정을 확인해 주세요.' }, {
-                  manager: 'smart',
-                  publishLobbyMessage: (k: any, b: any, c?: string) => this.send(k, b, c),
-                  participants: this.lobbyStore.participantsRef.current,
-                  localParticipantId: this.lobbyStore.localParticipantIdRef.current
-                });
-              }
-            })();
-            break;
-          }
-
-          // Normal chat append
-          this.chat.append(
-            {
-              id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-              authorId,
-              authorName: self?.name ?? 'Host',
-              authorTag: self?.tag ?? '#HOST',
-              authorRole: self?.role ?? 'guest',
-              body: trimmed,
-              at: Date.now()
-            },
-            'chat-append'
-          );
-          break;
-        }
-        case 'field:move:request': {
-          const body = message.body as any;
-          const { playerId, mapId, fromFieldId, toFieldId } = body;
-          if (!this.limiter.allow(`move:${playerId}`)) {
-            console.warn('[move] rate limited', { playerId });
-            break;
-          }
-          // Ensure player exists
-          const exists = this.lobbyStore.participantsRef.current.some((p) => p.id === playerId);
-          if (!exists) break;
-          const ok = this.world.moveField(String(playerId), String(mapId), String(fromFieldId), String(toFieldId));
-          if (!ok) console.warn('[move] rejected', { playerId, mapId, fromFieldId, toFieldId });
-          break;
-        }
+        // field:move:request handled by world:control command
         case 'map:travel:request': {
           const { requesterId, direction, toMapId } = message.body as any;
           if (!this.limiter.allow(`travel:${requesterId}`)) {

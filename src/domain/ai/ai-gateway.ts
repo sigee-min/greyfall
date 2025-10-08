@@ -83,13 +83,14 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
             } catch (err) {
               if (DEBUG) console.debug('[gw] chat.history failed', formatError(err));
             }
-            const parts: string[] = [];
-            if (contextText && contextText.trim()) parts.push(`맥락:\n${contextText}`);
-            if (historyText) parts.push(`최근 채팅(최대 10개):\n${historyText}`);
+            const sysParts: string[] = [];
+            if (contextText && contextText.trim()) sysParts.push(`맥락\n${contextText}`);
+            if (historyText) sysParts.push(`최근 채팅(최대 10개)\n${historyText}`);
             if (DEBUG) console.debug(`[gw] chat.params hasHistory=${Boolean(historyText)} hasContext=${Boolean(contextText)}`);
             return {
               persona: defaultPersona,
-              userSuffix: parts.length ? `\n${parts.join('\n\n')}` : ''
+              systemSuffix: sysParts.length ? sysParts.join('\n\n') : '',
+              userSuffix: ''
             };
           },
           next: null

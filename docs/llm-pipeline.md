@@ -40,7 +40,7 @@
 ```json
 {
   "request_type": "briefing",
-  "system_prompt": "You are the Greyfall TRPG host. Reply in Korean only.",
+  "system_prompt": "You are the Greyfall TRPG host.",
   "user_prompt": "현재 상황...\n플레이어 요청...",
   "target_response": "브리핑 문단",
   "metadata": {
@@ -67,9 +67,9 @@
 
 ### 4.3 학습 전략
 
-- LoRA/QLoRA로 1B 모델을 튜닝하되, `request_type` 별 샘플을 충분히 확보한다.  
+- LoRA/QLoRA로 1B 모델을 튜닝하되, 과업을 작게 쪼개 `task` 별(예: `plan`, `narrate`, `chat`) 샘플을 충분히 확보한다.  
 - Instruction tuning 이후, 필요 시 preference dataset(`good/bad`) 기반 RLHF/DPO를 추가.  
-- 검증용 홀드아웃을 `briefing`, `rules`, `scene_transition`, `player_prompt` 등으로 균형 있게 구성.
+- 검증용 홀드아웃을 `plan`, `narrate`, `chat` 등으로 균형 있게 구성.
 
 ## 5. 확장 아이디어
 
@@ -77,7 +77,7 @@
 - **멀티 에이전트**: `actor_role`을 추가해 GM/플레이어 보조를 분리.  
 - **장기 기억**: `session_memory` 필드로 이전 세션 요약을 전달.  
 - **안전 가드레일**: `safety_tag`(예: `/pause`) 샘플을 포함해 거절/완화 응답 학습.  
-- **툴 연동**: `tool_call` 구조(`{"name":"roll_d20","args":{...}}`)를 데이터에 포함해 function-calling 효과 실험.  
+ 
 - **자동 검증**: 연결 리스트 파이프라인을 그대로 돌리는 시뮬레이터 테스트로 회귀 검증.  
 - **실시간 피드백**: 운영 중 로그에 `good`/`bad` 태그를 붙여 재학습 데이터 풀을 상시 확보.
 
@@ -90,3 +90,50 @@
 5. **확장 가능성 고려**: 새 노드를 추가할 때는 동일한 패턴을 재사용해 유지보수성을 확보한다.
 
 이 원칙을 따르면 현재 파이프라인 구조를 유지하면서도 튜닝/확장에 필요한 문서화가 완성됩니다.
+
+---
+
+## 7. TRPG 의도/판정/효과/서술 아키텍처(1B 최적화)
+
+1B에서 신뢰도를 확보하기 위해 LLM은 “의도(plan)”와 “서술(narrate)”에만 집중하고, 주사위/수치/효과 적용은 코드가 수행합니다.
+
+- LLM: 작은 구조화 출력(plan)과 짧은 자연어 서술(narrate)
+- 코드: 판정/주사위/HP·상태 적용, 결과 로그 생성
+
+권장 파이프라인(개념)
+- `intent.plan` → `action.apply(code)` → `result.narrate` (+ 실패 시 `no_action`/축소 폴백)
+
+검증 원칙
+- `plan`: 스키마·화이트리스트 강제, 숫자/판정 결과/HP 변경 금지
+- `narrate`: 제공된 `Rolls/Effects` 외 사실·수치 언급 금지, 길이/로케일/금칙어 검사
+
+데이터셋 태스크 필드
+- `task: 'plan' | 'narrate' | 'chat'`
+
+## 8. 데이터 통신 규칙(컨벤션/규격)
+
+게이트웨이가 시스템 프롬프트에 다음 섹션을 주입하고, 유저 입력은 user로 전달합니다. 섹션 제목은 고정 문자열을 사용합니다.
+
+- 섹션 제목
+  - `맥락`: 장면/상황 요약(선택)
+  - `최근 채팅(최대 10개)`: `- author(role): message` 형식 목록
+  - `액터 목록`(선택): `id role=... name=... hp=cur/max status=[...]`
+  - `지형/위험 요소`(선택): `hazardId: dice effect=hp.sub|status.add(...)
+  - `Rolls`(코드 전용): `skill d20+mod vs DC=.. → total (pass|fail)`
+  - `Effects`(코드 전용): `actorId hp.sub N`, `status.add X (2r)`
+
+의도(plan) 출력(한 줄 JSON 예시)
+```
+{"action":"sneak_move","checks":["stealth"],"hazards":["thorns"],"targets":["p:alice"],"meta":{"reason":"도주"}}
+```
+- 모든 값은 현재 씬의 화이트리스트(actions/checks/hazards/targets)에서만 선택합니다. 숫자/주사위/HP 변경은 금지합니다.
+
+서술(narrate) 출력
+- 1–3문장 자연어. 반드시 `Rolls/Effects` 로그만 인용해 수치/사실을 기술합니다.
+
+로케일(locale)
+- 게이트웨이는 `locale: 'ko' | 'en'`을 엔진 옵션과 모니터 메타에 포함하며, 데이터셋에도 저장합니다.
+
+실패/폴백
+- `plan` 파싱/검증 실패 → 1회 보정/축소 → `no_action`
+- `narrate` 위반 → 1회 축소 재생성 → 1문장 폴백
