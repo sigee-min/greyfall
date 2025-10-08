@@ -219,10 +219,8 @@ const lobbyCharacterStatsSchema = z.object({
 const lobbyCharacterLoadoutSchema = z
   .object({
     playerId: z.string().min(1),
-    roll: z
-      .tuple([z.number().int().min(1).max(6), z.number().int().min(1).max(6), z.number().int().min(1).max(6)])
-      .refine((dice) => dice.length === 3, 'roll must contain exactly three dice'),
-    budget: z.number().int().min(3).max(18),
+    // Dice roll removed; budget is fixed at 10 to simplify setup
+    budget: z.literal(10),
     remaining: z.number().int(),
     stats: lobbyCharacterStatsSchema,
     passives: z.array(lobbyPassiveSchema).max(32),

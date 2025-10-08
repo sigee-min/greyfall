@@ -15,6 +15,13 @@ export const GREYFALL_ITEMS: ItemDef[] = [
   { id: 'mask_veil', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '보이드 베일 마스크' }, { locale: 'en', text: 'Void Veil Mask' }], synonyms: ['베일','veil'], tags: ['occult','void'], rarity: 'rare' },
   { id: 'goggles_lowlight', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '정찰 로우라이트 고글' }, { locale: 'en', text: 'Recon Low‑Light Goggles' }], synonyms: ['고글','goggles'], tags: ['optics','lantern'], rarity: 'uncommon' },
 
+  // HEAD — additional common/uncommon
+  { id: 'cap_watch_guild', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '길드 워치 캡' }, { locale: 'en', text: 'Guild Watch Cap' }], synonyms: ['워치캡','cap','모자'], tags: ['guild','headgear'], rarity: 'common' },
+  { id: 'balaclava_resist', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '레지스탕스 바라클라바' }, { locale: 'en', text: 'Resistance Balaclava' }], synonyms: ['바라클라바','mask'], tags: ['resistance','headgear'], rarity: 'common' },
+  { id: 'goggles_welding_arc', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '아크텍 용접 고글' }, { locale: 'en', text: 'Arc‑Tech Welding Goggles' }], synonyms: ['용접고글','goggles'], tags: ['arc','industrial','optics'], rarity: 'uncommon' },
+  { id: 'face_shield_riot', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '치안국 페이스 실드' }, { locale: 'en', text: 'Riot Face Shield' }], synonyms: ['페이스실드','face shield'], tags: ['riot','headgear'], rarity: 'uncommon' },
+  { id: 'cap_patrol_lantern', category: 'equipment', slot: 'head', names: [{ locale: 'ko', text: '등불단 패트롤 캡' }, { locale: 'en', text: 'Lantern Patrol Cap' }], synonyms: ['캡','cap','모자'], tags: ['lantern','headgear'], rarity: 'uncommon' },
+
   // BODY (13–28)
   { id: 'coat_reinforced', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '길드 강화 코트' }, { locale: 'en', text: 'Guild Reinforced Coat' }], synonyms: ['코트','coat'], tags: ['armor','civil','guild'], rarity: 'common' },
   { id: 'vest_arcweave', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '아크위브 베스트' }, { locale: 'en', text: 'Arcweave Vest' }], synonyms: ['베스트','vest'], tags: ['arc','armor'], rarity: 'uncommon' },
@@ -26,6 +33,13 @@ export const GREYFALL_ITEMS: ItemDef[] = [
   { id: 'coat_trench', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '길드 트렌치 코트' }, { locale: 'en', text: 'Guild Trench Coat' }], synonyms: ['트렌치','trench'], tags: ['civil','guild'], rarity: 'common' },
   { id: 'jacket_insulated', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '아크텍 절연 재킷' }, { locale: 'en', text: 'Arc‑Tech Insulated Jacket' }], synonyms: ['절연','insulated'], tags: ['arc'], rarity: 'uncommon' },
   { id: 'armor_riotmesh', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '치안국 메시 아머' }, { locale: 'en', text: 'Riot Mesh Armor' }], synonyms: ['메시아머','mesh armor'], tags: ['riot'], rarity: 'uncommon' },
+
+  // BODY — additional common/uncommon
+  { id: 'coat_field_guild', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '길드 필드 코트' }, { locale: 'en', text: 'Guild Field Coat' }], synonyms: ['코트','coat'], tags: ['guild','civil','armor'], rarity: 'common' },
+  { id: 'vest_padded_riot', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '치안국 패딩 베스트' }, { locale: 'en', text: 'Riot Padded Vest' }], synonyms: ['베스트','vest'], tags: ['riot','armor'], rarity: 'common' },
+  { id: 'apron_tech_arc', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '아크텍 테크 앞치마' }, { locale: 'en', text: 'Arc‑Tech Tech Apron' }], synonyms: ['앞치마','apron'], tags: ['arc','industrial'], rarity: 'uncommon' },
+  { id: 'softshell_shadow', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '섀도우라인 소프트쉘' }, { locale: 'en', text: 'Shadowline Softshell' }], synonyms: ['자켓','jacket'], tags: ['stealth'], rarity: 'uncommon' },
+  { id: 'overalls_industrial', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '인더스트리 오버올' }, { locale: 'en', text: 'Industrial Overalls' }], synonyms: ['오버올','overalls'], tags: ['industrial'], rarity: 'common' },
   { id: 'coat_voidlined', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '보이드 라이너 코트' }, { locale: 'en', text: 'Void-Lined Coat' }], synonyms: ['보이드코트','void coat'], tags: ['void','occult'], rarity: 'epic' },
   { id: 'suit_guild', category: 'equipment', slot: 'body', names: [{ locale: 'ko', text: '길드 슈트' }, { locale: 'en', text: 'Guild Suit' }], synonyms: ['길드슈트','guild suit'], tags: ['guild'], rarity: 'uncommon' },
 
@@ -54,6 +68,16 @@ export const GREYFALL_ITEMS: ItemDef[] = [
   { id: 'launcher_grenade', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '치안국 유탄 발사기' }, { locale: 'en', text: 'Riot Grenade Launcher' }], synonyms: ['유탄','launcher'], tags: ['firearm','riot'], rarity: 'rare' },
   { id: 'machete_junk', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '정글 마체테' }, { locale: 'en', text: 'Jungle Machete' }], synonyms: ['마체테','machete'], tags: ['blade'], rarity: 'common' },
 
+  // MAINHAND — additional common/uncommon
+  { id: 'sword_short_guild', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '길드 숏 소드' }, { locale: 'en', text: 'Guild Short Sword' }], synonyms: ['검','sword'], tags: ['blade','guild'], rarity: 'common' },
+  { id: 'truncheon_riot', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '치안국 트런천' }, { locale: 'en', text: 'Riot Truncheon' }], synonyms: ['곤봉','baton','truncheon'], tags: ['riot'], rarity: 'common' },
+  { id: 'wrench_industrial', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '인더스트리 렌치' }, { locale: 'en', text: 'Industrial Wrench' }], synonyms: ['렌치','wrench'], tags: ['industrial','tool'], rarity: 'common' },
+  { id: 'bolt_driver_arc', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '아크텍 볼트 드라이버' }, { locale: 'en', text: 'Arc‑Tech Bolt Driver' }], synonyms: ['드라이버','driver'], tags: ['arc','industrial'], rarity: 'uncommon' },
+  { id: 'pipe_rifle_resist', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '레지스탕스 파이프 라이플' }, { locale: 'en', text: 'Resistance Pipe Rifle' }], synonyms: ['라이플','rifle'], tags: ['resistance','firearm'], rarity: 'uncommon' },
+  { id: 'rivet_gun_tinker', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '팅커 리벳 건' }, { locale: 'en', text: 'Tinker Rivet Gun' }], synonyms: ['리벳건','rivet gun'], tags: ['tinker','industrial'], rarity: 'uncommon' },
+  { id: 'signal_rod_lantern', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '등불단 시그널 로드' }, { locale: 'en', text: 'Lantern Signal Rod' }], synonyms: ['시그널','rod'], tags: ['lantern'], rarity: 'uncommon' },
+  { id: 'scribing_dagger_archive', category: 'equipment', slot: 'mainhand', names: [{ locale: 'ko', text: '아카이브 스크라이빙 대거' }, { locale: 'en', text: 'Archive Scribing Dagger' }], synonyms: ['단검','dagger'], tags: ['scholar','scribe'], rarity: 'uncommon' },
+
   // OFFHAND (53–60)
   { id: 'shield_buckler', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '길드 버클러' }, { locale: 'en', text: 'Guild Buckler' }], synonyms: ['버클러','buckler'], tags: ['shield','guild'], rarity: 'common' },
   { id: 'shield_riot', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '치안국 실드' }, { locale: 'en', text: 'Riot Control Shield' }], synonyms: ['실드','shield'], tags: ['shield','riot'], rarity: 'uncommon' },
@@ -61,6 +85,12 @@ export const GREYFALL_ITEMS: ItemDef[] = [
   { id: 'lamp_void', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '보이드 램프' }, { locale: 'en', text: 'Void Lamp' }], synonyms: ['램프','lamp'], tags: ['lantern','void'], rarity: 'rare' },
   { id: 'parry_dagger', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '레지스탕스 패링 대거' }, { locale: 'en', text: 'Resistance Parrying Dagger' }], synonyms: ['패링','parry'], tags: ['blade','resistance'], rarity: 'uncommon' },
   { id: 'script_tome', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '오컬트 각인 토메' }, { locale: 'en', text: 'Occult Inscribed Tome' }], synonyms: ['토메','tome'], tags: ['occult'], rarity: 'rare' },
+
+  // OFFHAND — additional common/uncommon
+  { id: 'hand_shield_lantern', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '등불단 핸드 실드' }, { locale: 'en', text: 'Lantern Hand Shield' }], synonyms: ['실드','shield'], tags: ['lantern','shield'], rarity: 'common' },
+  { id: 'buckler_scrap_resist', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '레지스탕스 스크랩 버클러' }, { locale: 'en', text: 'Resistance Scrap Buckler' }], synonyms: ['버클러','buckler'], tags: ['resistance','shield'], rarity: 'common' },
+  { id: 'signal_lamp_arc', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아크텍 시그널 램프' }, { locale: 'en', text: 'Arc‑Tech Signal Lamp' }], synonyms: ['램프','lamp'], tags: ['arc','lantern'], rarity: 'uncommon' },
+  { id: 'folio_archive', category: 'equipment', slot: 'offhand', names: [{ locale: 'ko', text: '아카이브 폴리오' }, { locale: 'en', text: 'Archive Folio' }], synonyms: ['서책','book','folio'], tags: ['scholar'], rarity: 'uncommon' },
 
   // ACCESSORY (61–70)
   { id: 'ring_signal', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '길드 시그널 링' }, { locale: 'en', text: 'Guild Signal Ring' }], synonyms: ['반지','ring'], tags: ['comms','guild'], rarity: 'uncommon' },
@@ -73,6 +103,13 @@ export const GREYFALL_ITEMS: ItemDef[] = [
   { id: 'locket_photo', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '사진 로켓' }, { locale: 'en', text: 'Photo Locket' }], synonyms: ['로켓','locket'], tags: ['keepsake'], rarity: 'common' },
   { id: 'band_resist', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '레지스트 밴드' }, { locale: 'en', text: 'Resist Band' }], synonyms: ['밴드','band'], tags: ['resistance'], rarity: 'uncommon' },
   { id: 'pendant_lantern', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '등불단 펜던트' }, { locale: 'en', text: 'Lantern Wardens Pendant' }], synonyms: ['펜던트','pendant'], tags: ['lantern'], rarity: 'uncommon' },
+
+  // ACCESSORY — additional common/uncommon
+  { id: 'signet_ring_guild', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '길드 시그넷 링' }, { locale: 'en', text: 'Guild Signet Ring' }], synonyms: ['반지','ring'], tags: ['guild'], rarity: 'common' },
+  { id: 'whistle_riot', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '치안국 호루라기' }, { locale: 'en', text: 'Riot Whistle' }], synonyms: ['호루라기','whistle'], tags: ['riot','comms'], rarity: 'common' },
+  { id: 'circuit_pendant_arc', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '아크 회로 펜던트' }, { locale: 'en', text: 'Arc Circuit Pendant' }], synonyms: ['펜던트','pendant'], tags: ['arc'], rarity: 'uncommon' },
+  { id: 'prayer_beads_lantern', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '등불단 기도구' }, { locale: 'en', text: 'Lantern Prayer Beads' }], synonyms: ['염주','beads'], tags: ['lantern'], rarity: 'common' },
+  { id: 'armband_resist', category: 'equipment', slot: 'accessory', names: [{ locale: 'ko', text: '레지스탕스 암밴드' }, { locale: 'en', text: 'Resistance Armband' }], synonyms: ['암밴드','armband'], tags: ['resistance'], rarity: 'common' },
 
   // CONSUMABLE (71–85)
   { id: 'medkit_field', category: 'consumable', names: [{ locale: 'ko', text: '메딕 필드 메드킷' }, { locale: 'en', text: 'Medic Field Medkit' }], synonyms: ['메드킷','medkit'], tags: ['healing','medic'], stackable: true, weight: 200 },
