@@ -38,12 +38,12 @@ export function useGuideAgent({
   locale = 'ko',
   policy
 }: UseGuideAgentOptions) {
-  const guideName = useMemo(() => '심판자', []);
+  const guideName = useMemo(() => '게임 매니저', []);
   const authorId = useMemo(() => (localParticipantId ? `guide:${localParticipantId}` : 'guide:host'), [localParticipantId]);
   const fullPolicy: GuideAgentPolicy = useMemo(
     () => ({
       respondOnMention: true,
-      mentionAliases: ['심판자', '안내인', '가이드', 'guide', 'bot'],
+      mentionAliases: ['게임 매니저', '매니저', '안내인', '가이드', 'guide', 'bot'],
       cooldownMs: 3500,
       maxContext: 8,
       maxTokens: 160,
@@ -77,7 +77,7 @@ export function useGuideAgent({
         try {
           const context = historyRef.current
             .slice(-fullPolicy.maxContext)
-            .map((m) => `- ${m.role === 'assistant' ? '(심판자) ' : ''}${m.content}`)
+            .map((m) => `- ${m.role === 'assistant' ? '(게임 매니저) ' : ''}${m.content}`)
             .join('\n');
           // 1) Try structured intent.plan using live eligibility
           const requesterId = entry.authorId; // participant id
@@ -86,7 +86,7 @@ export function useGuideAgent({
             manager,
             actorId: `p:${requesterId}`,
             requestType: 'intent.plan',
-            persona: `${guideName}는 Greyfall 콘솔의 심판자다.`,
+            persona: `${guideName}는 Greyfall 콘솔의 게임 매니저다.`,
             userInstruction: entry.body,
             contextText: context,
             eligibility: elig,
@@ -134,7 +134,7 @@ export function useGuideAgent({
               manager,
               actorId: authorId,
               requestType: 'chat',
-              persona: `${guideName}는 Greyfall 콘솔의 심판자다. 친근하게 말한다.`,
+              persona: `${guideName}는 Greyfall 콘솔의 게임 매니저다. 친근하게 말한다.`,
               userInstruction: prompt,
               contextText: context,
               locale,
@@ -160,7 +160,7 @@ export function useGuideAgent({
                 manager,
                 actorId: authorId,
                 requestType: 'result.narrate',
-                persona: `${guideName}는 Greyfall 콘솔의 심판자다. 친근하게 말한다.`,
+                persona: `${guideName}는 Greyfall 콘솔의 게임 매니저다. 친근하게 말한다.`,
                 userInstruction: '',
                 sections: { effects },
                 locale,

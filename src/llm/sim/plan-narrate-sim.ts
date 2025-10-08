@@ -25,7 +25,7 @@ function sameField(mapA?: string | null, fieldA?: string | null, mapB?: string |
 
 export async function simulatePlanNarrate(opts: SimOptions): Promise<SimResult> {
   const manager = opts.manager ?? 'smart';
-  const persona = opts.persona ?? '너는 Greyfall TRPG 매니저이다.';
+  const persona = opts.persona ?? '너는 Greyfall 게임 매니저이다.';
   const locale = opts.locale ?? 'ko';
   const healAmount = Math.max(1, Math.min(10, Math.floor(opts.healAmount ?? 3)));
 
@@ -90,4 +90,3 @@ export async function simulatePlanNarrate(opts: SimOptions): Promise<SimResult> 
 
   return { planJson: planText, rolls, effects, narration };
 }
-

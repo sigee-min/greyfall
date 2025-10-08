@@ -164,7 +164,7 @@ export function GameStartLobby({
         manager: llmManager,
         requestType: 'chat',
         actorId: localParticipantId ?? 'host',
-        persona: '너는 Greyfall Ready Room을 운영하는 심판자이다. 한국어로만 격려의 말을 건넨다.',
+        persona: '너는 Greyfall Ready Room을 운영하는 게임 매니저이다. 한국어로만 격려의 말을 건넨다.',
         userInstruction: '랜턴 팀에게 임무 준비가 시작되었음을 알리고, 함께 준비하자는 인사를 건네라.',
         temperature: 0.5,
         maxTokens: 192,

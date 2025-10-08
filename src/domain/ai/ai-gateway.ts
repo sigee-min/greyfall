@@ -69,7 +69,7 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
       tools: makeDefaultToolsHost({ manager, providers: getToolsProviders() })
     };
     try {
-      const defaultPersona = persona ?? '너는 Greyfall TRPG 매니저이다.';
+      const defaultPersona = persona ?? '너는 Greyfall 게임 매니저이다.';
       const buildSections = async (): Promise<SectionBundle> => {
         let historyText = '';
         try {

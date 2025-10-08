@@ -234,7 +234,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                         requestType: 'chat',
                         actorId: 'p:host',
                         userInstruction: '다음 전개를 제안해줘',
-                        persona: '너는 Greyfall TRPG 매니저이다.',
+                        persona: '너는 Greyfall 게임 매니저이다.',
                         sections: { context: '테스트 맥락: 숲 가장자리에서 교전이 끝났습니다.', recentChat: '- 플레이어(user): 적 몰래 가시밭길로 도망간다' },
                         locale: 'ko'
                       });
@@ -260,7 +260,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                         actorId: 'p:host',
                         userInstruction: '브라보를 도와줄게',
                         eligibility,
-                        persona: '너는 Greyfall TRPG 매니저이다.',
+                        persona: '너는 Greyfall 게임 매니저이다.',
                         locale: 'ko'
                       });
                     } catch (e) { console.warn('[llm-monitor] plan sample failed', e); }
@@ -279,7 +279,7 @@ export function LlmMonitor({ onClose }: { onClose?: () => void }) {
                           rolls: ['stealth d20+3 vs DC=14 → 12 (fail)'],
                           effects: ['p:bravo hp.add 3 (by p:host)']
                         },
-                        persona: '너는 Greyfall TRPG 매니저이다.',
+                        persona: '너는 Greyfall 게임 매니저이다.',
                         locale: 'ko'
                       });
                     } catch (e) { console.warn('[llm-monitor] narrate sample failed', e); }
