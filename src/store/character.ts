@@ -11,6 +11,9 @@ export type TraitSpec = {
   statMods?: Partial<Record<StatKey, number>>;
   passives?: Passive[];
   description?: string;
+  // Optional: extra UI metadata (non-mechanical)
+  notes?: string[];
+  synergy?: string[];
 };
 
 export type CharacterSnapshot = {

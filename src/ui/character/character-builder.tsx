@@ -124,6 +124,23 @@ export function CharacterBuilder({ onClose, playerName = 'Player', localParticip
                     {t.statMods && (
                       <p className="mt-2 text-[11px] text-muted-foreground">{Object.entries(t.statMods).map(([k, v]) => `${k} ${v!>=0?'+':''}${v}`).join(', ')}</p>
                     )}
+                    {(t.synergy?.length || t.notes?.length) && (
+                      <div className="mt-2 space-y-1">
+                        {t.synergy?.length ? (
+                          <div className="text-[11px] text-primary/80">
+                            <span className="mr-1 font-semibold uppercase tracking-[0.2em]">{tt('char.synergy')}</span>
+                            {t.synergy.join(' · ')}
+                          </div>
+                        ) : null}
+                        {t.notes?.length ? (
+                          <ul className="list-disc pl-4 text-[11px] text-muted-foreground">
+                            {t.notes.map((n, i) => (
+                              <li key={i}>{n}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    )}
                     <div className="mt-2 flex justify-end">
                       {picked ? (
                         <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-destructive hover:text-destructive" onClick={() => remove(t.id)}>{tt('common.remove')}</button>

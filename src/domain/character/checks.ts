@@ -29,14 +29,18 @@ export function computeModifiers(params: {
   if (kind === 'triage' || kind === 'medicine') {
     if (has('triage+')) { mod += 1; labels.push('triage+'); }
     if (has('bleed-')) { mod += 1; labels.push('bleed-'); }
+    if (has('revive+')) { mod += 1; labels.push('revive+'); }
   }
   if (kind === 'precision') {
     if (has('stabilize+')) { mod += 1; labels.push('stabilize+'); }
     if (has('crit+')) { mod += 1; labels.push('crit+'); }
+    if (has('fumble+')) { mod -= 1; labels.push('fumble+'); }
   }
   if (kind === 'engineering') {
     if (has('blueprint+')) { mod += 1; labels.push('blueprint+'); }
     if (has('overclock+')) { mod += 1; labels.push('overclock+'); }
+    if (has('repair+')) { mod += 1; labels.push('repair+'); }
+    if (has('jam-')) { mod += 1; labels.push('jam-'); }
   }
   // penalties
   if (has('panic+')) { mod -= 1; labels.push('panic+'); }

@@ -20,7 +20,7 @@ export function StreamingView({ manager = 'fast', debugSystemPrompt, className }
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) return;
-    void start(userInput, { manager, maxTokens: 512, temperature: 0 });
+    void start(userInput, { manager, maxTokens: 1024, temperature: 0 });
   }, [userInput, start, manager]);
 
   const header = useMemo(() => (

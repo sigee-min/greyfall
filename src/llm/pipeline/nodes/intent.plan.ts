@@ -17,7 +17,7 @@ export const IntentPlanNode: NodeTemplate = {
   },
   options: {
     temperature: 0.2,
-    maxTokens: 120,
+    maxTokens: 240,
     timeoutMs: 20000
   },
   inputSpec: { directive: 'string' },
@@ -33,4 +33,3 @@ export function makePlanParams(ctx: PipelineCtx): { directive: string } {
   const locale = localeFromCtx(ctx);
   return { directive: planDirectives(locale) };
 }
-

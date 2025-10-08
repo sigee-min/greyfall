@@ -7,7 +7,7 @@ export function resolveGatewayConfig(
 ): GatewayResolvedConfig {
   const env = import.meta.env;
   const envMax = Number(env.VITE_LLM_MAX_TOKENS);
-  const maxTokEnv = Number.isFinite(envMax) && envMax > 0 ? Math.min(2048, Math.max(32, envMax)) : 128;
+  const maxTokEnv = Number.isFinite(envMax) && envMax > 0 ? Math.min(4096, Math.max(32, envMax)) : 256;
   const maxTokens = typeof params.maxTokens === 'number' && params.maxTokens > 0 ? params.maxTokens : maxTokEnv;
 
   const envTimeout = Number(env.VITE_LLM_TIMEOUT_MS);

@@ -11,7 +11,7 @@ export const ResultNarrateNode: NodeTemplate = {
   },
   options: {
     temperature: 0.4,
-    maxTokens: 160,
+    maxTokens: 320,
     timeoutMs: 20000
   },
   inputSpec: { directive: 'string' },
@@ -25,4 +25,3 @@ export const ResultNarrateNode: NodeTemplate = {
 export function makeNarrateParams(locale: 'ko' | 'en' = 'ko'): { directive: string } {
   return { directive: narrateDirectives(locale) };
 }
-

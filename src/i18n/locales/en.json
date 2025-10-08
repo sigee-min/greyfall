@@ -191,5 +191,7 @@
   "char.confirm.title": "Confirm Character",
   "char.confirm.desc": "Finalize this build and mark as ready?",
   "char.confirm.approve": "Approve",
+  "char.synergy": "Synergy",
+  "char.notes": "Notes",
   "char.ready": "Character Ready"
 }

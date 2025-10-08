@@ -9,7 +9,7 @@ export const ChatBasicNode: NodeTemplate = {
   },
   options: {
     temperature: 0.7,
-    maxTokens: 512,
+    maxTokens: 1024,
     timeoutMs: 20000
   }
 };

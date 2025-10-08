@@ -8,6 +8,8 @@ import { worldPositionsClient } from '../../net-objects/world-positions-client';
 import { worldActorsClient } from '../../net-objects/world-actors-client';
 import { resolveItemAlias } from '../../world/item-alias';
 import type { EligibilityInput } from './eligibility';
+import { useLobbyCharacterSync } from '../../character/hooks/use-character-sync';
+import type { CharacterLoadout } from '../../character/types';
 
 export type GuideAgentPolicy = {
   respondOnMention: boolean;
@@ -46,7 +48,7 @@ export function useGuideAgent({
       mentionAliases: ['게임 매니저', '매니저', '안내인', '가이드', 'guide', 'bot'],
       cooldownMs: 3500,
       maxContext: 8,
-      maxTokens: 160,
+      maxTokens: 320,
       ...policy
     }),
     [policy]
@@ -55,6 +57,7 @@ export function useGuideAgent({
   const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const lastAtRef = useRef(0);
   const pendingRef = useRef<Promise<void> | null>(null);
+  const charSync = useLobbyCharacterSync({ localParticipantId });
 
   useEffect(() => {
     if (!enabled) return;
@@ -81,20 +84,20 @@ export function useGuideAgent({
             .join('\n');
           // 1) Try structured intent.plan using live eligibility
           const requesterId = entry.authorId; // participant id
-          const elig = buildEligibilityFromLiveState(requesterId, _participants);
-          const planResp = await requestAICommand({
-            manager,
-            actorId: `p:${requesterId}`,
-            requestType: 'intent.plan',
-            persona: `${guideName}는 Greyfall TRPG 게임 매니저다.`,
-            userInstruction: entry.body,
-            contextText: context,
-            eligibility: elig,
-            locale,
-            temperature: 0.2,
-            maxTokens: 140,
-            fallbackChatText: ''
-          });
+          const elig = buildEligibilityFromLiveState(requesterId, _participants, charSync.byId);
+            const planResp = await requestAICommand({
+              manager,
+              actorId: `p:${requesterId}`,
+              requestType: 'intent.plan',
+              persona: `${guideName}는 Greyfall TRPG 게임 매니저다.`,
+              userInstruction: entry.body,
+              contextText: context,
+              eligibility: elig,
+              locale,
+              temperature: 0.2,
+              maxTokens: 280,
+              fallbackChatText: ''
+            });
           const planText = String(planResp.body ?? '').trim();
           let plan: { action?: string; targets?: string[]; item?: string } = {};
           try { plan = JSON.parse(planText); } catch {}
@@ -207,7 +210,11 @@ function shouldReply(text: string, name: string, policy: GuideAgentPolicy): bool
   return false;
 }
 
-function buildEligibilityFromLiveState(requesterParticipantId: string, participants: SessionParticipant[]): EligibilityInput {
+function buildEligibilityFromLiveState(
+  requesterParticipantId: string,
+  participants: SessionParticipant[],
+  loadoutsById?: Record<string, CharacterLoadout>
+): EligibilityInput {
   const positions = worldPositionsClient.getAll();
   const posById = new Map(positions.map((p) => [p.id, p]));
   const actorsState = worldActorsClient.getAll() as Array<{ id: string; hp?: { cur: number; max: number }; status?: string[]; inventory?: { key: string; count: number }[] }>;
@@ -220,6 +227,9 @@ function buildEligibilityFromLiveState(requesterParticipantId: string, participa
   const actors = participants.map((p) => {
     const pos = posById.get(p.id) ?? null;
     const stats = actorsState?.find((a) => a.id === p.id) ?? null;
+    const lo = loadoutsById?.[p.id];
+    const passiveIds = lo?.passives?.map((x) => x.id) ?? [];
+    const traitNames = lo?.traits?.map((t) => t.name) ?? [];
     return {
       id: `p:${p.id}`,
       role: 'player' as const,
@@ -230,7 +240,30 @@ function buildEligibilityFromLiveState(requesterParticipantId: string, participa
       fieldId: pos?.fieldId
     };
   });
-  return { requesterActorId: `p:${requesterParticipantId}`, actors, inventory: Object.keys(invMap).length ? invMap : undefined, rules: { sameFieldRequiredForGive: true, sameFieldRequiredForHeal: true } };
+  const elig: EligibilityInput = {
+    requesterActorId: `p:${requesterParticipantId}`,
+    actors,
+    inventory: Object.keys(invMap).length ? invMap : undefined,
+    rules: { sameFieldRequiredForGive: true, sameFieldRequiredForHeal: true }
+  };
+  // Encode requester's traits/passives into requester line by appending labels
+  const reqLoadout = loadoutsById?.[requesterParticipantId];
+  if (reqLoadout) {
+    const traitsLabel = reqLoadout.traits.map((t) => t.name).join(', ');
+    const passivesLabel = reqLoadout.passives.map((p) => p.id).join(', ');
+    const selfIdx = elig.actors?.findIndex((a) => a.id === `p:${requesterParticipantId}`) ?? -1;
+    if (selfIdx >= 0) {
+      // augment name with compact traits/passives marker via status for minimal intrusion
+      const a = elig.actors![selfIdx] as any;
+      const meta: string[] = [];
+      if (traitsLabel) meta.push(`traits=[${traitsLabel}]`);
+      if (passivesLabel) meta.push(`passives=[${passivesLabel}]`);
+      if (meta.length) {
+        a.status = Array.isArray(a.status) ? [...a.status, ...meta] : meta;
+      }
+    }
+  }
+  return elig;
 }
 
 // resolveItemKey is now centralised in item-alias.ts

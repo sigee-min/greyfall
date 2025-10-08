@@ -6,7 +6,7 @@ export const TurnSummarizeNode: NodeTemplate = {
   id: 'turn.summarize',
   doc: '최근 N턴 핵심 bullet 2–3개(JSON 한 줄)',
   prompt: { systemTpl: '${persona}\n\n${systemSuffix}\n\n${directive}', userTpl: '${userSuffix}' },
-  options: { temperature: 0.3, maxTokens: 120, timeoutMs: 20000 },
+  options: { temperature: 0.3, maxTokens: 240, timeoutMs: 20000 },
   inputSpec: { directive: 'string' },
   validate: async (raw) => validateBullets(raw, 48)
 };
@@ -14,4 +14,3 @@ export const TurnSummarizeNode: NodeTemplate = {
 export function makeTurnSummarizeParams(locale: 'ko' | 'en' = 'ko'): { directive: string } {
   return { directive: summarizeDirectives(locale) };
 }
-
