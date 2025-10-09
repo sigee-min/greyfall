@@ -5,7 +5,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 # Copy only needed packages for better caching
-COPY protocol/package.json ./protocol/package.json
+COPY shared/protocol ./shared/protocol
 COPY client/package.json ./client/package.json
 COPY client/package-lock.json ./client/package-lock.json
 COPY client/vite.config.ts ./client/vite.config.ts
@@ -14,10 +14,7 @@ COPY client/tailwind.config.ts ./client/tailwind.config.ts
 COPY client/index.html ./client/index.html
 COPY client/public ./client/public
 COPY client/src ./client/src
-COPY protocol/tsconfig.json ./protocol/tsconfig.json
-COPY protocol/src ./protocol/src
-
-RUN cd protocol && npm install --no-audit --no-fund && npm run build
+# No protocol build needed; client consumes shared/protocol source
 RUN cd client && npm install --no-audit --no-fund
 
 # Build-time configurable signal server public URL (optional)
@@ -43,8 +40,7 @@ COPY signal/package.json signal/package-lock.json ./
 RUN npm ci
 
 COPY signal/ ./
-COPY protocol /protocol
-RUN cd /protocol && npm install --no-audit --no-fund && npm run build
+COPY shared/protocol /shared/protocol
 RUN npm run build
 
 # Install only production deps for runtime

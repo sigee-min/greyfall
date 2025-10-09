@@ -1,1 +1,2 @@
-export * from '@greyfall/protocol';
+export * from '@shared/protocol';
+
