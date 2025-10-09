@@ -16,6 +16,7 @@
     "build": "npm -w client run build",
     "preview": "npm -w client run preview",
     "typecheck": "npm -w client run typecheck",
+    "lint": "npm -w client run lint",
     "server": "npm -w server run start",
     "server:build": "npm -w server run build",
     "signal": "npm -w signal run start",
