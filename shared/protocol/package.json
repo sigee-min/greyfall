@@ -1,0 +1,11 @@
+{
+  "name": "@shared/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./schema.ts"
+  },
+  "types": "./schema.ts"
+}
+

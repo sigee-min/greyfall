@@ -122,7 +122,7 @@ async function narrateEffects(effects: string[]) {
       at: Date.now()
     };
     chat.append(entry, 'actors:narrate');
-  } catch (e) {
+  } catch {
     // no-op
   }
 }

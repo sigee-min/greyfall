@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { infer as ZInfer } from 'zod';
 
 export const patchOpBase = z.object({
   path: z.string().min(1).optional(),
@@ -29,8 +30,7 @@ export const requestBodySchema = z.object({
   sinceRev: z.number().int().nonnegative().optional()
 });
 
-export type PatchOp = z.infer<typeof patchOpSchema>;
-export type PatchBody = z.infer<typeof patchBodySchema>;
-export type ReplaceBody = z.infer<typeof replaceBodySchema>;
-export type RequestBody = z.infer<typeof requestBodySchema>;
-
+export type PatchOp = ZInfer<typeof patchOpSchema>;
+export type PatchBody = ZInfer<typeof patchBodySchema>;
+export type ReplaceBody = ZInfer<typeof replaceBodySchema>;
+export type RequestBody = ZInfer<typeof requestBodySchema>;

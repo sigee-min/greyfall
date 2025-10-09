@@ -1,6 +1,6 @@
 import { normalizeQuery } from './normalize';
 import { similarity } from './fuzzy';
-import { candidatesForToken, getItem, listItems, search, searchByLocale, type SearchResult } from './registry';
+import { getItem, listItems, search, searchByLocale, type SearchResult } from './registry';
 import type { EquipmentSlot } from '../world/equipment-rules';
 
 export type ResolveOptions = {

@@ -21,7 +21,7 @@ export const IntentPlanNode: NodeTemplate = {
     timeoutMs: 20000
   },
   inputSpec: { directive: 'string' },
-  validate: async (raw, ctx) => {
+  validate: async (raw, _ctx) => {
     const v = validatePlanOutput(raw, { maxChecks: 2, maxHazards: 2, maxTargets: 2, allowItem: true });
     if (!v.ok || !v.fixed) return { ok: false, error: v.error ?? 'invalid' };
     // Emit back normalised JSON one-liner

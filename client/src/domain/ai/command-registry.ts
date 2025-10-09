@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { ZodType } from 'zod';
 import type { SessionParticipant } from '../session/types';
 import type { LlmManagerKind } from '../../llm/llm-engine';
 import type { LobbyMessageBodies, LobbyMessageKind } from '../../protocol';
@@ -33,7 +33,7 @@ export type CommandPolicy = {
 
 export type CommandSpec<T = unknown> = {
   cmd: string;
-  schema: z.ZodType<T>;
+  schema: ZodType<T>;
   doc: string;
   policy?: CommandPolicy;
   coerce?: (raw: unknown) => unknown;
@@ -69,7 +69,7 @@ class Registry {
       return false;
     }
     const raw = spec.coerce ? spec.coerce(envelope.body) : envelope.body;
-    const parsed = (spec.schema as z.ZodType<unknown>).safeParse(raw);
+    const parsed = (spec.schema as ZodType<unknown>).safeParse(raw);
     if (!parsed.success) {
       console.warn(`[ai] invalid command body cmd=${envelope.cmd} issues=${JSON.stringify(parsed.error.issues)}`);
       return false;

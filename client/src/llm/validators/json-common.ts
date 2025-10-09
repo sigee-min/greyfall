@@ -4,12 +4,12 @@ export function parseJsonLine<T = unknown>(text: string): { ok: boolean; value?:
   try {
     const obj = JSON.parse(t) as T;
     return { ok: true, value: obj };
-  } catch (e) {
+  } catch {
     return { ok: false, error: 'invalid_json' };
   }
 }
 
-export function clamp<T>(n: number, min: number, max: number): number {
+export function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
@@ -19,4 +19,3 @@ export function normString(v: unknown, maxLen: number): string | null {
   if (!s) return null;
   return s.length <= maxLen ? s : s.slice(0, maxLen);
 }
-

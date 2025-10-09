@@ -82,8 +82,7 @@ async function fetchAsset(url: string, signal: AbortSignal): Promise<void> {
   if (!response.ok && response.type !== 'opaque') {
     throw new Error(`Preload fetch failed ${response.status} for ${url}`);
   }
-  // Drain body to make sure browser caches the content.
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  // Drain body to ensure the browser caches content
   await response.arrayBuffer();
 }
 

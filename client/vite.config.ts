@@ -48,8 +48,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@shared/protocol': path.resolve(__dirname, '../shared/protocol/schema.ts'),
-      'zod': path.resolve(__dirname, 'node_modules/zod'),
       '@app': path.resolve(__dirname, 'src')
     }
   },

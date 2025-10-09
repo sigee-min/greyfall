@@ -23,7 +23,7 @@ export function validatePlanOutput(rawText: string, opts?: PlanValidatorOptions)
   if (!trimmed) return { ok: false, error: 'empty' };
   try {
     obj = JSON.parse(trimmed) as unknown;
-  } catch (e) {
+  } catch {
     return { ok: false, error: 'invalid_json' };
   }
   if (!obj || typeof obj !== 'object') return { ok: false, error: 'not_object' };
@@ -63,4 +63,3 @@ export function validatePlanOutput(rawText: string, opts?: PlanValidatorOptions)
 
   return { ok: true, fixed };
 }
-

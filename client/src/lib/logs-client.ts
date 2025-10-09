@@ -12,9 +12,9 @@ const LOGS_API_BASE = '/api';
 // Dev-only helper: do NOT bundle secrets in production.
 function getAuthHeader(): string | null {
   // Gate behind build-time flag so Vite can tree-shake this in production.
-  if (!(import.meta as any)?.env?.DEV) return null;
-  const user = (import.meta as any)?.env?.VITE_LOGS_BASIC_USER as string | undefined;
-  const pass = (import.meta as any)?.env?.VITE_LOGS_BASIC_PASS as string | undefined;
+  if (!import.meta.env.DEV) return null;
+  const user = import.meta.env.VITE_LOGS_BASIC_USER as unknown as string | undefined;
+  const pass = import.meta.env.VITE_LOGS_BASIC_PASS as unknown as string | undefined;
   if (!user || !pass) return null;
   try {
     const token = btoa(`${user}:${pass}`);
@@ -27,10 +27,12 @@ function getAuthHeader(): string | null {
 export async function postLlmLog(payload: LlmLogPayload): Promise<boolean> {
   const url = `${LOGS_API_BASE}/llm/logs`;
   try {
+    const auth = getAuthHeader();
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(auth ? { Authorization: auth } : {})
       },
       body: JSON.stringify({ ...payload, client_at: new Date().toISOString() })
     });
