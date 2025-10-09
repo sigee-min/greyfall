@@ -78,8 +78,8 @@ WORKDIR /opt/logs
 COPY --from=logs-builder /logs/server/dist ./dist
 
 # Nginx config and entrypoint
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY deploy/nginx.conf /etc/nginx/nginx.conf
+COPY deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Internal signal server port (do not expose directly)

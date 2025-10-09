@@ -34,3 +34,4 @@ node /opt/logs/dist/index.js &
 # Start nginx in foreground
 echo "[entrypoint] starting nginx on :80 and :443"
 exec nginx -g 'daemon off;'
+
