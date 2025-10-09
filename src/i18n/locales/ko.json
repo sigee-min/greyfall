@@ -45,9 +45,20 @@
   "sfx.volume": "효과음 음량",
   "sfx.volume.desc": "UI 효과음 및 상호작용 사운드의 크기를 조절합니다.",
 
+  "assets.preload": "백그라운드 에셋 미리받기",
+  "assets.preload.desc": "자주 쓰는 일러스트와 앰비언스를 진입 후 백그라운드에서 내려받습니다.",
+  "assets.preload.statusTitle": "미리받기 상태",
+  "assets.preload.statusLine": "{status} · {percent}% ({completed} / {total})",
+  "assets.preload.noRecent": "아직 로드된 에셋이 없어요.",
+  "assets.preload.errors": "최근 오류 {count}건",
+  "assets.preload.state.idle": "대기",
+  "assets.preload.state.running": "다운로드 중",
+  "assets.preload.state.paused": "일시 중지",
+  "assets.preload.state.done": "완료",
+  "assets.preload.state.cancelled": "취소됨",
+
   "debug.enable": "디버그 페이지 허용",
   "debug.enable.desc": "옵션이 켜져 있으면 ` 키로 네트워크 모니터를 열 수 있습니다.",
-  "debug.enable.note": "기본은 꺼져 있습니다. 활성화 시 단축키(`)로 열립니다.",
 
   "netmon.subtitle": "Network Monitor",
   "netmon.title": "네트워크 상태",

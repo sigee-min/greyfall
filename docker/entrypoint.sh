@@ -14,12 +14,13 @@ if [ ! -f "$CRT" ] || [ ! -f "$KEY" ]; then
     -subj "/CN=localhost" >/dev/null 2>&1
 fi
 
-# Start signal server
-export PORT=${PORT:-8787}
-echo "[entrypoint] starting signal server on :$PORT"
+# Start signal server on dedicated internal port to avoid clashing with nginx
+SIGNAL_PORT=${SIGNAL_PORT:-8787}
+export SIGNAL_PORT
+unset PORT
+echo "[entrypoint] starting signal server on :$SIGNAL_PORT"
 node /opt/signal/dist/index.js &
 
 # Start nginx in foreground
 echo "[entrypoint] starting nginx on :80 and :443"
 exec nginx -g 'daemon off;'
-

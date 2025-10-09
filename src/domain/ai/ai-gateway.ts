@@ -57,6 +57,7 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
       timeoutMs,
       twoPhase: false
     });
+    const runtimeTimeout = Math.max(3_000, Math.min(180_000, effectiveTimeout));
 
     if (DEBUG) console.debug('[gw] ensureRuntimeReady.begin');
     await ensureRuntimeReady(manager);
@@ -65,7 +66,7 @@ export async function requestAICommand(params: AIGatewayParams): Promise<AIComma
     const ctx: PipelineCtx = {
       user: userInstruction,
       manager,
-      scratch: { overrides: { temperature, maxTokens: maxTok, timeoutMs: Math.min(60_000, Math.max(3_000, effectiveTimeout)), locale: locale === 'en' ? 'en' : 'ko' } },
+      scratch: { overrides: { temperature, maxTokens: maxTok, timeoutMs: runtimeTimeout, locale: locale === 'en' ? 'en' : 'ko' } },
       tools: makeDefaultToolsHost({ manager, providers: getToolsProviders() })
     };
     try {

@@ -44,10 +44,14 @@ function StartLobbyLayoutBase({
   onCopyLobbyCode,
   onCopyAnswerCode,
   onChatKeyDown,
-  chatListRef
+  chatListRef,
+  hasApprovedCharacter
 }: StartLobbyLayoutBaseProps) {
   const { t } = useI18n();
   const { isMobile } = useResponsive();
+  const isStandard = variant === 'standard';
+  const isWide = variant === 'wide';
+  const isTall = variant === 'tall';
 
   const activeParticipant = useMemo(() => {
     if (localParticipant) return localParticipant;
@@ -55,40 +59,43 @@ function StartLobbyLayoutBase({
     return participants.find((participant) => participant.id === localParticipantId);
   }, [localParticipant, localParticipantId, participants]);
 
-  const bgObjectFit = variant === 'wide' ? 'contain' : 'cover';
-  const bgObjectPosition =
-    variant === 'wide' ? 'center' : variant === 'tall' ? 'center 40%' : 'center 34%';
+  const bgObjectFit = isWide ? 'contain' : 'cover';
+  const bgObjectPosition = isWide ? 'center' : isTall ? 'center 40%' : 'center 34%';
 
   const containerClass = cn(
     'mx-auto flex h-full w-full flex-col gap-10',
-    variant === 'standard' && 'max-w-7xl px-5 sm:px-7 lg:px-12',
-    variant === 'wide' && 'max-w-[1600px] px-6 sm:px-10 lg:px-16',
-    variant === 'tall' && 'max-w-4xl px-6 sm:px-8'
+    isStandard && 'max-w-7xl px-5 sm:px-7 lg:px-12',
+    isWide && 'max-w-[1680px] px-6 sm:px-8 lg:px-12 xl:px-16',
+    isTall && 'max-w-3xl px-4 sm:px-6'
   );
 
   const headerClass = cn(
-    'flex flex-col gap-5 md:flex-row md:items-start md:justify-between',
-    variant === 'tall' && 'items-center text-center md:flex-col md:gap-6'
+    'flex flex-col gap-5',
+    !isTall && 'md:flex-row md:items-start md:justify-between',
+    isTall && 'items-center text-center',
+    isWide && 'xl:gap-8'
   );
 
   const headerMetaClass = cn(
     'flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground',
-    variant === 'tall' && 'justify-center'
+    isTall ? 'justify-center' : 'md:justify-end'
   );
 
   const layoutSectionClass =
-    variant === 'tall'
-      ? 'flex flex-col gap-6'
+    isTall
+      ? 'flex flex-col gap-5'
       : cn(
           'grid gap-8',
-          variant === 'standard' && 'lg:grid-cols-[minmax(0,1.25fr),minmax(380px,460px)]',
-          variant === 'wide' && 'lg:grid-cols-[minmax(0,1.35fr),minmax(420px,520px)]'
+          isStandard && 'lg:grid-cols-[minmax(0,1.2fr),minmax(340px,400px)] xl:grid-cols-[minmax(0,1.25fr),minmax(360px,440px)]',
+          isWide && 'xl:grid-cols-[minmax(0,1.15fr),minmax(320px,380px)] 2xl:grid-cols-[minmax(0,1.18fr),minmax(340px,400px)]'
         );
 
   const chatPanelWidthClass =
-    variant === 'wide'
-      ? 'sm:w-[28rem] sm:rounded-l-2xl lg:w-[32rem]'
-      : 'sm:w-[26rem] sm:rounded-l-2xl lg:w-[30rem]';
+    isTall
+      ? 'w-full'
+      : isWide
+        ? 'sm:w-[25rem] sm:rounded-l-2xl md:w-[26rem] lg:w-[28rem] xl:w-[30rem]'
+        : 'sm:w-[26rem] sm:rounded-l-2xl lg:w-[28rem]';
 
   const handleCopyLobby = useCallback(() => {
     if (onCopyLobbyCode) {
@@ -123,7 +130,7 @@ function StartLobbyLayoutBase({
         <div className="flex-1 py-10">
           <div className={containerClass}>
             <header className={headerClass}>
-              <div className={cn('space-y-2', variant !== 'tall' && 'lg:max-w-3xl')}>
+              <div className={cn('space-y-2', !isTall && 'lg:max-w-3xl', isWide && 'xl:max-w-4xl')}>
                 <p className="text-xs uppercase tracking-[0.35em] text-primary/80">{t('ready.brand')}</p>
                 <h2 className="text-3xl font-semibold lg:text-4xl xl:text-5xl">
                   {mode === 'host' ? t('ready.header.host') : t('ready.header.guest')}
@@ -160,7 +167,7 @@ function StartLobbyLayoutBase({
             </header>
 
             <section className={layoutSectionClass}>
-              <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
+              <article className={cn('rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6', isTall && 'p-4 sm:p-5')}>
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                     {t('ready.crewStatus')}
@@ -169,7 +176,7 @@ function StartLobbyLayoutBase({
                     {participants.length}명 연결
                   </span>
                 </div>
-                <ul className="mt-5 space-y-4 text-sm">
+                <ul className={cn('mt-5 space-y-4 text-sm', isTall && 'space-y-3')}>
                   {participants.map((participant) => {
                     const isReady = participant.ready;
                     return (
@@ -216,8 +223,8 @@ function StartLobbyLayoutBase({
                 )}
               </article>
 
-              <div className={cn('flex flex-col gap-6 text-sm', variant === 'tall' && 'lg:flex-row lg:items-start lg:gap-6')}>
-                <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
+              <div className={cn('flex flex-col gap-6 text-sm', isTall && 'gap-4 lg:flex-row lg:items-start lg:gap-6')}>
+                <article className={cn('rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6', isTall && 'p-4 sm:p-5')}>
                   <header className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                       {mode === 'host'
@@ -237,7 +244,7 @@ function StartLobbyLayoutBase({
                     )}
                   </header>
 
-                  <div className="mt-4 space-y-3">
+                  <div className={cn('mt-4 space-y-3', isTall && 'space-y-2')}>
                     <div className="rounded-xl border border-border/60 bg-background/90 px-4 py-4 font-mono text-sm text-primary shadow-inner">
                       {mode === 'host'
                         ? lobbyCode
@@ -257,7 +264,7 @@ function StartLobbyLayoutBase({
                   </div>
 
                   {mode === 'host' && onAnswerSubmit && !autoConnect && (
-                    <div className="mt-5 space-y-3">
+                    <div className={cn('mt-5 space-y-3', isTall && 'space-y-2')}>
                       <label
                         htmlFor="answer-input"
                         className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground"
@@ -295,11 +302,11 @@ function StartLobbyLayoutBase({
                   )}
                 </article>
 
-                <article className="rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6">
+                <article className={cn('rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6', isTall && 'p-4 sm:p-5')}>
                   <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                     {t('ready.check')}
                   </h3>
-                  <div className="mt-4 space-y-3">
+                  <div className={cn('mt-4 space-y-3', isTall && 'space-y-2')}>
                     {activeParticipant && (
                       <div className="flex w-full flex-col gap-3">
                         {!activeParticipant.ready ? (
@@ -309,7 +316,13 @@ function StartLobbyLayoutBase({
                               'w-full rounded-md border px-3 py-2 text-sm font-semibold uppercase tracking-[0.3em] transition',
                               'border-primary bg-primary/90 text-primary-foreground hover:bg-primary'
                             )}
-                            onClick={() => onOpenCharacterBuilder?.()}
+                            onClick={() => {
+                              if (hasApprovedCharacter) {
+                                onToggleReady(activeParticipant.id);
+                              } else {
+                                onOpenCharacterBuilder?.();
+                              }
+                            }}
                           >
                             {t('ready.set')}
                           </button>
@@ -528,9 +541,13 @@ function StartLobbyLayoutBase({
               : []),
             {
               key: 'ready',
-              label: activeParticipant?.ready ? t('ready.status.ready') : t('ready.action.ready'),
+              label: activeParticipant?.ready ? t('ready.status.ready') : t('ready.set'),
               onClick: () => {
                 if (!localParticipantId) return;
+                if (!activeParticipant?.ready && !hasApprovedCharacter) {
+                  onOpenCharacterBuilder?.();
+                  return;
+                }
                 onToggleReady(localParticipantId);
               }
             },

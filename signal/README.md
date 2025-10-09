@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-기본 포트는 `8787`이며 `http://localhost:8787/health` 엔드포인트로 상태를 확인할 수 있습니다. Vite 프런트엔드에서는 `VITE_SIGNAL_SERVER_URL` 환경 변수를 통해 서버 주소를 지정합니다.
+기본 포트는 `8787`이며 `http://localhost:8787/health` 엔드포인트로 상태를 확인할 수 있습니다. `SIGNAL_PORT`(또는 기존 `PORT`) 환경 변수로 포트를 변경할 수 있습니다. Vite 프런트엔드에서는 `VITE_SIGNAL_SERVER_URL` 환경 변수를 통해 서버 주소를 지정합니다.
 
 ## Render 배포 가이드
 

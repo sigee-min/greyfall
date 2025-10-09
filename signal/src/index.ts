@@ -31,7 +31,7 @@ const sessions = new Map<string, Session>();
 const MAX_GUESTS = 3; // host + 3 guests = 4 players
 
 const SESSION_TTL_MS = 1000 * 60 * 30; // 30 minutes
-const PORT = Number(process.env.PORT ?? 8787);
+const SIGNAL_PORT = Number(process.env.SIGNAL_PORT ?? process.env.PORT ?? 8787);
 
 const app = express();
 app.use(cors({
@@ -270,7 +270,7 @@ setInterval(() => {
   }
 }, 60_000);
 
-server.listen(PORT, () => {
+server.listen(SIGNAL_PORT, () => {
   const address = server.address() as AddressInfo;
   console.log(`Signal server listening on port ${address.port}`);
 });

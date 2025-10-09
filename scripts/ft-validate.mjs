@@ -44,7 +44,9 @@ function sentences(text) {
   return String(text || '').trim().split(/(?<=[.!?])\s+/u).filter(Boolean);
 }
 
-function okActor(id) { return typeof id === 'string' && /^p:/.test(id); }
+const ACTOR_ID_REGEX = /^(p|e|n|a):[a-z0-9-]+$/i;
+
+function okActor(id) { return typeof id === 'string' && ACTOR_ID_REGEX.test(id); }
 
 function validate(task, sample) {
   const errs = [];

@@ -69,7 +69,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Internal signal server port (do not expose directly)
-ENV PORT=8787
+ENV SIGNAL_PORT=8787
 
 EXPOSE 80 443
 

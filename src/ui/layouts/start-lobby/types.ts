@@ -35,4 +35,5 @@ export type StartLobbyLayoutProps = {
   onCopyAnswerCode?: () => void;
   onChatKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   chatListRef: MutableRefObject<HTMLDivElement | null>;
+  hasApprovedCharacter: boolean;
 };

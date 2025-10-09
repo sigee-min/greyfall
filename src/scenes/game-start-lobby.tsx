@@ -72,6 +72,7 @@ export function GameStartLobby({
   });
   const everyoneReady = participants.length > 0 && participants.every((participant) => participant.ready);
   const localParticipant = participants.find((participant) => participant.id === localParticipantId);
+  const hasApprovedCharacter = useCharacterStore((state) => state.built);
   const playerName = localParticipant?.name ?? 'Player';
   const chatListRef = useRef<HTMLDivElement | null>(null);
   const [llmPrewarmText, setLlmPrewarmText] = useState<string | null>(null);
@@ -230,11 +231,11 @@ export function GameStartLobby({
       }
     >
       <LayoutComponent
-        background={background}
-        mode={mode}
-        lobbyCode={lobbyCode}
-        answerCode={answerCode}
-        autoConnect={autoConnect}
+      background={background}
+      mode={mode}
+      lobbyCode={lobbyCode}
+      answerCode={answerCode}
+      autoConnect={autoConnect}
         participants={participants}
         localParticipantId={localParticipantId}
         localParticipant={localParticipant}
@@ -260,6 +261,7 @@ export function GameStartLobby({
         onChatClose={handleChatClose}
         onChatKeyDown={handleChatKeyDown}
         chatListRef={chatListRef}
+        hasApprovedCharacter={hasApprovedCharacter}
       />
 
       {charBuilderOpen && (
@@ -316,3 +318,4 @@ export function GameStartLobby({
     </Suspense>
   );
 }
+import { useCharacterStore } from '../store/character';

@@ -45,9 +45,20 @@
   "sfx.volume": "SFX Volume",
   "sfx.volume.desc": "Adjust the loudness of UI/interaction sounds.",
 
+  "assets.preload": "Background asset preloading",
+  "assets.preload.desc": "Download frequently used illustrations and ambient audio after launch.",
+  "assets.preload.statusTitle": "Preload status",
+  "assets.preload.statusLine": "{status} · {percent}% ({completed} / {total})",
+  "assets.preload.noRecent": "No asset fetched yet.",
+  "assets.preload.errors": "Recent errors: {count}",
+  "assets.preload.state.idle": "Idle",
+  "assets.preload.state.running": "Fetching",
+  "assets.preload.state.paused": "Paused",
+  "assets.preload.state.done": "Completed",
+  "assets.preload.state.cancelled": "Cancelled",
+
   "debug.enable": "Enable Debug Page",
   "debug.enable.desc": "When enabled, press the ` key to open the Network Monitor.",
-  "debug.enable.note": "Disabled by default. Use backquote (`) to open when enabled.",
 
   "netmon.subtitle": "Network Monitor",
   "netmon.title": "Network Status",

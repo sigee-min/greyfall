@@ -1,19 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { exitFullscreen, getFullscreenElement, requestFullscreen } from '../../lib/fullscreen';
 import {
+  selectAssetPreloadEnabled,
   selectFullscreenEnabled,
   selectMusicEnabled,
-  selectMusicVolume,
   selectPreferencesLoaded,
   selectSfxEnabled,
-  selectSfxVolume,
-  usePreferencesStore
+  usePreferencesStore,
 } from '../../store/preferences';
 import { useI18n } from '../../i18n';
 import type { LocaleKey } from '../../i18n/config';
 import { LanguagePicker } from '../common/language-picker';
 import { purgeLocalModels, type WebLLMProgress } from '../../llm/llm-engine';
+import { useAssetPreloadStore, selectAssetPreloadSnapshot } from '../../domain/assets/preload-store';
+import { useSliderPreference } from './use-slider-preference';
 
 const TABS = [
   { key: 'music', label: '음악' },
@@ -36,27 +37,13 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
   const [activeTab, setActiveTab] = useState<TabKey>('music');
   const preferencesLoaded = usePreferencesStore(selectPreferencesLoaded);
   const musicEnabled = usePreferencesStore(selectMusicEnabled);
-  const musicVolume = usePreferencesStore(selectMusicVolume);
-  const [musicVolumeDraft, setMusicVolumeDraft] = useState(() => musicVolume);
   const sfxEnabled = usePreferencesStore(selectSfxEnabled);
-  const sfxVolume = usePreferencesStore(selectSfxVolume);
   const fullscreenEnabled = usePreferencesStore(selectFullscreenEnabled);
   const debugPageEnabled = usePreferencesStore((s) => s.debugPageEnabled);
+  const assetPreloadEnabled = usePreferencesStore(selectAssetPreloadEnabled);
   const setPreference = usePreferencesStore((state) => state.setPreference);
   const load = usePreferencesStore((state) => state.load);
-  const debouncedVolumeRef = useRef<number | null>(null);
-  const volumeCommitTimeoutRef = useRef<number | null>(null);
-
-  const flushVolumeChange = useCallback(() => {
-    if (debouncedVolumeRef.current === null) return;
-    setPreference('musicVolume', debouncedVolumeRef.current);
-    debouncedVolumeRef.current = null;
-    if (volumeCommitTimeoutRef.current !== null) {
-      window.clearTimeout(volumeCommitTimeoutRef.current);
-      volumeCommitTimeoutRef.current = null;
-    }
-  }, [setPreference]);
-
+  const preloadSnapshot = useAssetPreloadStore(selectAssetPreloadSnapshot);
 
   const handleMusicToggle = useCallback(
     (value: boolean) => {
@@ -68,22 +55,26 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
     [onEnableMusic, setPreference]
   );
 
-  const handleMusicVolumeChange = useCallback((value: number) => {
-    const normalized = value / 100;
-    setMusicVolumeDraft(normalized);
-    onPreviewMusicVolume?.(normalized);
-    if (typeof window === 'undefined') {
-      setPreference('musicVolume', normalized);
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      debouncedVolumeRef.current = normalized;
-      if (volumeCommitTimeoutRef.current !== null) {
-        window.clearTimeout(volumeCommitTimeoutRef.current);
-      }
-      volumeCommitTimeoutRef.current = window.setTimeout(flushVolumeChange, 120);
-    });
-  }, [flushVolumeChange, onPreviewMusicVolume, setPreference]);
+  const {
+    value: musicVolumeSlider,
+    handleChange: handleMusicVolumeChange,
+    flushPending: flushMusicVolume,
+  } = useSliderPreference({
+    key: 'musicVolume',
+    toSlider: (value) => Math.round(value * 100),
+    fromSlider: (value) => Math.min(1, Math.max(0, value / 100)),
+    onPreview: onPreviewMusicVolume,
+  });
+
+  const {
+    value: sfxVolumeSlider,
+    handleChange: handleSfxVolumeChange,
+    flushPending: flushSfxVolume,
+  } = useSliderPreference({
+    key: 'sfxVolume',
+    toSlider: (value) => Math.round(value * 100),
+    fromSlider: (value) => Math.min(1, Math.max(0, value / 100)),
+  });
 
   useEffect(() => {
     if (!preferencesLoaded) {
@@ -98,19 +89,11 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
   }, [open]);
 
   useEffect(() => {
-    setMusicVolumeDraft(musicVolume);
-  }, [musicVolume, open]);
-
-
-  useEffect(() => {
-    return () => {
-      flushVolumeChange();
-      if (volumeCommitTimeoutRef.current !== null) {
-        window.clearTimeout(volumeCommitTimeoutRef.current);
-        volumeCommitTimeoutRef.current = null;
-      }
-    };
-  }, [flushVolumeChange]);
+    if (!open) {
+      flushMusicVolume();
+      flushSfxVolume();
+    }
+  }, [flushMusicVolume, flushSfxVolume, open]);
   if (!open) return null;
 
   const applyFullscreen = async (value: boolean) => {
@@ -136,6 +119,31 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
 
   let tabContent: JSX.Element;
   if (activeTab === 'controls') {
+    const percent = preloadSnapshot.total > 0 ? Math.round((preloadSnapshot.completed / preloadSnapshot.total) * 100) : 0;
+    const statusLabel = (() => {
+      switch (preloadSnapshot.status) {
+        case 'running':
+          return t('assets.preload.state.running');
+        case 'paused':
+          return t('assets.preload.state.paused');
+        case 'done':
+          return t('assets.preload.state.done');
+        case 'cancelled':
+          return t('assets.preload.state.cancelled');
+        default:
+          return t('assets.preload.state.idle');
+      }
+    })();
+    const statusLine = t('assets.preload.statusLine', {
+      status: statusLabel,
+      percent,
+      completed: preloadSnapshot.completed,
+      total: preloadSnapshot.total,
+    });
+    const lastEntryLabel = preloadSnapshot.lastEntry ? preloadSnapshot.lastEntry.url : null;
+    const errorsLabel = preloadSnapshot.errors.length > 0
+      ? t('assets.preload.errors', { count: preloadSnapshot.errors.length })
+      : null;
     tabContent = (
       <div className="space-y-4">
         <div className="space-y-3 rounded-xl border border-dashed border-border/60 bg-card/60 p-6 text-xs text-muted-foreground">
@@ -150,9 +158,16 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
           checked={Boolean(debugPageEnabled)}
           onChange={(value) => setPreference('debugPageEnabled', value)}
         />
-        <p className="rounded-lg border border-border/60 bg-card/50 px-4 py-3 text-[11px] text-muted-foreground">
-          {t('debug.enable.note')}
-        </p>
+
+        <AssetPreloadCard
+          enabled={assetPreloadEnabled}
+          onToggle={(value) => setPreference('assetPreloadEnabled', value)}
+          statusLine={statusLine}
+          lastEntryLabel={lastEntryLabel ?? t('assets.preload.noRecent')}
+          errorsLabel={errorsLabel}
+          title={t('assets.preload')}
+          description={t('assets.preload.desc')}
+        />
       </div>
     );
   } else if (activeTab === 'display') {
@@ -189,7 +204,7 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
         <OptionSlider
           label={t('music.bgm.volume')}
           description={t('music.bgm.volume.desc')}
-          value={Math.round(musicVolumeDraft * 100)}
+          value={musicVolumeSlider}
           onChange={handleMusicVolumeChange}
           disabled={!musicEnabled}
         />
@@ -202,8 +217,8 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
         <OptionSlider
           label={t('sfx.volume')}
           description={t('sfx.volume.desc')}
-          value={Math.round(sfxVolume * 100)}
-          onChange={(value) => setPreference('sfxVolume', value / 100)}
+          value={sfxVolumeSlider}
+          onChange={handleSfxVolumeChange}
           disabled={!sfxEnabled}
         />
       </div>
@@ -331,6 +346,53 @@ function OptionSlider({ label, description, value, onChange, disabled }: OptionS
         className="w-full cursor-pointer accent-primary"
         onChange={(event) => onChange(Number(event.target.value))}
       />
+    </div>
+  );
+}
+
+type AssetPreloadCardProps = {
+  enabled: boolean;
+  onToggle: (value: boolean) => void;
+  statusLine: string;
+  lastEntryLabel: string;
+  errorsLabel?: string | null;
+  title: string;
+  description: string;
+};
+
+function AssetPreloadCard({
+  enabled,
+  onToggle,
+  statusLine,
+  lastEntryLabel,
+  errorsLabel,
+  title,
+  description
+}: AssetPreloadCardProps) {
+  return (
+    <div className="space-y-3 rounded-xl border border-border/60 bg-card/60 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <label className="flex items-center gap-2" data-cursor="pointer">
+          <span className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+            {enabled ? 'ON' : 'OFF'}
+          </span>
+          <input
+            type="checkbox"
+            className="h-5 w-5 cursor-pointer rounded border border-border accent-primary"
+            checked={enabled}
+            onChange={(event) => onToggle(event.target.checked)}
+          />
+        </label>
+      </div>
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p className="font-semibold text-xs uppercase tracking-[0.25em] text-primary/80">{statusLine}</p>
+        <p className="truncate text-[11px] text-muted-foreground/80">{lastEntryLabel}</p>
+        {errorsLabel ? <p className="text-[11px] text-rose-300">{errorsLabel}</p> : null}
+      </div>
     </div>
   );
 }

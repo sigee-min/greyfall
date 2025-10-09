@@ -39,6 +39,7 @@ import { Toaster } from './ui/common/toaster';
 import { useI18n } from './i18n';
 import { setToolsProviders } from './llm/tools/providers';
 import { LlmMonitor } from './ui/dev/llm-monitor';
+import { useAssetPreload } from './domain/assets/use-asset-preload';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -47,6 +48,7 @@ function App() {
   useUiSfx();
   useCustomCursor();
   useDisableAutofill();
+  useAssetPreload();
 
   const resources = useGreyfallStore(selectResources);
   const [scene, setScene] = useState<SceneKey>('mainLobby');
@@ -208,25 +210,29 @@ function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [scene]);
 
-  // Backquote(`) → 네트워크 모니터 토글 (옵션에서 허용 시)
+  // Backquote(`) → 네트워크 / LLM 모니터 토글 (디버그 허용 시)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // Ctrl+` → LLM 모니터 토글, 단일 ` → 네트워크 모니터(옵션 허용 시)
-      if ((event.code === 'Backquote' || event.key === '`') && event.ctrlKey) {
+      const isBackquote = event.code === 'Backquote' || event.key === '`';
+      if (!isBackquote) return;
+      if (!debugPageEnabled) return;
+      if (event.ctrlKey) {
         event.preventDefault();
         setLlmMonitorOpen((v) => !v);
         return;
       }
-      if ((event.code === 'Backquote' || event.key === '`') && !event.ctrlKey) {
-        if (debugPageEnabled) {
-          event.preventDefault();
-          setNetmonOpen((v) => !v);
-        }
-      }
+      event.preventDefault();
+      setNetmonOpen((v) => !v);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [debugPageEnabled]);
+
+  useEffect(() => {
+    if (!debugPageEnabled && llmMonitorOpen) {
+      setLlmMonitorOpen(false);
+    }
+  }, [debugPageEnabled, llmMonitorOpen]);
 
   const handleCreateGame = useCallback(
     async (name: string) => {
@@ -526,7 +532,7 @@ function App() {
       />
       <DeveloperDialog open={developerOpen} onClose={() => setDeveloperOpen(false)} />
       <NetworkMonitorDialog open={netmonOpen} onClose={() => setNetmonOpen(false)} />
-      {llmMonitorOpen && <LlmMonitor onClose={() => setLlmMonitorOpen(false)} />}
+      {debugPageEnabled && llmMonitorOpen && <LlmMonitor onClose={() => setLlmMonitorOpen(false)} />}
       {/* 매니저 선택 다이얼로그 제거됨 */}
       <ErrorDialog open={Boolean(errorMessage)} message={errorMessage ?? ''} onClose={dismissError} />
     </>
