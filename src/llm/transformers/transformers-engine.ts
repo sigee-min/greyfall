@@ -124,7 +124,25 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
     listeners.clear();
   };
 
+  let settled = false;
+  let externalAbortReject: (reason?: unknown) => void = () => {};
+
   const p = new Promise<string>((resolve, reject) => {
+    const settleResolve = (value: string) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const settleReject = (reason?: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(reason);
+    };
+    externalAbortReject = (reason?: unknown) => {
+      cleanup();
+      try { markAborted(streamId); } catch {}
+      settleReject(reason ?? new DOMException('Aborted', 'AbortError'));
+    };
     let acc = '';
     const onMsg = (ev: MessageEvent<unknown>) => {
       const raw = typeof ev.data === 'object' && ev.data !== null ? ev.data as Record<string, unknown> : {};
@@ -139,16 +157,16 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
         cleanup();
         const text = String(raw.text ?? acc);
         try { markDone(streamId, text); } catch {}
-        resolve(text);
+        settleResolve(text);
       } else if (type === 'aborted') {
         cleanup();
         try { markAborted(streamId); } catch {}
-        reject(new DOMException('Aborted', 'AbortError'));
+        settleReject(new DOMException('Aborted', 'AbortError'));
       } else if (type === 'error') {
         cleanup();
         const errMsg = String(raw.error ?? 'transformers error');
         try { markError(streamId, errMsg); } catch {}
-        reject(new Error(errMsg));
+        settleReject(new Error(errMsg));
       }
     };
     listeners.add(onMsg);
@@ -159,20 +177,19 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
       cleanup();
       const errorMessage = e instanceof Error ? e.message : String(e);
       try { markError(streamId, errorMessage); } catch {}
-      reject(e instanceof Error ? e : new Error(errorMessage));
+      settleReject(e instanceof Error ? e : new Error(errorMessage));
     }
   });
 
   if (signal) {
     if (signal.aborted) {
       try { w.postMessage({ type: 'abort', id }); } catch {}
-      cleanup();
-      try { markAborted(streamId); } catch {}
-      throw new DOMException('Aborted', 'AbortError');
+      externalAbortReject(new DOMException('Aborted', 'AbortError'));
+      return await p;
     }
     const onAbort = () => {
       try { w.postMessage({ type: 'abort', id }); } catch {}
-      cleanup();
+      externalAbortReject(new DOMException('Aborted', 'AbortError'));
     };
     signal.addEventListener('abort', onAbort, { once: true });
     try {

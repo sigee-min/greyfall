@@ -13,7 +13,7 @@ const MAP_LUMENFORD: MapNode = {
     mood: 'tense-hopeful',
   },
   bg: {
-    path: '/assets/bg/maps/lumenford/city_gate.webp',
+    path: '/assets/bg/maps/lumenford/gate.gif',
     position: 'center 70%',
     focalPoint: 'city-gate-lantern',
     parallax: 0.1,
@@ -31,11 +31,7 @@ const MAP_LUMENFORD: MapNode = {
   },
   music: {
     mood: 'ambient-industrial + muted choirs',
-    tracks: [
-      '/assets/audio/maps/lumenford/ambient.ogg',
-      '/assets/audio/maps/lumenford/ambient.mp3',
-      '/assets/audio/maps/shared/wind_low.ogg',
-    ],
+    tracks: ['/assets/audio/maps/lumenford/ambient.wav'],
     loop: true,
     volume: 0.7,
     cuePoints: [
@@ -56,7 +52,7 @@ const MAP_LUMENFORD: MapNode = {
       description: '통행세와 통행증 검문이 이뤄지는 북문. 등불탑이 도시를 비춘다.',
       neighbors: ['market', 'docks'],
       bg: {
-        path: '/assets/bg/maps/lumenford/gate_close.webp',
+        path: '/assets/bg/maps/lumenford/gate.png',
         position: 'center bottom',
         focalPoint: 'lantern-tower',
         overlay: 'grain',
@@ -68,17 +64,6 @@ const MAP_LUMENFORD: MapNode = {
         llmPrompt:
           'Close shot of lantern tower base with rain beads, teal neon flicker reflecting on metal grilles; shallow depth of field; loopable subtle flicker.',
       },
-      musicCue: {
-        mood: 'brass low + gate bustle',
-        tracks: ['/assets/audio/maps/lumenford/gate.ogg'],
-        loop: true,
-        volume: 0.8,
-        description:
-          '저음 브라스 드론, 멀리서 웅성거림·발소리·장비 금속 마찰 샘플을 레이어. ' +
-          '템포 프리, 간헐적 신호음(짧은 네온 플리커 샘플)로 포인트.',
-        llmPrompt:
-          'Low brass drone + crowd/footstep/metal scrapes ambience; free tempo; occasional short neon flicker tone; understated mix.',
-      },
     },
     {
       id: 'market',
@@ -87,7 +72,7 @@ const MAP_LUMENFORD: MapNode = {
       description: '부두길드 상인과 밀수꾼이 섞여드는 시장. 정보와 장비가 교차한다.',
       neighbors: ['gate', 'archives'],
       bg: {
-        path: '/assets/bg/maps/lumenford/market.webp',
+        path: '/assets/bg/maps/lumenford/market.png',
         position: 'center 65%',
         overlay: 'grain',
         grade: 'cool',
@@ -100,7 +85,7 @@ const MAP_LUMENFORD: MapNode = {
       },
       musicCue: {
         mood: 'rhythmic stalls + low pads',
-        tracks: ['/assets/audio/maps/lumenford/market.ogg'],
+        tracks: ['/assets/audio/maps/lumenford/field-market.wav'],
         loop: true,
         volume: 0.7,
         description:
@@ -117,7 +102,7 @@ const MAP_LUMENFORD: MapNode = {
       description: '유적도서관 분소. 봉인된 열람실로 가는 허가증이 필요한 곳.',
       neighbors: ['market'],
       bg: {
-        path: '/assets/bg/maps/lumenford/archives.webp',
+        path: '/assets/bg/maps/lumenford/archives.png',
         position: 'center 45%',
         overlay: 'fog',
         grade: 'cool',
@@ -127,12 +112,6 @@ const MAP_LUMENFORD: MapNode = {
         llmPrompt:
           'Museum-like archive interior with teal-glowing void shard in vacuum glass case; cool spotlights; dust motes; emphasize reflection/refraction details.',
       },
-      musicCue: {
-        mood: 'glass harmonics + hush',
-        tracks: ['/assets/audio/maps/lumenford/archives.ogg'],
-        loop: true,
-        volume: 0.6,
-      },
     },
     {
       id: 'docks',
@@ -141,7 +120,7 @@ const MAP_LUMENFORD: MapNode = {
       description: '검은 수로 위 격납 링. 프리 컴퍼니의 이착륙 포인트.',
       neighbors: ['gate'],
       bg: {
-        path: '/assets/bg/maps/lumenford/docks.webp',
+        path: '/assets/bg/maps/lumenford/docks.png',
         position: 'center bottom',
         overlay: 'fog',
         grade: 'cool',
@@ -151,16 +130,6 @@ const MAP_LUMENFORD: MapNode = {
         gifRecommended: true,
         llmPrompt:
           'Foggy docks with buoy beacons and runway-like light lines; slow water ripples; occasional hangar light flicker; loopable subtle motion.',
-      },
-      musicCue: {
-        mood: 'low wind + distant horns',
-        tracks: ['/assets/audio/maps/shared/wind_low.ogg'],
-        loop: true,
-        volume: 0.65,
-        description:
-          '저음 바람/해무 앰비언스, 멀리서 짧은 혼 경적이 드물게 울림. 잔향 길고 공간감 넓음.',
-        llmPrompt:
-          'Low wind/sea mist ambience; rare distant short foghorn calls; long tail reverb; wide spatial field.',
       },
     },
   ],
@@ -189,7 +158,7 @@ const MAP_BACKSTREETS: MapNode = {
   },
   music: {
     mood: 'noir ticks + alley ambience',
-    tracks: ['/assets/audio/maps/backstreets/noir.ogg'],
+    tracks: ['/assets/audio/maps/backstreets/noir.wav'],
     loop: true,
     volume: 0.65,
     description:
@@ -298,8 +267,8 @@ const MAP_LIBRARY: MapNode = {
   music: {
     mood: 'choral shards + sub bass',
     tracks: [
-      '/assets/audio/maps/library/echoes.ogg',
-      '/assets/audio/maps/library/echoes.mp3',
+      '/assets/audio/maps/library/echoes.wav',
+      '/assets/audio/maps/library/echoes.wav',
     ],
     loop: true,
     volume: 0.65,

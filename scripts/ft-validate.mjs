@@ -48,9 +48,74 @@ const ACTOR_ID_REGEX = /^(p|e|n|a):[a-z0-9-]+$/i;
 
 function okActor(id) { return typeof id === 'string' && ACTOR_ID_REGEX.test(id); }
 
+function norm(s) { return String(s || '').trim(); }
+
+function splitLines(s) {
+  return norm(s).split(/\r?\n/).filter((l) => l.trim());
+}
+
+function parseSections(sample) {
+  const sec = sample?.sections || {};
+  const actors = new Set();
+  const positions = new Map(); // id -> { map, field }
+  const eligible = { heal: new Set(), 'item.give': new Set() };
+  // actors: first token is id (e.g., "p:host role=...")
+  if (Array.isArray(sec.actors)) {
+    for (const line of sec.actors) {
+      const id = String(line).split(/\s+/)[0];
+      if (okActor(id)) actors.add(id);
+    }
+  }
+  // positions: id map= field=
+  if (Array.isArray(sec.positions)) {
+    for (const line of sec.positions) {
+      const m = String(line).match(/^(\w+:[^\s]+).*?map=([^\s]+).*?field=([^\s]+)/);
+      if (m) positions.set(m[1], { map: m[2], field: m[3] });
+    }
+  }
+  // targetsEligible entries like "heal:[p:bravo,p:delta]"
+  if (Array.isArray(sec.targetsEligible)) {
+    for (const line of sec.targetsEligible) {
+      const m = String(line).match(/^(heal|item\.give):\[([^\]]*)\]/);
+      if (m) {
+        const key = m[1];
+        for (const id of m[2].split(',').map((t) => t.trim()).filter(Boolean)) {
+          if (okActor(id)) eligible[key].add(id);
+        }
+      }
+    }
+  }
+  // recent chat
+  const recent = splitLines(sec.recentChat || '');
+  // numbers from rolls/effects (used to sanity-check narration figures)
+  const nums = new Set();
+  const collectNums = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const line of arr) {
+      const matches = String(line).match(/\b\d+\b/g);
+      if (matches) for (const n of matches) nums.add(n);
+    }
+  };
+  collectNums(sec.rolls);
+  collectNums(sec.effects);
+
+  return { actors, positions, eligible, recent, nums };
+}
+
 function validate(task, sample) {
   const errs = [];
   const out = sample.output;
+  const sec = parseSections(sample);
+  // Generic checks common to many tasks
+  if (sample?.meta) {
+    const locale = sample.meta.locale;
+    if (locale !== 'ko' && locale !== 'en') errs.push('locale invalid');
+    const ver = sample.meta.version;
+    if (ver !== 'v1') errs.push('version invalid');
+  }
+  // recentChat style: <=10 lines and each starts with '- '
+  if (sec.recent.length > 10) errs.push('recentChat too many lines');
+  if (sec.recent.some((l) => !/^\s*-\s/.test(l))) errs.push('recentChat format');
   switch (task) {
     case 'intent.plan': {
       if (!out || typeof out !== 'object') { errs.push('output not object'); break; }
@@ -65,6 +130,11 @@ function validate(task, sample) {
       const targets = Array.isArray(out.targets) ? out.targets : [];
       if (targets.length > caps.plan.maxTargets) errs.push('targets too many');
       if (!targets.every(okActor)) errs.push('targets invalid');
+      // Cross-check targets exist in actors set if provided
+      if (sec.actors.size && !targets.every((t) => sec.actors.has(t))) errs.push('targets not in actors');
+      // Cross-check eligible targets by action if available
+      if (a === 'heal' && sec.eligible.heal.size && !targets.every((t) => sec.eligible.heal.has(t))) errs.push('targets not eligible:heal');
+      if (a === 'item.give' && sec.eligible['item.give'].size && !targets.every((t) => sec.eligible['item.give'].has(t))) errs.push('targets not eligible:item.give');
       if (out.item != null && typeof out.item !== 'string') errs.push('item invalid');
       const reason = out?.meta?.reason;
       if (reason != null && typeof reason !== 'string') errs.push('reason invalid');
@@ -75,6 +145,9 @@ function validate(task, sample) {
       if (!text.trim()) errs.push('empty text');
       if (text.length > caps.narrate.maxChars) errs.push('too long');
       if (sentences(text).length > caps.narrate.maxSentences) errs.push('too many sentences');
+      // Heuristic: any digits in narration should appear in rolls/effects numbers
+      const nums = text.match(/\b\d+\b/g) || [];
+      if (nums.length && nums.some((n) => !sec.nums.has(n))) errs.push('numbers not in rolls/effects');
       break;
     }
     case 'intent.disambiguate': {
@@ -94,6 +167,7 @@ function validate(task, sample) {
         const t = String(r.text || '');
         if (!t || t.length > caps.entity.textMax) errs.push('text invalid');
         if (!okActor(r.actor)) errs.push('actor invalid');
+        if (sec.actors.size && !sec.actors.has(r.actor)) errs.push('actor not in actors');
       }
       break;
     }
@@ -114,7 +188,8 @@ function validate(task, sample) {
     case 'npc.name': {
       const names = Array.isArray(out?.names) ? out.names : [];
       if (names.length < caps.names.min || names.length > caps.names.max) errs.push('names size');
-      if (!names.every((n) => typeof n === 'string' && n.length <= caps.names.maxLen)) errs.push('name invalid');
+      const nameOk = (n) => typeof n === 'string' && n.length <= caps.names.maxLen && /[A-Za-z가-힣]/u.test(n);
+      if (!names.every(nameOk)) errs.push('name invalid');
       break;
     }
     case 'turn.summarize':
