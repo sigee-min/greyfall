@@ -65,11 +65,15 @@ async function main() {
         res.statusCode = 204; res.end(); return;
       }
 
-      if (!checkBasicAuth(req, res, cfg)) {
-        return unauthorized(res);
-      }
-
       const { pathname, query } = parseUrl(req);
+
+      // Open ingest endpoint (no auth required): POST /api/llm/logs
+      const isOpenIngest = req.method === 'POST' && pathname === '/api/llm/logs';
+      if (!isOpenIngest) {
+        if (!checkBasicAuth(req, res, cfg)) {
+          return unauthorized(res);
+        }
+      }
 
       // Determine dashboard base for link generation and route matching
       const isDash = (p: string) => p === '/dashboard' || p.startsWith('/dashboard/');

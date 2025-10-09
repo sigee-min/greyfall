@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "sh -c 'tsc -p tsconfig.server.json -w & while [ ! -f dist/index.js ]; do sleep 0.2; done; node --watch dist/index.js'",
     "build": "tsc -p tsconfig.server.json",
     "start": "node dist/index.js"
   },
@@ -12,4 +13,3 @@
     "typescript": "~5.4.5"
   }
 }
-

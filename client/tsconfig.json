@@ -21,6 +21,5 @@
       "@shared/protocol": ["../shared/protocol/schema.ts"]
     }
   },
-  "include": ["src"],
-  "references": [{ "path": "../tsconfig.node.json" }]
+  "include": ["src"]
 }

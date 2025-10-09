@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "dev": "npm -w client run dev",
+    "dev:all": "sh -c 'trap \"kill 0\" EXIT INT TERM; npm -w server run dev & npm -w signal run dev & npm -w client run dev; wait'",
+    "start:dev": "npm run dev:all",
     "build": "npm -w client run build",
     "preview": "npm -w client run preview",
     "typecheck": "npm -w client run typecheck",

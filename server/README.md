@@ -23,11 +23,11 @@ Greyfall LLM Logs Server — 사용법
    - 프록시 경유(운영/Nginx): `https://<도메인>/server/dashboard`
 
 API 요약
-- 인증: Basic Auth 필요(`Authorization: Basic base64(user:pass)`)
+- 인증: Basic Auth 필요(`Authorization: Basic base64(user:pass)`) — 단, 수집 엔드포인트는 예외
 - Health: `GET /api/health` → `{ ok: true, ts }`
 - 일자 목록: `GET /api/dates` → `{ dates: ["YYYY-MM-DD", ...] }`
 - 타입 목록: `GET /api/types?date=YYYY-MM-DD` → `{ date, types: ["npc.reply", ...] }`
-- 로그 적재(Create/Append): `POST /api/llm/logs`
+- 로그 적재(Create/Append): `POST /api/llm/logs` (인증 불필요)
   - Body(단건 또는 배열):
     {
       "request_id": "문자열 식별자",
@@ -62,8 +62,8 @@ API 요약
 - 상세: `GET /dashboard/logs/{request_id}?date=YYYY-MM-DD&request_type=...`
 
 프런트엔드 연동(단일 훅)
-- LLM 완료 시 프런트에서 `/api/llm/logs`로 Fire-and-Forget 전송합니다(실패 시 무시).
-- 기본 경로는 same-origin `/api`이며, Basic Auth는 환경변수(VITE_LOGS_BASIC_USER/PASS)로 주입합니다.
+- LLM 완료 시 프런트에서 `/api/llm/logs`로 Fire-and-Forget 전송합니다(실패 시 무시). 인증은 필요 없습니다.
+- 기본 경로는 same-origin `/api`입니다. 운영 환경에서는 프록시 레벨에서 레이트리밋/IP 제한 적용을 권장합니다.
 
 리버스 프록시 권장(Nginx)
 - TLS 오프로드 및 인증/접근 제어는 프록시에서 담당

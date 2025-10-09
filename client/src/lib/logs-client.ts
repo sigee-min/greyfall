@@ -6,19 +6,17 @@ type LlmLogPayload = {
   client_at?: string;
 };
 
-function getBaseUrl(): string {
-  const explicit = (import.meta as any)?.env?.VITE_LOGS_SERVER_URL as string | undefined;
-  if (explicit && explicit.trim()) return explicit.replace(/\/$/, '') + '/api';
-  // default: same-origin reverse proxy under /api
-  return '/api';
-}
+// Logs API base (same-origin reverse proxy under /api)
+const LOGS_API_BASE = '/api';
 
+// Dev-only helper: do NOT bundle secrets in production.
 function getAuthHeader(): string | null {
+  // Gate behind build-time flag so Vite can tree-shake this in production.
+  if (!(import.meta as any)?.env?.DEV) return null;
   const user = (import.meta as any)?.env?.VITE_LOGS_BASIC_USER as string | undefined;
   const pass = (import.meta as any)?.env?.VITE_LOGS_BASIC_PASS as string | undefined;
   if (!user || !pass) return null;
   try {
-    // Basic auth; encode as base64(user:pass)
     const token = btoa(`${user}:${pass}`);
     return `Basic ${token}`;
   } catch {
@@ -27,15 +25,12 @@ function getAuthHeader(): string | null {
 }
 
 export async function postLlmLog(payload: LlmLogPayload): Promise<boolean> {
-  const base = getBaseUrl();
-  const url = `${base}/llm/logs`;
-  const auth = getAuthHeader();
+  const url = `${LOGS_API_BASE}/llm/logs`;
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(auth ? { Authorization: auth } : {})
       },
       body: JSON.stringify({ ...payload, client_at: new Date().toISOString() })
     });
@@ -44,4 +39,3 @@ export async function postLlmLog(payload: LlmLogPayload): Promise<boolean> {
     return false;
   }
 }
-
