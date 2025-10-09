@@ -7,7 +7,6 @@ WORKDIR /app
 # Copy only needed packages for better caching
 COPY shared/protocol ./shared/protocol
 COPY client/package.json ./client/package.json
-COPY client/package-lock.json ./client/package-lock.json
 COPY client/vite.config.ts ./client/vite.config.ts
 COPY client/postcss.config.cjs ./client/postcss.config.cjs
 COPY client/tailwind.config.ts ./client/tailwind.config.ts
@@ -53,7 +52,7 @@ WORKDIR /logs
 COPY server/package.json ./server/package.json
 COPY server/tsconfig.server.json ./server/tsconfig.server.json
 COPY server/src ./server/src
-RUN cd server && npm ci && npm run build
+RUN cd server && npm install --no-audit --no-fund && npm run build
 
 # -------- Runtime image --------
 FROM node:20-alpine AS runtime
