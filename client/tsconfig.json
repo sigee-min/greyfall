@@ -16,11 +16,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],
-    "paths": {
-      "@greyfall/protocol": ["protocol/src/schema.ts"]
-    }
+    "types": ["vite/client"]
   },
-  "include": ["client/src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"],
+  "references": [{ "path": "../tsconfig.node.json" }]
 }

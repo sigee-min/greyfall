@@ -8,6 +8,10 @@
     "dev:test-llm": "vite --open /test-llm/index.html",
     "prebuild": "node scripts/generate-favicon.mjs --size 128",
     "build": "tsc -b && vite build",
+    "postinstall": "npm --prefix protocol install --no-audit --no-fund && npm --prefix protocol run build",
+    "server:build": "tsc -p server/tsconfig.server.json",
+    "server:start": "node server/dist/index.js",
+    "server": "npm run server:build && npm run server:start",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
@@ -16,6 +20,7 @@
     "coretest": "npm run coretest:build && CORETEST_FILES='(ack-resend|host-router-limit|client-patch-queue)' node scripts/run-core-tests.mjs"
   },
   "dependencies": {
+    "@greyfall/protocol": "file:protocol",
     "@huggingface/transformers": "^3.7.5",
     "@mlc-ai/web-llm": "^0.2.79",
     "@pixi/filter-kawase-blur": "^5.1.1",

@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import path from 'node:path';
 
-// 개발 환경에서도 HTTPS 사용 (자체 서명 인증서)
 export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
@@ -14,29 +13,29 @@ export default defineConfig({
       'Cross-Origin-Resource-Policy': 'same-origin',
       'X-Content-Type-Options': 'nosniff'
     },
-    // basicSsl() plugin enables HTTPS; explicit boolean can conflict with types
+    // no need to allow parent now that files are inside client/
     proxy: {
-      // Signal server REST endpoints (register these BEFORE generic /api to ensure precedence)
+      // Signal server REST endpoints (register before generic /api)
       '/api/sessions': {
         target: 'http://localhost:8787',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\//, '/')
+        rewrite: (p) => p.replace(/^\/api\//, '/')
       },
       '/api/health': {
         target: 'http://localhost:8787',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\//, '/')
+        rewrite: (p) => p.replace(/^\/api\//, '/')
       },
-      // Logs API (ingest/dashboard) on /api → local logs server
+      // Logs API (ingest/dashboard)
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true
       },
-      // Logs dashboard under /server/dashboard → local logs server (/dashboard)
+      // Logs dashboard under /server/dashboard → logs server (/dashboard)
       '/server/dashboard': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/server\/dashboard/, '/dashboard')
+        rewrite: (p) => p.replace(/^\/server\/dashboard/, '/dashboard')
       },
       // Signal WebSocket gateway
       '/ws': {
@@ -48,9 +47,12 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@greyfall/protocol': path.resolve(__dirname, 'protocol/src/schema.ts')
+      '@greyfall/protocol': path.resolve(__dirname, '../protocol/src/schema.ts'),
+      'zod': path.resolve(__dirname, 'node_modules/zod'),
+      '@app': path.resolve(__dirname, 'src')
     }
   },
+  publicDir: path.resolve(__dirname, 'public'),
   build: {
     chunkSizeWarningLimit: 3000,
     rollupOptions: {

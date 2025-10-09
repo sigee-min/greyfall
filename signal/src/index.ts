@@ -7,7 +7,7 @@ import {
   createSignalServerMessage,
   parseSignalClientMessage,
   SignalServerMessage
-} from './protocol/schema.js';
+} from '@greyfall/protocol';
 
 type Role = 'host' | 'guest';
 
