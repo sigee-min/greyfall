@@ -19,8 +19,8 @@ Greyfall LLM Logs Server — 사용법
 
 3) 대시보드 접속
    - 서버 직접: `http://localhost:8080/dashboard`
-   - 프록시 경유(개발): `https://localhost:5173/server/dashboard` (Vite 프록시가 `/server/dashboard` → 서버 `/dashboard`로 전달)
-   - 프록시 경유(운영/Nginx): `https://<도메인>/server/dashboard`
+   - 프록시 경유(개발): `https://localhost:5173/dashboard` (Vite 프록시가 `/dashboard` → 서버 `/dashboard`로 전달)
+   - 프록시 경유(운영/Nginx): `https://<도메인>/dashboard`
 
 API 요약
 - 인증: Basic Auth 필요(`Authorization: Basic base64(user:pass)`) — 단, 수집 엔드포인트는 예외
@@ -69,7 +69,7 @@ API 요약
 - TLS 오프로드 및 인증/접근 제어는 프록시에서 담당
 - 예시 매핑
   - `/api/*` → 로그 서버 (예외: `/api/sessions`, `/api/health` → 시그널 서버)
-  - `/server/dashboard` → 로그 서버 `/dashboard`
+- `/dashboard` → 로그 서버 `/dashboard`
 
 보안/운영 메모
 - HTTP를 사용하되(프록시에서 TLS 종단), Basic Auth 자격은 네트워크 레벨 제약(IP, 레이트리밋)과 함께 운용을 권장합니다.

@@ -32,11 +32,10 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true
       },
-      // Logs dashboard under /server/dashboard → logs server (/dashboard)
-      '/server/dashboard': {
+      // Logs dashboard under /dashboard → logs server
+      '/dashboard': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/server\/dashboard/, '/dashboard')
+        changeOrigin: true
       },
       // Signal WebSocket gateway
       '/ws': {

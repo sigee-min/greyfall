@@ -75,13 +75,12 @@ async function main() {
         }
       }
 
-      // Determine dashboard base for link generation and route matching
+      // Dashboard base path
       const isDash = (p: string) => p === '/dashboard' || p.startsWith('/dashboard/');
-      const isDashAlt = (p: string) => p === '/server/dashboard' || p.startsWith('/server/dashboard/');
-      const dashBase = isDashAlt(pathname) ? '/server/dashboard' : '/dashboard';
+      const dashBase = '/dashboard';
 
       // Dashboard (home)
-      if (req.method === 'GET' && (pathname === '/' || pathname === '/dashboard' || pathname === '/server/dashboard')) {
+      if (req.method === 'GET' && (pathname === '/' || pathname === '/dashboard')) {
         const body = `
           <div class="card">
             <h2>Getting started</h2>
@@ -94,7 +93,7 @@ async function main() {
       }
 
       // Dashboard: dates
-      if (req.method === 'GET' && (pathname === '/dashboard/dates' || pathname === '/server/dashboard/dates')) {
+      if (req.method === 'GET' && pathname === '/dashboard/dates') {
         const dates = await storage.listDates();
         const list = dates.map((d) => `<li><a href="${dashBase}/date/${d}">${escHtml(d)}</a></li>`).join('') || '<li class="muted">No data</li>';
         const body = `<div class="card"><h2>Dates</h2><ul>${list}</ul></div>`;
@@ -104,7 +103,7 @@ async function main() {
       }
 
       // Dashboard: types by date
-      if (req.method === 'GET' && (pathname.startsWith('/dashboard/date/') || pathname.startsWith('/server/dashboard/date/'))) {
+      if (req.method === 'GET' && pathname.startsWith('/dashboard/date/')) {
         const parts = pathname.split('/');
         const dateStr = decodeURIComponent(parts[parts.length - 1] || '');
         if (!isIsoDateString(dateStr)) {
@@ -121,7 +120,7 @@ async function main() {
       }
 
       // Dashboard: logs list
-      if (req.method === 'GET' && (pathname === '/dashboard/logs' || pathname === '/server/dashboard/logs')) {
+      if (req.method === 'GET' && pathname === '/dashboard/logs') {
         const dateStr = (query.date || '') as string;
         const type = (query.request_type || '') as string;
         const q = (query.q || '') as string;
@@ -168,7 +167,7 @@ async function main() {
       }
 
       // Dashboard: log detail
-      if (req.method === 'GET' && (pathname.startsWith('/dashboard/logs/') || pathname.startsWith('/server/dashboard/logs/'))) {
+      if (req.method === 'GET' && pathname.startsWith('/dashboard/logs/')) {
         const id = decodeURIComponent(pathname.split('/').pop() || '');
         const dateStr = (query.date || '') as string;
         const type = (query.request_type || '') as string;
