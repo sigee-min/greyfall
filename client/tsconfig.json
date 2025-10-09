@@ -10,16 +10,17 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "paths": {
-      "@shared/protocol": ["../shared/protocol/schema.ts"]
+      "@shared/protocol": ["../shared/protocol/schema.ts"],
+      "zod": ["./node_modules/zod"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../shared/protocol/**/*.ts"]
 }

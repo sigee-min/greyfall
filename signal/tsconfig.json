@@ -8,12 +8,12 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
-    "rootDir": "src",
     "baseUrl": ".",
     "paths": {
-      "@shared/protocol": ["../shared/protocol/schema.ts"]
+      "@shared/protocol": ["../shared/protocol/schema.ts"],
+      "zod": ["./node_modules/zod"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "../shared/protocol/schema.ts"],
   "exclude": ["dist"]
 }

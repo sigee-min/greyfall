@@ -200,8 +200,8 @@ const lobbyTraitSchema = z.object({
   statMods: z
     .record(statKeySchema, z.number().int())
     .optional()
-    .refine(
-      (value) => (value ? Object.keys(value).length > 0 : true),
+  .refine(
+      (value: Record<string, number> | undefined) => (value ? Object.keys(value).length > 0 : true),
       'statMods cannot be empty when provided'
     ),
   passives: z.array(lobbyPassiveSchema).max(16).optional(),
@@ -342,7 +342,7 @@ const lobbyMapTravelRequestSchema = lobbyEnvelopeSchema.extend({
       direction: z.enum(['next', 'prev']).optional(),
       toMapId: z.string().min(1).optional()
     })
-    .refine((v) => Boolean(v.direction) !== Boolean(v.toMapId), {
+    .refine((v: { direction?: 'next' | 'prev'; toMapId?: string }) => Boolean(v.direction) !== Boolean(v.toMapId), {
       message: 'Provide either direction or toMapId'
     })
 });
@@ -356,7 +356,7 @@ const lobbyMapTravelProposeSchema = lobbyEnvelopeSchema.extend({
       toMapId: z.string().min(1).optional(),
       quorum: z.enum(['majority', 'all']).optional()
     })
-    .refine((v) => Boolean(v.direction) !== Boolean(v.toMapId), {
+    .refine((v: { direction?: 'next' | 'prev'; toMapId?: string }) => Boolean(v.direction) !== Boolean(v.toMapId), {
       message: 'Provide either direction or toMapId'
     })
 });
@@ -409,6 +409,27 @@ const lobbyInteractCancelSchema = lobbyEnvelopeSchema.extend({
 const lobbyInteractConfirmedSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('interact:confirmed'),
   body: z.object({ inviteId: z.string().min(6), fromId: z.string().min(1), toId: z.string().min(1), verb: z.string().min(1) })
+});
+
+// Actors control (client -> host)
+const lobbyActorsHpAddRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:hpAdd:request'),
+  body: z.object({ actorId: z.string().min(1), delta: z.number().int().min(-20).max(20) })
+});
+
+const lobbyActorsInventoryTransferRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:inventory:transfer:request'),
+  body: z.object({ fromId: z.string().min(1), toId: z.string().min(1), key: z.string().min(1), count: z.number().int().min(1).max(99).optional() })
+});
+
+const lobbyActorsEquipRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:equip:request'),
+  body: z.object({ actorId: z.string().min(1), key: z.string().min(1) })
+});
+
+const lobbyActorsUnequipRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:unequip:request'),
+  body: z.object({ actorId: z.string().min(1), key: z.string().min(1) })
 });
 
 export const lobbyMessageSchema = z.discriminatedUnion('kind', [
@@ -498,4 +519,3 @@ export function parseLobbyMessage(input: unknown): LobbyMessage | null {
   const result = lobbyMessageSchema.safeParse(input);
   return result.success ? result.data : null;
 }
-
