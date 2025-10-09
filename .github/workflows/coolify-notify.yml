@@ -20,12 +20,13 @@ jobs:
     steps:
       - name: Prepare image reference
         id: image
-        env:
-          IMAGE_NAME: ${{ env.REGISTRY }}/${{ github.repository }}
-          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: |
-          echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          repo_lower=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+          image_name="${REGISTRY}/${repo_lower}"
+          commit_sha="${{ github.event.workflow_run.head_sha }}"
+          short_sha="${commit_sha:0:7}"
+          echo "image_name=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=sha-${short_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Coolify
         env:
