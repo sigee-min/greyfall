@@ -31,7 +31,12 @@ coverage
 *:Zone.Identifier
 .venv
 out
-data/
+# Ignore top-level data folder only
+/data/
+
+# Allow data directories under src (e.g., seed tables)
+!src/**/data/
+!src/**/data/**
 
 # Internal agent notes
 AGENTS.md
