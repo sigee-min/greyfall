@@ -11,6 +11,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@shared/protocol": "workspace:*",
     "@huggingface/transformers": "^3.7.5",
     "@mlc-ai/web-llm": "^0.2.79",
     "@pixi/filter-kawase-blur": "^5.1.1",

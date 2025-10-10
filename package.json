@@ -10,7 +10,10 @@
     "shared/protocol"
   ],
   "scripts": {
-    "dev": "npm -w client run dev",
+    "dev": "npm run dev:all",
+    "dev:client": "npm -w client run dev",
+    "dev:server": "npm -w server run dev",
+    "dev:signal": "npm -w signal run dev",
     "dev:all": "sh -c 'trap \"kill 0\" EXIT INT TERM; npm -w server run dev & npm -w signal run dev & npm -w client run dev; wait'",
     "start:dev": "npm run dev:all",
     "build": "npm -w client run build",

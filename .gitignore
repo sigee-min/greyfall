@@ -15,6 +15,9 @@ dist-server
 .eslintcache
 .svelte-kit
 coverage
+**/.tmp-tests
+.logs
+.npm-cache
 
 # TypeScript build info
 *.tsbuildinfo
@@ -38,3 +41,6 @@ AGENTS.md
 
 # Local LLM test workspace (ignore everything except entry files)
 test-llm
+
+# Allow checked-in contributor guide
+!AGENTS.md

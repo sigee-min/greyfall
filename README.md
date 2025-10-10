@@ -83,7 +83,7 @@ You only need Node.js 18+ and npm 9+ to run the watchpost locally:
 
 ```bash
 npm install
-npm run dev
+npm run dev   # = dev:all (client + signal + logs)
 ```
 
 Open the provided URL to explore the lobby, ready room, and tactical stage.
