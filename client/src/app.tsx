@@ -151,7 +151,7 @@ function App() {
       }
     });
     return unsub;
-  }, [changeScene, fullscreenEnabled, registerLobbyHandler, scene]);
+  }, [changeScene, fullscreenEnabled, registerLobbyHandler, scene, sessionMeta?.mode]);
 
   const dismissError = useCallback(() => {
     setErrorMessage(null);
@@ -358,7 +358,7 @@ function App() {
     if (sessionMeta?.mode === 'host') {
       missionStateSync.host.set({ state: 'combat', since: Date.now(), version: 1 }, 'mission:state:combat');
     }
-  }, [changeScene, fullscreenEnabled, publishLobbyMessage, resumeMusic, scene, startMissionReady]);
+  }, [changeScene, fullscreenEnabled, publishLobbyMessage, resumeMusic, scene, startMissionReady, sessionMeta?.mode]);
 
   const handleOptionsClose = useCallback(() => {
     dismissError();
