@@ -42,24 +42,12 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
   };
 
   const existing = getAuthUser();
-  // Hardcoded hero image path; place file at client/public/assets/login/hero.svg
-  const heroUrl = '/assets/login/hero.svg';
+  // Use live main lobby as background (no static hero image)
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[1000]">
-      {/* Subtle, weighty backdrop */}
-      <div className="absolute inset-0 bg-slate-950" />
-      <div className="absolute inset-0 overflow-hidden">
-        <img
-          src={heroUrl}
-          alt=""
-          className="h-full w-full object-cover opacity-35"
-          decoding="async"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-        />
-        <div className="absolute inset-0 bg-black/40" />
-      </div>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_400px_at_50%_-10%,rgba(148,163,184,0.06),transparent_60%)]" />
+      {/* Live lobby remains visible; apply a subtle scrim for readability */}
+      <div className="absolute inset-0 bg-black/50" />
 
       <div className="relative grid h-full place-items-center p-6">
         <div className="w-[min(560px,94vw)] overflow-hidden rounded-xl border border-border/60 bg-background/70 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-background/60">
