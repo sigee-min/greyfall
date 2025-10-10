@@ -42,8 +42,8 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
   };
 
   const existing = getAuthUser();
-  // Hardcoded hero image path; place file at client/public/images/login-hero.webp
-  const heroUrl = '/images/login-hero.webp';
+  // Hardcoded hero image path; place file at client/public/assets/login/hero.svg
+  const heroUrl = '/assets/login/hero.svg';
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[1000]">

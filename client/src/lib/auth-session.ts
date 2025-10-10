@@ -46,3 +46,31 @@ export async function getAuthNonce(): Promise<{ ok: boolean; nonce?: string; non
     return { ok: false };
   }
 }
+
+// In-flight dedupe helpers (dev StrictMode safe)
+let inflightAuthMe: Promise<{ ok: boolean; user?: AuthUser; token?: string } | { ok: false }> | null = null;
+export function getMeDedup(withToken = false) {
+  if (!inflightAuthMe) {
+    inflightAuthMe = getMe(withToken).finally(() => { inflightAuthMe = null; });
+  }
+  return inflightAuthMe;
+}
+
+type UsersMe = { ok: boolean; user?: { id: number; name?: string | null; picture?: string | null; role?: string } };
+let inflightUsersMe: Promise<UsersMe> | null = null;
+export async function getUsersMeDedup(): Promise<UsersMe> {
+  if (inflightUsersMe) return inflightUsersMe;
+  inflightUsersMe = (async () => {
+    try {
+      const res = await fetch('/api/users/me', { headers: { Accept: 'application/json' } });
+      if (!res.ok) return { ok: false } as UsersMe;
+      const json = (await res.json()) as UsersMe;
+      return json;
+    } catch {
+      return { ok: false } as UsersMe;
+    } finally {
+      inflightUsersMe = null;
+    }
+  })();
+  return inflightUsersMe;
+}

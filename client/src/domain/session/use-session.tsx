@@ -474,6 +474,18 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
 
       const hostParticipant: SessionWireParticipant = { id, name, tag, ready: false, role: 'host' };
       lobbyStore.replaceFromWire([hostParticipant]);
+      // Fetch server profile to enrich with avatar/name (authoritative callsign)
+      try {
+        const { getUsersMeDedup } = await import('../../lib/auth-session');
+        const json = await getUsersMeDedup();
+        if (json.ok) {
+          const n = (json.user?.name ?? name) as string;
+          const p = json.user?.picture ?? undefined;
+          lobbyStore.upsertFromWire({ id, name: n, tag, ready: false, role: 'host', avatarUrl: p as any });
+          // Broadcast updated snapshot to guests (authoritative host)
+          hostControllerRef.current?.broadcastParticipants('profile-update');
+        }
+      } catch {}
       globalBus.publish('session:state', { mode: 'host', code: sessionCode, participants: 1 });
     },
     [
@@ -671,6 +683,18 @@ export function useSession({ startHostSession: startHost, joinHostSession: joinH
       };
       const self: SessionWireParticipant = { id, name, tag, ready: false, role: 'guest' };
       lobbyStore.replaceFromWire([placeholder, self]);
+      // Fetch server profile to enrich with avatar/name before hello broadcast
+      try {
+        const { getUsersMeDedup } = await import('../../lib/auth-session');
+        const json = await getUsersMeDedup();
+        if (json.ok) {
+          const n = (json.user?.name ?? name) as string;
+          const p = json.user?.picture ?? undefined;
+          lobbyStore.upsertFromWire({ id, name: n, tag, ready: false, role: 'guest', avatarUrl: p as any });
+          // Re-announce self profile to host
+          publishLobbyMessage('hello', { participant: lobbyStore.toWire({ id, name: n, tag, ready: false, role: 'guest' } as any) }, 'profile-update hello');
+        }
+      } catch {}
       globalBus.publish('session:state', {
         mode: 'guest',
         code: upperInput,

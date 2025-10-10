@@ -33,14 +33,19 @@ import { useWorldMedia } from './domain/world/use-world-media';
 import { FieldGraph } from './ui/world/field-graph';
 import { MapMini } from './ui/world/map-mini';
 import { InteractionPanel } from './ui/world/interaction-panel';
+import { EquipmentHudBadge } from './ui/hud/equipment-hud-badge';
 import { CharacterBuilder } from './ui/character/character-builder';
+import { EquipmentPanel } from './ui/character/equipment-panel';
 import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
 import { useI18n } from './i18n';
 import { setToolsProviders } from './llm/tools/providers';
 import { LlmMonitor } from './ui/dev/llm-monitor';
 import { useAssetPreload } from './domain/assets/use-asset-preload';
+import { missionStateSync } from './domain/mission/mission-sync';
+import { useMissionStore } from './domain/mission/state';
 import { getAuthUser, setAuthUser, clearAuthUser, type AuthUser } from './lib/auth';
+import { getMeDedup, getUsersMeDedup } from './lib/auth-session';
 import { LoginGate } from './ui/auth/login-gate';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
@@ -95,6 +100,7 @@ function App() {
   });
 
   const musicPlayEnabled = preferencesLoaded && musicEnabled;
+  const missionState = useMissionStore((s) => s.state);
   // Dynamic world media (bg/music) in game scene
   const worldMedia = useWorldMedia(localParticipantId);
   const activeTracks = scene === 'game' ? worldMedia.tracks : LOBBY_TRACKS;
@@ -140,6 +146,9 @@ function App() {
       } catch {}
       if (scene !== 'game') changeScene('game');
       setSettingsOpen(false);
+      if (sessionMeta?.mode === 'host') {
+        missionStateSync.host.set({ state: 'combat', since: Date.now(), version: 1 }, 'mission:state:combat');
+      }
     });
     return unsub;
   }, [changeScene, fullscreenEnabled, registerLobbyHandler, scene]);
@@ -161,25 +170,32 @@ function App() {
   useEffect(() => {
     // Validate server session and sync local auth state
     const validateSession = async () => {
-      try {
-        const res = await fetch('/api/auth/me', { method: 'GET', headers: { 'Accept': 'application/json' } });
-        if (!res.ok) {
-          // Session missing/expired → clear local
-          clearAuthUser();
-          setAuthUserState(null);
-          return;
-        }
-        const json = (await res.json()) as { ok: boolean; user?: AuthUser };
-        if (json?.ok && json.user?.sub) {
-          setAuthUser(json.user);
-          setAuthUserState(json.user);
-        }
-      } catch {
-        // ignore network errors in validation path
+      const json = await getMeDedup(false);
+      if (!json.ok || !json.user?.sub) {
+        clearAuthUser();
+        setAuthUserState(null);
+        return;
       }
+      setAuthUser(json.user);
+      setAuthUserState(json.user);
     };
     void validateSession();
   }, []);
+
+  // When authenticated, fetch server-side profile to initialise callsign/playerName
+  useEffect(() => {
+    if (!authUser) return;
+    if (playerName && playerName.trim().length > 0) return;
+    let cancelled = false;
+    const loadProfile = async () => {
+      const json = await getUsersMeDedup();
+      if (!cancelled && json?.ok && json.user?.name) {
+        setPlayerName(json.user.name);
+      }
+    };
+    void loadProfile();
+    return () => { cancelled = true; };
+  }, [authUser, playerName]);
 
   useEffect(() => {
     if (!preferencesLoaded) {
@@ -336,6 +352,9 @@ function App() {
 
     if (scene !== 'game') changeScene('game');
     setSettingsOpen(false);
+    if (sessionMeta?.mode === 'host') {
+      missionStateSync.host.set({ state: 'combat', since: Date.now(), version: 1 }, 'mission:state:combat');
+    }
   }, [changeScene, fullscreenEnabled, publishLobbyMessage, resumeMusic, scene, startMissionReady]);
 
   const handleOptionsClose = useCallback(() => {
@@ -443,6 +462,7 @@ function App() {
                 <span className="text-primary">{t('resources.glow')} {resources.glow}</span>
                 <span className="text-destructive">{t('resources.corruption')} {resources.corruption}</span>
               </div>
+              <EquipmentHudBadge actorId={localParticipantId} />
               <button
                 type="button"
                 className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground transition hover:border-primary hover:text-primary"
@@ -457,6 +477,7 @@ function App() {
           <div className="pointer-events-auto absolute bottom-6 left-6 flex w-[360px] flex-col gap-4">
             <ChatDock />
             <CommandConsole publish={publishLobbyMessage} localParticipantId={localParticipantId} />
+            <EquipmentPanel actorId={localParticipantId} publish={publishLobbyMessage} />
           </div>
 
           {scene === 'game' && (

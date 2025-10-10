@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { cn } from '../../../lib/utils';
 import { useI18n } from '../../../i18n';
 import type { LobbyLayoutProps } from './types';
@@ -22,7 +23,7 @@ export function LobbyForm({
   joinCode,
   canCreate,
   canJoin,
-  onNameChange,
+  onNameChange: _onNameChange,
   onJoinCodeChange,
   onCreate,
   onJoin,
@@ -34,26 +35,51 @@ export function LobbyForm({
   const baseLabel = 'text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-slate-200/80 sm:text-xs';
   const baseInput =
     'w-full rounded-md border border-slate-100/20 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/70';
+  // Load server-side profile for avatar (best effort)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('../../../lib/auth-session');
+        const json = await mod.getUsersMeDedup();
+        if (!cancelled && json.ok) setAvatarUrl(json.user?.picture ?? null);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className={cn('w-full max-w-sm space-y-6 sm:max-w-sm', classes?.container)}>
       <div className={cn('space-y-2', classes?.panel)}>
         <label htmlFor="player-name" className={cn(baseLabel, classes?.label)}>
-          {t('lobby.callsign')}
+          {t('lobby.callsign')} <span className="ml-1 text-[0.65rem] lowercase text-muted-foreground">(Google)</span>
         </label>
-        <input
-          id="player-name"
-          name="greyfall-callsign"
-          value={playerName}
-          onChange={(event) => onNameChange(event.target.value)}
-          placeholder={t('lobby.callsign.placeholder')}
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          autoCapitalize="off"
-          inputMode="text"
-          className={cn(baseInput, classes?.input)}
-        />
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 overflow-hidden rounded-full border border-border/60 bg-background/60">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={playerName} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{playerName?.[0] ?? 'P'}</div>
+            )}
+          </div>
+          <input
+            id="player-name"
+            name="greyfall-callsign"
+            value={playerName}
+            readOnly
+            disabled
+            placeholder={t('lobby.callsign.placeholder')}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            inputMode="text"
+            className={cn(baseInput, 'cursor-not-allowed opacity-80', classes?.input)}
+          />
+        </div>
       </div>
 
       <div className={cn('space-y-2', classes?.panel)}>
