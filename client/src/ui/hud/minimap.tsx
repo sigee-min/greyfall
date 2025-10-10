@@ -44,10 +44,16 @@ export function Minimap({ stageCanvasRef, localParticipantId = null, publishLobb
   const [pings, setPings] = useState<Array<{ x: number; y: number; at: number }>>([]);
   const [hover, setHover] = useState<{ nodeId: string | null }>({ nodeId: null });
   const [innerSize, setInnerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [resizeTick, setResizeTick] = useState(0);
   // Travel vote domain (for entry guard / propose)
-  const travel = publishLobbyMessage && registerLobbyHandler
-    ? useTravelVote({ publishLobbyMessage, registerLobbyHandler, localParticipantId, sessionMode: null })
-    : null;
+  const safeRegister: RegisterLobbyHandler = (kind, handler) => () => {};
+  const safePublish: PublishLobbyMessage = () => false;
+  const travel = useTravelVote({
+    publishLobbyMessage: publishLobbyMessage ?? safePublish,
+    registerLobbyHandler: registerLobbyHandler ?? safeRegister,
+    localParticipantId,
+    sessionMode: null
+  });
 
   // Exit marker titles (localized). If cannot propose, append Entry-needed hint.
   const exitTitles = useMemo(() => {
@@ -264,14 +270,11 @@ export function Minimap({ stageCanvasRef, localParticipantId = null, publishLobb
     const worldRect = { x: clamped.x - vpWorld.width / 2, y: clamped.y - vpWorld.height / 2, width: vpWorld.width, height: vpWorld.height };
     const miniRect = rectToMinimap(worldRect, world, inner);
     strokeRect(ctx, miniRect.x, miniRect.y, miniRect.width, miniRect.height, style.viewport, 2 * DPR);
-  }, [scene.tokens, scene.fog, camera, world, mini.enabled, mini.showFog, mini.showTokens, stageCanvasRef, localParticipantId, pings, hover]);
+  }, [scene.tokens, scene.fog, camera, world, mini.enabled, mini.showFog, mini.showTokens, stageCanvasRef, localParticipantId, pings, hover, resizeTick]);
 
   // Resize redraw
   useEffect(() => {
-    const onResize = () => {
-      // trigger both size and draw effects by changing dependency via style.width computed inside
-      const canvas = canvasRef.current; if (!canvas) return; canvas.style.width = canvas.style.width; // no-op to retrigger
-    };
+    const onResize = () => setResizeTick((t) => t + 1);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

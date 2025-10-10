@@ -96,7 +96,7 @@ export function StageViewport({ children, background, className, localParticipan
     const rect = canvas.getBoundingClientRect();
     const st = stageRef.current;
     if (!st) return;
-    applyCamera(st.camera as any, camera, world, { width: rect.width, height: rect.height });
+    applyCamera(st.camera, camera, world, { width: rect.width, height: rect.height });
   }, [camera, world, stageRef]);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export function StageViewport({ children, background, className, localParticipan
       const canvas = canvasRef.current; const st = stageRef.current;
       if (!canvas || !st) return;
       const rect = canvas.getBoundingClientRect();
-      applyCamera(st.camera as any, camera, world, { width: rect.width, height: rect.height });
+      applyCamera(st.camera, camera, world, { width: rect.width, height: rect.height });
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);

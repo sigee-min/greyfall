@@ -143,7 +143,11 @@ export function SettingsOverlay({ open, onClose }: SettingsOverlayProps) {
               </div>
               <div className="grid grid-cols-3 items-center gap-2">
                 <span className="text-xs text-muted-foreground col-span-1">Size</span>
-                <select className="col-span-2" value={minimap.sizeMode} onChange={(e) => setMinimap({ sizeMode: e.target.value as any })}>
+                <select
+                  className="col-span-2"
+                  value={minimap.sizeMode}
+                  onChange={(e) => setMinimap({ sizeMode: e.target.value as import('../../store').GreyfallStore['minimap']['sizeMode'] })}
+                >
                   <option value="auto">Auto</option>
                   <option value="desktop-large">Desktop</option>
                   <option value="ultra">Ultra</option>

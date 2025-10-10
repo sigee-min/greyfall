@@ -12,12 +12,11 @@ type Props = {
 
 export function MinimapTravelChip({ localParticipantId, publishLobbyMessage, registerLobbyHandler }: Props) {
   const { t } = useI18n();
-  const { state, computed, actions, expanded } = useTravelVote({ localParticipantId, publishLobbyMessage, registerLobbyHandler, sessionMode: null });
+  const { state, computed, actions, expanded: _expanded } = useTravelVote({ localParticipantId, publishLobbyMessage, registerLobbyHandler, sessionMode: null });
   const [open, setOpen] = useState(false);
   const isActive = computed.isActive;
   const mapName = useMemo(() => (state.targetMapId ? (WORLD_STATIC.maps.find((m) => m.id === state.targetMapId)?.name ?? state.targetMapId) : ''), [state.targetMapId]);
 
-  if (!isActive && !open) return null;
 
   const pct = Math.round(computed.progressPct * 100);
   const seconds = computed.secondsLeft;
@@ -40,7 +39,9 @@ export function MinimapTravelChip({ localParticipantId, publishLobbyMessage, reg
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, computed.canCancel]);
+  }, [open, computed.canCancel, handleYes, handleNo, handleCancel]);
+
+  if (!isActive && !open) return null;
 
   return (
     <div className="absolute left-[16px] top-[16px] z-30" aria-live="polite">
