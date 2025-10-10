@@ -48,7 +48,8 @@ export default defineConfig({
   resolve: {
     preserveSymlinks: true,
     alias: {
-      '@app': path.resolve(__dirname, 'src')
+      '@app': path.resolve(__dirname, 'src'),
+      '@shared/protocol': path.resolve(__dirname, '../shared/protocol/schema.ts')
     }
   },
   publicDir: path.resolve(__dirname, 'public'),

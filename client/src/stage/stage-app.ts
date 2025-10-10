@@ -2,7 +2,9 @@ import * as PIXI from 'pixi.js';
 
 export type StageRef = {
   app: PIXI.Application;
-  root: PIXI.Container;
+  root: PIXI.Container; // stable root
+  camera: PIXI.Container; // transforms (position/scale)
+  world: PIXI.Container; // holds world layers (grid/fog/tokens/effects)
   dispose: () => void;
 };
 
@@ -23,9 +25,19 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<StageRef> 
   root.sortableChildren = true;
   app.stage.addChild(root);
 
+  const camera = new PIXI.Container();
+  camera.sortableChildren = true;
+  root.addChild(camera);
+
+  const world = new PIXI.Container();
+  world.sortableChildren = true;
+  camera.addChild(world);
+
   return {
     app,
     root,
+    camera,
+    world,
     dispose: () => {
       app.destroy(true, { children: true });
     }

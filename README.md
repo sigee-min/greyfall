@@ -83,7 +83,42 @@ You only need Node.js 18+ and npm 9+ to run the watchpost locally:
 
 ```bash
 npm install
-npm run dev   # = dev:all (client + signal + logs)
+npm run dev   # protocol only (shared types watch)
+```
+
+To run app and servers, use separate terminals:
+
+```
+npm -w shared/protocol run dev   # build/watch shared types
+npm -w client run dev            # web app (https://localhost:5173)
+npm -w server run dev            # app API (http://localhost:8080)
+npm -w signal run dev            # signaling (ws://localhost:8787)
+
+### Docker: Monolithic (CI default)
+
+Build single image with Nginx + Signal + App API in one container:
+
+```
+docker build -f deploy/Dockerfile -t greyfall:monolith .
+docker run -p 80:80 -p 443:443 greyfall:monolith
+```
+
+### Docker: Multi-Image (manual)
+
+Manual build of three images (client/signal/app) and compose run:
+
+```
+# From repo root
+docker build -f deploy/Dockerfile.client -t greyfall-client:local .
+docker build -f deploy/Dockerfile.signal -t greyfall-signal:local .
+docker build -f deploy/Dockerfile.server -t greyfall-app:local .
+
+cd deploy
+docker compose up --build
+# visit http://localhost:8080
+```
+
+Alternatively, trigger the manual GH Actions workflow “Build multi images (manual)” and set `push=true` to publish to GHCR.
 ```
 
 Open the provided URL to explore the lobby, ready room, and tactical stage.
@@ -94,6 +129,7 @@ Open the provided URL to explore the lobby, ready room, and tactical stage.
 - `docs/rulebook.md`: Tactical rules, clocks, Glow economy, and downtime actions.
 - `docs/scenes.md`: Sample narration beats to drop directly into mission briefings.
 - `docs/rtc-protocol.md`: Signal flow reference if you host your own comms server.
+- `references/protocol/llm-logs.md`: LLM 로그 스키마(messages)와 학습용 TRAIN-JSONL export 가이드.
 
 ## License
 

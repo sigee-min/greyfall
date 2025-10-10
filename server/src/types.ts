@@ -1,8 +1,12 @@
+export type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
 export type LlmLogInput = {
   request_id: string;
   request_type: string;
-  input_text: string;
-  output_text: string;
+  messages: ChatMessage[];
   client_at?: string;
   model?: string;
   temperature?: number;
@@ -25,4 +29,3 @@ export type IndexEntry = {
 };
 
 export type ApiError = { error: string; code?: string };
-

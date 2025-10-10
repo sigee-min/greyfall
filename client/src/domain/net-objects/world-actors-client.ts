@@ -1,6 +1,8 @@
 import type { ClientObject } from './types';
 import { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 import type { PositionEntry } from './world-positions-client';
+import type { Modifiers } from '../equipment/effect-types';
+import type { StatKey } from '../stats/keys';
 
 export type ActorInventoryItem = { key: string; count: number };
 export type ActorEntry = {
@@ -9,6 +11,11 @@ export type ActorEntry = {
   status?: string[];
   inventory?: ActorInventoryItem[];
   equipment?: string[];
+  // Optional equipment snapshot fields (tolerant parsing)
+  modifiers?: Modifiers;
+  derived?: Partial<Record<StatKey, number>>;
+  effectsHash?: string;
+  schemaVersion?: number;
 };
 
 type Subscriber = (list: ActorEntry[]) => void;
@@ -52,7 +59,11 @@ function normalizeEntry(raw: any): ActorEntry {
   const inv = Array.isArray(raw?.inventory) ? raw.inventory.map((i: any) => ({ key: String(i?.key ?? ''), count: Math.max(0, Number(i?.count ?? 0)) })) : undefined;
   const eq = Array.isArray(raw?.equipment) ? raw.equipment.map((e: any) => String(e ?? '')) : undefined;
   const status = Array.isArray(raw?.status) ? raw.status.map((s: any) => String(s ?? '')).filter(Boolean) : undefined;
-  return { id: String(raw?.id ?? ''), hp, inventory: inv, equipment: eq, status };
+  const modifiers = raw?.modifiers && typeof raw.modifiers === 'object' ? (raw.modifiers as Modifiers) : undefined;
+  const derived = raw?.derived && typeof raw.derived === 'object' ? (raw.derived as Partial<Record<StatKey, number>>) : undefined;
+  const effectsHash = typeof raw?.effectsHash === 'string' ? raw.effectsHash : undefined;
+  const schemaVersion = typeof raw?.schemaVersion === 'number' ? raw.schemaVersion : undefined;
+  return { id: String(raw?.id ?? ''), hp, inventory: inv, equipment: eq, status, modifiers, derived, effectsHash, schemaVersion };
 }
 
 export const worldActorsClient = new ClientWorldActors();

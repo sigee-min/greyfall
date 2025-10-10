@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { WORLD_STATIC } from '../../domain/world/data';
 import { worldPositionsClient } from '../../domain/net-objects/world-positions-client';
 import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/chat/use-lobby-chat';
-import { useTravelSession } from '../../domain/world/travel-session';
+import { useTravelVote } from '../../domain/world/travel/use-travel-vote';
 import { useGlobalBus } from '../../bus/global-bus';
 import type { SessionParticipant } from '../../domain/session/types';
 import { useI18n } from '../../i18n';
@@ -19,16 +19,7 @@ export function MapMini({ localParticipantId, participants, publish, register: _
   const bus = useGlobalBus();
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
-  const travel = useTravelSession();
-  const vote = useMemo(() => (travel.status === 'idle' ? null : ({
-    inviteId: travel.inviteId || '',
-    targetMapId: travel.targetMapId || WORLD_STATIC.head,
-    yes: travel.yes,
-    no: travel.no,
-    total: travel.total,
-    quorum: travel.quorum,
-    status: travel.status
-  } as const)), [travel]);
+  const { state: travelState, computed: travelComputed, actions: travelActions } = useTravelVote({ localParticipantId, publishLobbyMessage: publish, registerLobbyHandler: _register, sessionMode: null });
   const [now, setNow] = useState<number>(Date.now());
   const [policy, setPolicy] = useState<'majority' | 'all'>('majority');
   useEffect(() => {
@@ -45,36 +36,27 @@ export function MapMini({ localParticipantId, participants, publish, register: _
   const localRole = useMemo(() => participants.find((p) => p.id === localParticipantId)?.role ?? 'guest', [participants, localParticipantId]);
 
   useEffect(() => {
-    if (!vote) return;
-    if (vote.status === 'approved' || vote.status === 'rejected' || vote.status === 'cancelled') {
-      const mapName = WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId;
-      const statusTitle = vote.status === 'approved' ? t('map.travel.approved') : vote.status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
-      const statusKind: 'success' | 'warning' | 'info' = vote.status === 'approved' ? 'success' : vote.status === 'rejected' ? 'warning' : 'info';
-      bus.publish('toast:show', { title: statusTitle, message: `→ ${mapName}`, status: statusKind, durationMs: 2500 });
-      return undefined;
+    const status = travelState.status;
+    if (status === 'approved' || status === 'rejected' || status === 'cancelled') {
+      const mapName = travelState.targetMapId ? (WORLD_STATIC.maps.find((m) => m.id === travelState.targetMapId)?.name ?? travelState.targetMapId) : '';
+      const statusTitle = status === 'approved' ? t('map.travel.approved') : status === 'rejected' ? t('map.travel.rejected') : t('map.travel.cancelled');
+      const statusKind: 'success' | 'warning' | 'info' = status === 'approved' ? 'success' : status === 'rejected' ? 'warning' : 'info';
+      bus.publish('toast:show', { title: statusTitle, message: mapName ? `→ ${mapName}` : '', status: statusKind, durationMs: 2500 });
     }
-    return undefined;
-  }, [bus, t, vote]);
+  }, [bus, t, travelState.status, travelState.targetMapId]);
 
   const handleTravel = (dir: 'next' | 'prev') => {
-    if (!localParticipantId) return;
-    publish('map:travel:propose', { requesterId: localParticipantId, direction: dir, quorum: policy }, 'ui:travel:propose');
+    if (!travelComputed.canPropose) {
+      bus.publish('toast:show', { status: 'info', message: t('map.travel.entryRequired') });
+      travelActions.expand(true);
+      return;
+    }
+    travelActions.propose({ direction: dir, quorum: policy });
   };
 
-  const voteYes = () => {
-    if (!localParticipantId || !vote) return;
-    publish('map:travel:vote', { inviteId: vote.inviteId, voterId: localParticipantId, approve: true }, 'ui:travel:vote');
-  };
-  const voteNo = () => {
-    if (!localParticipantId || !vote) return;
-    publish('map:travel:vote', { inviteId: vote.inviteId, voterId: localParticipantId, approve: false }, 'ui:travel:vote');
-  };
-
-  const cancelTravel = () => {
-    if (!localParticipantId || !vote) return;
-    if (localRole !== 'host') return;
-    publish('map:travel:cancel', { inviteId: vote.inviteId, byId: localParticipantId }, 'ui:travel:cancel');
-  };
+  const voteYes = () => { travelActions.vote(true); };
+  const voteNo = () => { travelActions.vote(false); };
+  const cancelTravel = () => { travelActions.cancel(); };
 
   const occupancyByField = useMemo(() => {
     const map = WORLD_STATIC.maps[mapIndex];
@@ -111,23 +93,23 @@ export function MapMini({ localParticipantId, participants, publish, register: _
           <button className="rounded-md border border-border/60 px-2 py-1 text-xs hover:border-primary hover:text-primary" onClick={() => handleTravel('next')}>{t('common.next')}</button>
         </div>
       </div>
-      {vote && (
+      {travelComputed.isActive && (
         <div className="mb-3 rounded-md border border-primary/60 bg-primary/10 px-3 py-2 text-xs">
           <div className="flex items-center justify-between">
-            <span>{t('map.travel.vote')} → {WORLD_STATIC.maps.find((m) => m.id === vote.targetMapId)?.name ?? vote.targetMapId}</span>
-            <span className="text-[10px] text-muted-foreground">{vote.yes}/{vote.total} {t('common.yes')}{travel.status === 'proposed' && travel.deadlineAt ? ` · ${Math.max(0, Math.ceil((travel.deadlineAt - now) / 1000))}s` : ''}</span>
+            <span>{t('map.travel.vote')} → {travelState.targetMapId ? (WORLD_STATIC.maps.find((m) => m.id === travelState.targetMapId)?.name ?? travelState.targetMapId) : '—'}</span>
+            <span className="text-[10px] text-muted-foreground">{travelState.yes}/{travelState.total} {t('common.yes')} · {Math.max(0, Math.ceil(travelComputed.secondsLeft))}s</span>
           </div>
-          {vote.status === 'proposed' && (
+          {travelState.status === 'proposed' && (
             <div className="mt-2 flex gap-2">
               <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteYes}>{t('common.yes')}</button>
               <button className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:border-primary hover:text-primary" onClick={voteNo}>{t('common.no')}</button>
-              {localRole === 'host' && (
+              {localRole === 'host' && travelComputed.canCancel && (
                 <button className="ml-auto rounded-md border border-destructive/60 px-2 py-1 text-[11px] text-destructive hover:border-destructive hover:bg-destructive/10" onClick={cancelTravel}>{t('common.cancel')}</button>
               )}
             </div>
           )}
-          {vote.status !== 'proposed' && (
-            <div className="mt-2 text-[11px] text-muted-foreground">{vote.status}</div>
+          {travelState.status !== 'proposed' && (
+            <div className="mt-2 text-[11px] text-muted-foreground">{travelState.status}</div>
           )}
         </div>
       )}

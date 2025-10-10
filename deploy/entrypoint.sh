@@ -26,12 +26,12 @@ LOGS_PORT=${LOGS_PORT:-8080}
 export PORT=$LOGS_PORT
 export DATA_ROOT=${DATA_ROOT:-/data/llm-logs}
 mkdir -p "$DATA_ROOT"
-export AUTH_BASIC_ENABLED=${AUTH_BASIC_ENABLED:-true}
-export AUTH_USERS=${AUTH_USERS:-admin:admin}
-echo "[entrypoint] starting logs server on :$LOGS_PORT (data at $DATA_ROOT)"
+export SESSION_TTL_SEC=${SESSION_TTL_SEC:-18000}
+export COOKIE_NAME=${COOKIE_NAME:-SID}
+export JWT_SECRET=${JWT_SECRET:-change-me}
+echo "[entrypoint] starting app server on :$LOGS_PORT (data at $DATA_ROOT)"
 node /opt/logs/dist/index.js &
 
 # Start nginx in foreground
 echo "[entrypoint] starting nginx on :80 and :443"
 exec nginx -g 'daemon off;'
-

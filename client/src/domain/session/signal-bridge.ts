@@ -23,6 +23,17 @@ export type SignalBridge = {
   isOpen: () => boolean;
 };
 
+async function fetchAuthTokenSafe(): Promise<string | null> {
+  try {
+    const res = await fetch('/api/auth/me?with_token=1', { method: 'GET', headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { ok: boolean; user?: unknown; token?: string };
+    return (json && json.ok && typeof json.token === 'string') ? json.token : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useSignalBridge(): SignalBridge {
   const socketRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -54,9 +65,10 @@ export function useSignalBridge(): SignalBridge {
       handlersRef.current = handlers;
       sessionIdRef.current = sessionId;
 
+      const token = await fetchAuthTokenSafe();
       await new Promise<void>((resolve, reject) => {
         let settled = false;
-        const wsUrl = buildSignalWsUrl(sessionId, role);
+        const wsUrl = buildSignalWsUrl(sessionId, role, token);
         const socket = new WebSocket(wsUrl);
 
         const teardown = () => {
@@ -139,6 +151,8 @@ export function useSignalBridge(): SignalBridge {
     [disconnect]
   );
 
+  // token helper moved to top-level
+
   const sendEnvelope = useCallback(
     <K extends 'offer' | 'answer' | 'candidate'>(kind: K, payload: SignalClientBodies[K]) => {
       const socket = socketRef.current;
@@ -195,7 +209,10 @@ export function isLikelySignalCode(code: string) {
 }
 
 export async function requestSignalSessionId() {
-  const response = await fetch(buildSignalHttpUrl('/sessions'), { method: 'POST' });
+  const token = await fetchAuthTokenSafe();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const response = await fetch(buildSignalHttpUrl('/sessions'), { method: 'POST', headers });
   if (!response.ok) {
     throw new Error(`Failed to create signal session (${response.status})`);
   }

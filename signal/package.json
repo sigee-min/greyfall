@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@shared/auth": "*",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "ws": "^8.17.1",

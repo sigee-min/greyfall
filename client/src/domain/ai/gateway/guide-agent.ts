@@ -115,16 +115,6 @@ export function useGuideAgent({
             publishLobbyMessage('actors:inventory:transfer:request', { fromId: requesterId, toId: toPid, key, count: 1 }, 'ai:plan');
             applied = true;
             effects.push(`item.transfer ${key} from p:${requesterId} to ${target}`);
-          } else if (plan.action === 'equip' && typeof plan.item === 'string' && plan.item.trim()) {
-            const key = resolveItemAlias(plan.item.trim(), (worldActorsClient.getFor(requesterId)?.inventory ?? []).map((i) => i.key));
-            publishLobbyMessage('actors:equip:request', { actorId: requesterId, key }, 'ai:plan');
-            applied = true;
-            effects.push(`equip p:${requesterId} ${key}`);
-          } else if (plan.action === 'unequip' && typeof plan.item === 'string' && plan.item.trim()) {
-            const key = resolveItemAlias(plan.item.trim(), (worldActorsClient.getFor(requesterId)?.inventory ?? []).map((i) => i.key));
-            publishLobbyMessage('actors:unequip:request', { actorId: requesterId, key }, 'ai:plan');
-            applied = true;
-            effects.push(`unequip p:${requesterId} ${key}`);
           }
 
           if (!applied) {

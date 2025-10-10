@@ -158,17 +158,14 @@ export async function generateTransformersChat(prompt: string, options: ChatOpti
         cleanup();
         const text = String(raw.text ?? acc);
         try { markDone(streamId, text); } catch {}
-        // Fire-and-forget: append LLM log to server
+        // Fire-and-forget: append LLM log to server (canonical messages)
         try {
-          const system = typeof systemPrompt === 'string' ? systemPrompt : '';
-          const inputCombined = `${system}${system ? '\n\n' : ''}${prompt}`;
           const reqType = (options?.task as string) || 'chat';
-          void postLlmLog({
-            request_id: streamId,
-            request_type: reqType,
-            input_text: inputCombined,
-            output_text: text
-          });
+          const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
+          if (typeof systemPrompt === 'string' && systemPrompt.trim()) messages.push({ role: 'system', content: systemPrompt });
+          messages.push({ role: 'user', content: prompt });
+          messages.push({ role: 'assistant', content: text });
+          void postLlmLog({ request_id: streamId, request_type: reqType, messages });
         } catch { /* ignore log errors */ }
         settleResolve(text);
       } else if (type === 'aborted') {

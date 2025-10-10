@@ -3,6 +3,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { AddressInfo } from 'net';
 import { WebSocket, WebSocketServer } from 'ws';
+import { verifyJwtHS256 } from '@shared/auth';
 import {
   createSignalServerMessage,
   parseSignalClientMessage,
@@ -47,7 +48,22 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', sessions: sessions.size });
 });
 
-app.post('/sessions', (_req, res) => {
+app.post('/sessions', (req, res) => {
+  const requireAuth = String(process.env.SIGNAL_AUTH_REQUIRED || '0') === '1';
+  if (requireAuth) {
+    const secret = process.env.JWT_SECRET || 'change-me';
+    const auth = req.headers['authorization'];
+    const token = typeof auth === 'string' && /^Bearer\s+(.+)$/i.test(auth) ? (auth.match(/^Bearer\s+(.+)$/i) as RegExpMatchArray)[1] : (req.query?.token as string | undefined);
+    if (!token) {
+      res.status(401).json({ error: 'Missing auth token' });
+      return;
+    }
+    const v = verifyJwtHS256(token, secret);
+    if (!v.ok) {
+      res.status(401).json({ error: 'Invalid auth token' });
+      return;
+    }
+  }
   const id = generateSessionId();
   sessions.set(id, {
     id,
@@ -71,11 +87,26 @@ wss.on('connection', (socket, request) => {
   const url = new URL(request.url ?? '', 'http://localhost');
   const sessionId = url.searchParams.get('session');
   const role = url.searchParams.get('role') as Role | null;
+  const token = url.searchParams.get('token');
 
   if (!sessionId || !role || (role !== 'host' && role !== 'guest')) {
     console.warn('[ws] rejected connection due to invalid params', { sessionId, role });
     socket.close(1008, 'Invalid session parameters');
     return;
+  }
+
+  const requireAuth = String(process.env.SIGNAL_AUTH_REQUIRED || '0') === '1';
+  if (requireAuth) {
+    const secret = process.env.JWT_SECRET || 'change-me';
+    if (!token) {
+      socket.close(1008, 'Missing auth token');
+      return;
+    }
+    const v = verifyJwtHS256(token, secret);
+    if (!v.ok) {
+      socket.close(1008, 'Invalid auth token');
+      return;
+    }
   }
 
   let session = sessions.get(sessionId);

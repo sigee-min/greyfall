@@ -50,6 +50,10 @@ export type SessionState = {
 
 export type GreyfallStore = SessionState & {
   selectedTokenId: string | null;
+  // Camera and world state for stage/minimap
+  camera: { x: number; y: number; scale: number; minScale: number; maxScale: number };
+  world: { width: number; height: number };
+  minimap: { enabled: boolean; sizeMode: 'auto' | 'ultra' | 'desktop-large' | 'tablet' | 'mobile' | 'custom'; customSize?: number; showFog: boolean; showTokens: boolean; clusterThreshold: number; opacity: number };
   setScene: (scene: Partial<SceneState>) => void;
   setFog: (fog: Partial<FogState>) => void;
   setFogReveals: (reveals: FogReveal[]) => void;
@@ -58,6 +62,13 @@ export type GreyfallStore = SessionState & {
   appendLog: (entry: { id: string; body: string }) => void;
   selectToken: (tokenId: string | null) => void;
   hydrate: (snapshot: SessionState) => void;
+  // Camera/world/minimap actions
+  setCamera: (patch: Partial<GreyfallStore['camera']>) => void;
+  centerOn: (x: number, y: number) => void;
+  panBy: (dx: number, dy: number) => void;
+  zoomTo: (scale: number) => void;
+  setWorldSize: (size: Partial<GreyfallStore['world']>) => void;
+  setMinimap: (patch: Partial<GreyfallStore['minimap']>) => void;
 };
 
 const defaultScene: SceneState = {
@@ -78,6 +89,9 @@ const defaultState: SessionState = {
 export const useGreyfallStore = create<GreyfallStore>((set) => ({
   ...defaultState,
   selectedTokenId: null,
+  camera: { x: 2048, y: 2048, scale: 1, minScale: 0.5, maxScale: 4 },
+  world: { width: 4096, height: 4096 },
+  minimap: { enabled: true, sizeMode: 'auto', showFog: true, showTokens: true, clusterThreshold: 3, opacity: 0.9 },
   setScene: (scene) =>
     set((state) => ({
       scene: {
@@ -137,7 +151,14 @@ export const useGreyfallStore = create<GreyfallStore>((set) => ({
         fog: snapshot.scene.fog ?? state.scene.fog
       },
       selectedTokenId: state.selectedTokenId
-    }))
+    })),
+  setCamera: (patch) =>
+    set((state) => ({ camera: { ...state.camera, ...patch } })),
+  centerOn: (x, y) => set((state) => ({ camera: { ...state.camera, x, y } })),
+  panBy: (dx, dy) => set((state) => ({ camera: { ...state.camera, x: state.camera.x + dx, y: state.camera.y + dy } })),
+  zoomTo: (scale) => set((state) => ({ camera: { ...state.camera, scale: Math.max(state.camera.minScale, Math.min(state.camera.maxScale, scale)) } })),
+  setWorldSize: (size) => set((state) => ({ world: { ...state.world, ...size } })),
+  setMinimap: (patch) => set((state) => ({ minimap: { ...state.minimap, ...patch } }))
 }));
 
 export const selectScene = (state: GreyfallStore) => state.scene;
@@ -148,3 +169,6 @@ export const selectResources = (state: GreyfallStore) => ({
 });
 
 export const selectSelectedTokenId = (state: GreyfallStore) => state.selectedTokenId;
+export const selectCamera = (state: GreyfallStore) => state.camera;
+export const selectWorld = (state: GreyfallStore) => state.world;
+export const selectMinimap = (state: GreyfallStore) => state.minimap;

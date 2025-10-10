@@ -11,7 +11,7 @@ export function buildSignalHttpUrl(path: string) {
   return `/api${suffix}`;
 }
 
-export function buildSignalWsUrl(sessionId: string, role: 'host' | 'guest') {
+export function buildSignalWsUrl(sessionId: string, role: 'host' | 'guest', token?: string | null) {
   let base: URL;
   if (explicitSignalOrigin) {
     base = new URL(explicitSignalOrigin);
@@ -23,5 +23,6 @@ export function buildSignalWsUrl(sessionId: string, role: 'host' | 'guest') {
   base.pathname = '/ws';
   base.searchParams.set('session', sessionId);
   base.searchParams.set('role', role);
+  if (token) base.searchParams.set('token', token);
   return base.toString();
 }

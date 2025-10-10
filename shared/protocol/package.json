@@ -4,8 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./schema.ts"
+    ".": "./dist/schema.js"
   },
-  "types": "./schema.ts"
+  "types": "./dist/schema.d.ts",
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "dev": "sh -c 'tsc -p ./tsconfig.json -w --preserveWatchOutput'",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "typescript": "~5.4.5",
+    "rimraf": "^6.0.1"
+  }
 }
-

@@ -411,6 +411,19 @@ const lobbyInteractConfirmedSchema = lobbyEnvelopeSchema.extend({
   body: z.object({ inviteId: z.string().min(6), fromId: z.string().min(1), toId: z.string().min(1), verb: z.string().min(1) })
 });
 
+// Map ping (ephemeral broadcast)
+const lobbyMapPingSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('map:ping'),
+  body: z.object({
+    byId: z.string().min(1),
+    x: z.number().nonnegative(),
+    y: z.number().nonnegative(),
+    at: z.number().int().nonnegative().optional(),
+    ttlMs: z.number().int().min(250).max(10000).optional(),
+    color: z.string().min(1).optional()
+  })
+});
+
 // Actors control (client -> host)
 const lobbyActorsHpAddRequestSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('actors:hpAdd:request'),
@@ -460,6 +473,7 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyInteractAcceptSchema,
   lobbyInteractCancelSchema,
   lobbyInteractConfirmedSchema,
+  lobbyMapPingSchema,
   lobbyActorsHpAddRequestSchema,
   lobbyActorsInventoryTransferRequestSchema,
   lobbyActorsEquipRequestSchema,
@@ -497,11 +511,139 @@ export type LobbyMessageBodies = {
   'interact:accept': { inviteId: string; toId: string };
   'interact:cancel': { inviteId: string; byId: string };
   'interact:confirmed': { inviteId: string; fromId: string; toId: string; verb: string };
+  'map:ping': { byId: string; x: number; y: number; at?: number; ttlMs?: number; color?: string };
   'actors:hpAdd:request': { actorId: string; delta: number };
   'actors:inventory:transfer:request': { fromId: string; toId: string; key: string; count?: number };
   'actors:equip:request': { actorId: string; key: string };
   'actors:unequip:request': { actorId: string; key: string };
 };
+
+// =====================
+// Auth & Logs (HTTP API)
+// =====================
+
+export const authSigninRequestSchema = z
+  .object({ credential: z.string().min(10) })
+  .strict();
+export type AuthSigninRequest = z.infer<typeof authSigninRequestSchema>;
+
+export const authUserSchema = z
+  .object({
+    sub: z.string().min(1),
+    name: z.string().optional(),
+    email: z.string().email().optional(),
+    picture: z.string().url().optional(),
+    iss: z.string().optional(),
+    aud: z.string().optional(),
+    exp: z.number().int().optional(),
+    role: z.string().optional()
+  })
+  .strict();
+export type AuthUser = z.infer<typeof authUserSchema>;
+
+export const authSigninResponseSchema = z
+  .object({ ok: z.literal(true), user: authUserSchema, token: z.string().optional() })
+  .strict();
+export type AuthSigninResponse = z.infer<typeof authSigninResponseSchema>;
+
+export const authMeResponseSchema = z
+  .object({ ok: z.literal(true), user: authUserSchema, token: z.string().optional() })
+  .strict();
+export type AuthMeResponse = z.infer<typeof authMeResponseSchema>;
+
+export const chatMessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string().min(1)
+});
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+export const llmLogCreateSchema = z
+  .object({
+    request_id: z.string().min(1),
+    request_type: z.string().min(1),
+    messages: z.array(chatMessageSchema).min(2),
+    client_at: z.string().optional(),
+    model: z.string().optional(),
+    temperature: z.number().optional(),
+    top_p: z.number().optional(),
+    seed: z.number().optional(),
+    meta: z.any().optional()
+  })
+  .strict();
+export type LlmLogCreate = z.infer<typeof llmLogCreateSchema>;
+
+export const llmLogCreateBatchSchema = z.union([llmLogCreateSchema, z.array(llmLogCreateSchema)]);
+export type LlmLogCreateBatch = z.infer<typeof llmLogCreateBatchSchema>;
+
+// Common query helpers
+export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+// Types query: GET /api/types?date=YYYY-MM-DD
+export const typesQuerySchema = z
+  .object({
+    date: isoDateSchema
+  })
+  .strict();
+export type TypesQuery = z.infer<typeof typesQuerySchema>;
+
+// Logs list: GET /api/llm/logs?date=...&request_type=...&q=...&page=...&page_size=...
+export const logsListQuerySchema = z
+  .object({
+    date: isoDateSchema,
+    request_type: z.string().min(1),
+    q: z.string().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    page_size: z.coerce.number().int().min(1).max(500).optional()
+  })
+  .strict();
+export type LogsListQuery = z.infer<typeof logsListQuerySchema>;
+
+// Logs by id: GET /api/llm/logs/{id}?date=...&request_type=...
+export const logsReadByIdQuerySchema = z
+  .object({
+    date: isoDateSchema,
+    request_type: z.string().min(1)
+  })
+  .strict();
+export type LogsReadByIdQuery = z.infer<typeof logsReadByIdQuerySchema>;
+
+// Download: GET /api/download?date=...&request_type=...&format=...&latest=1|0&filter=...&id?&max_turns?
+export const downloadQuerySchema = z
+  .object({
+    date: isoDateSchema,
+    request_type: z.string().min(1),
+    format: z.enum(['ndjson', 'json', 'train-jsonl']).default('ndjson'),
+    latest: z.union([z.literal('1'), z.literal('0')]).optional(),
+    filter: z.enum(['complete', 'all']).optional(),
+    id: z.string().optional(),
+    max_turns: z.coerce.number().int().min(1).max(32).optional()
+  })
+  .strict();
+export type DownloadQuery = z.infer<typeof downloadQuerySchema>;
+
+// Update (PATCH): optional date/request_type to preserve current fallback semantics
+export const logsUpdateQuerySchema = z
+  .object({
+    date: isoDateSchema.optional(),
+    request_type: z.string().min(1).optional()
+  })
+  .strict();
+export type LogsUpdateQuery = z.infer<typeof logsUpdateQuerySchema>;
+
+// Delete (DELETE): optional date/request_type with same fallback semantics
+export const logsDeleteQuerySchema = z
+  .object({
+    date: isoDateSchema.optional(),
+    request_type: z.string().min(1).optional()
+  })
+  .strict();
+export type LogsDeleteQuery = z.infer<typeof logsDeleteQuerySchema>;
+
+// Update body: require messages as canonical container; allow passthrough fields
+export const llmLogUpdateBodySchema = z
+  .object({ messages: z.array(chatMessageSchema).min(2) })
+  .passthrough();
+export type LlmLogUpdateBody = z.infer<typeof llmLogUpdateBodySchema>;
 
 export function createLobbyMessage<K extends LobbyMessageKind>(
   kind: K,

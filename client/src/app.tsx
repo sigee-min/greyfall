@@ -40,6 +40,8 @@ import { useI18n } from './i18n';
 import { setToolsProviders } from './llm/tools/providers';
 import { LlmMonitor } from './ui/dev/llm-monitor';
 import { useAssetPreload } from './domain/assets/use-asset-preload';
+import { getAuthUser, setAuthUser, clearAuthUser, type AuthUser } from './lib/auth';
+import { LoginGate } from './ui/auth/login-gate';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
@@ -57,6 +59,7 @@ function App() {
   const [developerOpen, setDeveloperOpen] = useState(false);
   const [netmonOpen, setNetmonOpen] = useState(false);
   const [llmMonitorOpen, setLlmMonitorOpen] = useState(false);
+  const [authUser, setAuthUserState] = useState<AuthUser | null>(() => getAuthUser());
   // Manager selection UI removed; default manager handled inside loaders/components
   const [playerName, setPlayerName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -153,6 +156,29 @@ function App() {
       document.body.style.margin = '';
       document.body.style.overflow = '';
     };
+  }, []);
+
+  useEffect(() => {
+    // Validate server session and sync local auth state
+    const validateSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (!res.ok) {
+          // Session missing/expired → clear local
+          clearAuthUser();
+          setAuthUserState(null);
+          return;
+        }
+        const json = (await res.json()) as { ok: boolean; user?: AuthUser };
+        if (json?.ok && json.user?.sub) {
+          setAuthUser(json.user);
+          setAuthUserState(json.user);
+        }
+      } catch {
+        // ignore network errors in validation path
+      }
+    };
+    void validateSession();
   }, []);
 
   useEffect(() => {
@@ -394,7 +420,13 @@ function App() {
 
     const stageBg = scene === 'game' ? worldMedia.bgSrc : '/assets/bg/stage-ops.png';
     return (
-      <StageViewport background={stageBg} className="cursor-crosshair">
+      <StageViewport
+        background={stageBg}
+        className="cursor-crosshair"
+        localParticipantId={localParticipantId}
+        publishLobbyMessage={publishLobbyMessage}
+        registerLobbyHandler={registerLobbyHandler}
+      >
         <div className="pointer-events-none absolute inset-0">
           <Toaster />
           {/* Global toasts */}
@@ -523,6 +555,9 @@ function App() {
   return (
     <>
       {content}
+      {scene === 'mainLobby' && !authUser && Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID) && (
+        <LoginGate onSignedIn={(u) => setAuthUserState(u)} />
+      )}
       <OptionsDialog
         open={optionsOpen}
         onClose={handleOptionsClose}

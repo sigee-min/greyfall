@@ -16,7 +16,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": {
+      "@shared/protocol": ["../shared/protocol/schema.ts"]
+    }
   },
   "include": ["src"]
 }

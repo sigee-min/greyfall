@@ -164,6 +164,22 @@ npm run dev
 
 터미널에 표시된 주소로 접속하면 로비, 준비실, 전술 스테이지를 바로 탐색할 수 있습니다.
 
+## Environment Variables
+
+- `VITE_GOOGLE_CLIENT_ID` (required for Google 로그인)
+  - 예: `1234567890-abc.apps.googleusercontent.com`
+  - 설정되면 구글 로그인 버튼이 표시되고, 서버와 세션을 교환합니다.
+- `VITE_SIGNAL_SERVER_URL` (optional)
+  - 예: `https://signal.example.com`
+  - 지정하지 않으면 same-origin 프록시를 사용해 `http /api`, `ws /ws` 경로로 연결합니다.
+
+추천: `client/.env.local`에 설정
+
+```
+VITE_GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+# VITE_SIGNAL_SERVER_URL=https://signal.example.com
+```
+
 ### 라이선스
 
 `LICENSE`에 명시된 *Greyfall Console Non-Commercial License*를 따릅니다. Greyfall 내부 검토와 비상업적 세션 외의 사용에는 Greyfall 운영진의 별도 승인이 필요합니다.

@@ -1,17 +1,21 @@
 Greyfall LLM Logs Server — 사용법
 
 개요
-- 역할: LLM 요청/응답을 날짜/타입별(NDJSON)로 저장하고, Basic Auth 대시보드 및 CRUD API를 제공합니다.
+- 역할: LLM 요청/응답을 날짜/타입별(NDJSON)로 저장하고, 세션 인증 기반 대시보드 및 CRUD API를 제공합니다.
 - 저장 규칙: 데이터 루트(DATA_ROOT)/YYYY-MM-DD/{request_type}.json 에 JSON Lines(NDJSON)로 append 저장합니다.
-- 인증: HTTP Basic Auth. 대시보드/모든 API 공통으로 적용합니다.
+- 인증: Google 로그인 교환(`/api/auth/google/signin`) → 서버 JWT 발급(쿠키 `SID`), 세션 TTL 기본 5시간.
 
 빠른 시작(로컬)
 1) 환경 변수(.env 예시)
    - PORT=8080
    - DATA_ROOT=./data/llm-logs
    - MAX_FILE_SIZE_MB=100
-   - AUTH_BASIC_ENABLED=true
-   - AUTH_USERS=admin:admin;viewer:viewer
+   - SESSION_TTL_SEC=18000 # 5시간
+   - SESSION_REFRESH_SKEW_SEC=900 # 만료 임박 시 재발급 임계값(초)
+   - COOKIE_NAME=SID
+   - JWT_SECRET=change-me
+   - JWT_SECRET=change-me
+   - GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 
 2) 빌드/실행
    - 빌드: `npm run server:build` → 산출물 `server/dist`
@@ -23,7 +27,10 @@ Greyfall LLM Logs Server — 사용법
    - 프록시 경유(운영/Nginx): `https://<도메인>/dashboard`
 
 API 요약
-- 인증: Basic Auth 필요(`Authorization: Basic base64(user:pass)`) — 단, 수집 엔드포인트는 예외
+- 인증: 세션(Bearer 또는 쿠키). 수집 엔드포인트는 예외
+- 인증 교환: `POST /api/auth/google/signin` Body `{ credential }` → `{ ok, user, token }` + `Set-Cookie: SID=...`
+- 세션 확인: `GET /api/auth/me` → `{ ok, user }`
+- 로그아웃: `POST /api/auth/logout`
 - Health: `GET /api/health` → `{ ok: true, ts }`
 - 일자 목록: `GET /api/dates` → `{ dates: ["YYYY-MM-DD", ...] }`
 - 타입 목록: `GET /api/types?date=YYYY-MM-DD` → `{ date, types: ["npc.reply", ...] }`
@@ -72,7 +79,7 @@ API 요약
 - `/dashboard` → 로그 서버 `/dashboard`
 
 보안/운영 메모
-- HTTP를 사용하되(프록시에서 TLS 종단), Basic Auth 자격은 네트워크 레벨 제약(IP, 레이트리밋)과 함께 운용을 권장합니다.
+- 프록시에서 TLS 종단 및 접근 제어 수행, API는 Bearer 권장(변경 요청 시).
 - 대용량 데이터에 대비해 로테이션/컴팩션(야간)과 백업/보존정책을 운영 환경에서 스케줄링하세요.
 
 개발 팁(테스트)
@@ -85,10 +92,22 @@ API 요약
 소스 구조
 - `server/src/index.ts`  HTTP 서버 및 라우팅
 - `server/src/storage.ts` NDJSON append/로테이션/인덱스
-- `server/src/auth.ts`    Basic Auth 검사
+- `server/src/routes/auth.ts` 세션 교환/확인/로그아웃 라우트
+- `server/src/middleware/auth.ts` 보호 라우트 가드(JWT/쿠키)
 - `server/src/config.ts`  환경 변수 로드
 - `server/src/utils.ts`   유틸(파서, 날짜 등)
 - `server/src/types.ts`   타입 정의
 
 라이선스/주석
 - 현재 서버는 Node 내장 모듈로만 동작합니다. 외부 디펜던시는 빌드 타임(TypeScript) 용도에 한정됩니다.
+
+## Environment Variables
+
+- `PORT` (기본 8080) — HTTP 포트
+- `DATA_ROOT` (기본 `./data/llm-logs`) — 데이터 루트 디렉터리
+- `MAX_FILE_SIZE_MB` (기본 100) — 파일 로테이션 임계값(MB)
+- `GOOGLE_CLIENT_ID` (필수) — Google ID 토큰 검증용 클라이언트 ID
+- `JWT_SECRET` (필수/운영) — 서버 세션 JWT 서명 시크릿
+- `SESSION_TTL_SEC` (기본 18000=5h) — 세션 유효기간
+- `SESSION_REFRESH_SKEW_SEC` (기본 900=15m) — 만료 임박 시 갱신 임계값
+- `COOKIE_NAME` (기본 `SID`) — 세션 쿠키 이름

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef } from 'react';
-import { selectScene, selectResources, useGreyfallStore } from '../../store';
+import { selectScene, selectResources, selectMinimap, useGreyfallStore } from '../../store';
 import { useI18n } from '../../i18n';
 import { cn } from '../../lib/utils';
 
@@ -12,6 +12,8 @@ export function SettingsOverlay({ open, onClose }: SettingsOverlayProps) {
   const { t } = useI18n();
   const scene = useGreyfallStore(selectScene);
   const resources = useGreyfallStore(selectResources);
+  const minimap = useGreyfallStore(selectMinimap);
+  const setMinimap = useGreyfallStore((s) => s.setMinimap);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -112,6 +114,51 @@ export function SettingsOverlay({ open, onClose }: SettingsOverlayProps) {
                 ))}
               </ul>
             )}
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-border/60 bg-card/50 p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">Minimap</h3>
+            <div className="mt-3 space-y-3 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={minimap.enabled} onChange={(e) => setMinimap({ enabled: e.target.checked })} />
+                <span>Enabled</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={minimap.showFog} onChange={(e) => setMinimap({ showFog: e.target.checked })} />
+                <span>Show Fog</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={minimap.showTokens} onChange={(e) => setMinimap({ showTokens: e.target.checked })} />
+                <span>Show Tokens</span>
+              </label>
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-xs text-muted-foreground col-span-1">Opacity</span>
+                <input className="col-span-2" type="range" min={0.6} max={1.0} step={0.05} value={minimap.opacity} onChange={(e) => setMinimap({ opacity: Number(e.target.value) })} />
+              </div>
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-xs text-muted-foreground col-span-1">Cluster</span>
+                <input className="col-span-2" type="range" min={2} max={10} step={1} value={minimap.clusterThreshold} onChange={(e) => setMinimap({ clusterThreshold: Number(e.target.value) })} />
+              </div>
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-xs text-muted-foreground col-span-1">Size</span>
+                <select className="col-span-2" value={minimap.sizeMode} onChange={(e) => setMinimap({ sizeMode: e.target.value as any })}>
+                  <option value="auto">Auto</option>
+                  <option value="desktop-large">Desktop</option>
+                  <option value="ultra">Ultra</option>
+                  <option value="tablet">Tablet</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              {minimap.sizeMode === 'custom' && (
+                <div className="grid grid-cols-3 items-center gap-2">
+                  <span className="text-xs text-muted-foreground col-span-1">Custom</span>
+                  <input className="col-span-2" type="number" min={120} max={320} step={10} value={minimap.customSize ?? 240} onChange={(e) => setMinimap({ customSize: Number(e.target.value) })} />
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>

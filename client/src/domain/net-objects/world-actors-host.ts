@@ -5,6 +5,10 @@ import type { ActorEntry, ActorInventoryItem } from './world-actors-client';
 import { worldActorsClient } from './world-actors-client.js';
 import { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 import { itemSlot, slotCapacity } from '../world/equipment-rules.js';
+import { computeEquipmentSnapshot } from '../equipment/aggregator';
+import { getItemEffects } from '../equipment/effect-registry';
+import { RULES_VERSION } from '../equipment/rules';
+import type { StatKey } from '../stats/keys';
 
 export { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 
@@ -117,7 +121,9 @@ export class HostWorldActorsObject implements HostObject {
     // Consume item from inventory and equip
     inv = this.adjustInventory(inv, key, -1);
     eq.push(key);
-    return this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:equip');
+    const ok = this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:equip');
+    if (ok) this.updateEquipmentSnapshot(actorId);
+    return ok;
   }
 
   unequipItem(actorId: string, key: string): boolean {
@@ -129,7 +135,31 @@ export class HostWorldActorsObject implements HostObject {
     if (idx < 0) return false;
     eq.splice(idx, 1);
     const inv = this.adjustInventory(e.inventory, key, 1);
-    return this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:unequip');
+    const ok = this.list.upsertMany([{ ...e, inventory: inv, equipment: eq }], 'actors:equipment:unequip');
+    if (ok) this.updateEquipmentSnapshot(actorId);
+    return ok;
+  }
+
+  private updateEquipmentSnapshot(actorId: string): void {
+    try {
+      const list = this.getAll();
+      const e = list.find((a) => a.id === actorId);
+      if (!e) return;
+      const equipped = Array.isArray(e.equipment) ? e.equipment : [];
+      const effectsByItem: Record<string, ReturnType<typeof getItemEffects>> = {};
+      for (const k of equipped) effectsByItem[k] = getItemEffects(k);
+      // Base stats unknown at this layer → derive zeros to keep modifiers authoritative for now
+      const base: Record<StatKey, number> = {
+        Strength: 0,
+        Agility: 0,
+        Engineering: 0,
+        Dexterity: 0,
+        Medicine: 0
+      } as Record<StatKey, number>;
+      const snap = computeEquipmentSnapshot({ base, equipped, effectsByItem, rulesVersion: RULES_VERSION }, { includeDerived: false, trace: false });
+      const next: ActorEntry = { ...e, modifiers: snap.modifiers, effectsHash: snap.effectsHash, schemaVersion: 1 } as any;
+      this.list.upsertMany([next], 'actors:equipment:snapshot');
+    } catch {}
   }
 }
 
