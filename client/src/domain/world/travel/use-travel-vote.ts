@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../../chat/use-lobby-chat';
 import { WORLD_STATIC } from '../../world/data';
 import { worldPositionsClient } from '../../net-objects/world-positions-client';
@@ -101,14 +101,14 @@ export function useTravelVote(args: {
   const canCancel = isHost && isActive;
   const canVote = isActive && Boolean(localParticipantId);
 
-  const resolveToMapId = (params: { direction?: 'next' | 'prev'; toMapId?: string }): string | null => {
+  const resolveToMapId = useCallback((params: { direction?: 'next' | 'prev'; toMapId?: string }): string | null => {
     if (params.toMapId) return params.toMapId;
     const dir = params.direction;
     if (!dir) return null;
     if (dir === 'next') return currentMap.next ?? null;
     if (dir === 'prev') return currentMap.prev ?? null;
     return null;
-  };
+  }, [currentMap]);
 
   const propose: TravelVoteActions['propose'] = useCallback((params) => {
     if (!canPropose || !localParticipantId) return false;
@@ -122,7 +122,7 @@ export function useTravelVote(args: {
     }, 'ui:travel:propose');
     if (ok) setExpanded(true);
     return ok;
-  }, [canPropose, localParticipantId, publishLobbyMessage]);
+  }, [canPropose, localParticipantId, publishLobbyMessage, resolveToMapId]);
 
   const vote: TravelVoteActions['vote'] = useCallback((approve) => {
     if (!canVote || !localParticipantId) return false;

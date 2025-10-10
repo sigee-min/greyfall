@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RegisterLobbyHandler, PublishLobbyMessage } from '../../domain/chat/use-lobby-chat';
 import { useTravelVote } from '../../domain/world/travel/use-travel-vote';
 import { WORLD_STATIC } from '../../domain/world/data';
@@ -23,10 +23,11 @@ export function MinimapTravelChip({ localParticipantId, publishLobbyMessage, reg
   const barColor = pct >= 66 ? '#22c55e' : pct >= 33 ? '#f59e0b' : '#ef4444';
   const secColor = seconds > 10 ? 'text-foreground' : seconds > 5 ? 'text-yellow-400' : 'text-destructive';
 
-  const handleToggle = () => setOpen((v) => !v);
-  const handleYes = () => actions.vote(true);
-  const handleNo = () => actions.vote(false);
-  const handleCancel = () => actions.cancel();
+  const handleToggle = useCallback(() => setOpen((v) => !v), []);
+  const { vote, cancel: cancelAction } = actions;
+  const handleYes = useCallback(() => vote(true), [vote]);
+  const handleNo = useCallback(() => vote(false), [vote]);
+  const handleCancel = useCallback(() => cancelAction(), [cancelAction]);
 
   // Keyboard shortcuts when panel open: Y/N vote, Esc close, C cancel (host)
   useEffect(() => {

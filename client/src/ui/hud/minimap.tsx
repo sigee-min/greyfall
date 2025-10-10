@@ -46,8 +46,8 @@ export function Minimap({ stageCanvasRef, localParticipantId = null, publishLobb
   const [innerSize, setInnerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [resizeTick, setResizeTick] = useState(0);
   // Travel vote domain (for entry guard / propose)
-  const safeRegister: RegisterLobbyHandler = (kind, handler) => () => {};
-  const safePublish: PublishLobbyMessage = () => false;
+  const safeRegister: RegisterLobbyHandler = (_kind, _handler) => () => {};
+  const safePublish: PublishLobbyMessage = (_kind, _body, _context) => false;
   const travel = useTravelVote({
     publishLobbyMessage: publishLobbyMessage ?? safePublish,
     registerLobbyHandler: registerLobbyHandler ?? safeRegister,
@@ -270,7 +270,7 @@ export function Minimap({ stageCanvasRef, localParticipantId = null, publishLobb
     const worldRect = { x: clamped.x - vpWorld.width / 2, y: clamped.y - vpWorld.height / 2, width: vpWorld.width, height: vpWorld.height };
     const miniRect = rectToMinimap(worldRect, world, inner);
     strokeRect(ctx, miniRect.x, miniRect.y, miniRect.width, miniRect.height, style.viewport, 2 * DPR);
-  }, [scene.tokens, scene.fog, camera, world, mini.enabled, mini.showFog, mini.showTokens, stageCanvasRef, localParticipantId, pings, hover, resizeTick]);
+  }, [scene.tokens, scene.fog, camera, world, mini.enabled, mini.showFog, mini.showTokens, mini.clusterThreshold, stageCanvasRef, localParticipantId, pings, hover, resizeTick, style]);
 
   // Resize redraw
   useEffect(() => {
@@ -326,7 +326,6 @@ export function Minimap({ stageCanvasRef, localParticipantId = null, publishLobb
       const my = (ev.clientY - rect.top) * (canvas.height / rect.height);
       // Hover detection when not dragging
       if (!drag?.active) {
-        const pos = localParticipantId ? worldPositionsClient.getFor(localParticipantId) : null;
         const graph = graphRef.current;
         let best: { id: string; d2: number } | null = null;
         if (graph) {
@@ -409,7 +408,7 @@ export function Minimap({ stageCanvasRef, localParticipantId = null, publishLobb
       window.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('wheel', onWheel);
     };
-  }, [mini.enabled, stageCanvasRef, world, camera.scale, panBy, centerOn, zoomTo, drag, localParticipantId]);
+  }, [mini.enabled, stageCanvasRef, world, camera.scale, camera.minScale, camera.maxScale, panBy, centerOn, zoomTo, drag, localParticipantId, publishLobbyMessage]);
 
   // Keyboard toggles: M(toggle enable), F(toggle fog), T(toggle tokens)
   useEffect(() => {

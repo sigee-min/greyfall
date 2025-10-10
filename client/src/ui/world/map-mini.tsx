@@ -20,12 +20,8 @@ export function MapMini({ localParticipantId, participants, publish, register: _
   const [positions, setPositions] = useState(worldPositionsClient.getAll());
   useEffect(() => worldPositionsClient.subscribe(setPositions), []);
   const { state: travelState, computed: travelComputed, actions: travelActions } = useTravelVote({ localParticipantId, publishLobbyMessage: publish, registerLobbyHandler: _register, sessionMode: null });
-  const [now, setNow] = useState<number>(Date.now());
   const [policy, setPolicy] = useState<'majority' | 'all'>('majority');
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
+  // no timer needed here
 
   const local = useMemo(() => {
     if (!localParticipantId) return null;
