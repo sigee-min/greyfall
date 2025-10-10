@@ -3,10 +3,10 @@ export type EquipmentSlot = 'head' | 'body' | 'mainhand' | 'offhand' | 'accessor
 // Very lightweight mapping; extend as your item keys grow.
 export function itemSlot(key: string): EquipmentSlot {
   const k = String(key || '').toLowerCase();
-  if (/hat|cap|helmet|helm|hood/.test(k)) return 'head';
+  if (/hat|cap|helmet|helm|hood|visor|goggle/.test(k)) return 'head';
   if (/armor|armour|chest|plate|vest|robe|jacket/.test(k)) return 'body';
   if (/shield|buckler/.test(k)) return 'offhand';
-  if (/sword|dagger|axe|mace|staff|bow|gun/.test(k)) return 'mainhand';
+  if (/sword|dagger|knife|axe|mace|hammer|wrench|staff|spear|bow|gun|pistol|rifle/.test(k)) return 'mainhand';
   if (/ring|amulet|necklace|bracelet|belt|charm/.test(k)) return 'accessory';
   return 'misc';
 }

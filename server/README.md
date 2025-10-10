@@ -31,6 +31,7 @@ API 요약
 - 인증 교환: `POST /api/auth/google/signin` Body `{ credential }` → `{ ok, user, token }` + `Set-Cookie: SID=...`
 - 세션 확인: `GET /api/auth/me` → `{ ok, user }`
 - 로그아웃: `POST /api/auth/logout`
+- 사용자 프로필: `GET /api/users/me` → `{ ok, user: { id, name, picture, role } }`
 - Health: `GET /api/health` → `{ ok: true, ts }`
 - 일자 목록: `GET /api/dates` → `{ dates: ["YYYY-MM-DD", ...] }`
 - 타입 목록: `GET /api/types?date=YYYY-MM-DD` → `{ date, types: ["npc.reply", ...] }`
@@ -81,6 +82,7 @@ API 요약
 보안/운영 메모
 - 프록시에서 TLS 종단 및 접근 제어 수행, API는 Bearer 권장(변경 요청 시).
 - 대용량 데이터에 대비해 로테이션/컴팩션(야간)과 백업/보존정책을 운영 환경에서 스케줄링하세요.
+- 권한: `role ∈ { user, admin, sysadmin }` (sysadmin > admin > user). `SYSADMIN_EMAILS`, `ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`로 자동 부여.
 
 개발 팁(테스트)
 - 헬스: `curl -u admin:admin http://localhost:8080/api/health`
@@ -111,3 +113,6 @@ API 요약
 - `SESSION_TTL_SEC` (기본 18000=5h) — 세션 유효기간
 - `SESSION_REFRESH_SKEW_SEC` (기본 900=15m) — 만료 임박 시 갱신 임계값
 - `COOKIE_NAME` (기본 `SID`) — 세션 쿠키 이름
+- `SYSADMIN_EMAILS` — 세미콜론/쉼표/공백 구분. 일치 이메일은 sysadmin 부여
+- `ADMIN_EMAILS` — 세미콜론/쉼표/공백 구분. 일치 이메일은 admin 부여
+- `ALLOWED_EMAIL_DOMAINS` — 도메인 화이트리스트(예: `example.com dev.local`)

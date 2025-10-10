@@ -6,6 +6,9 @@ import path from 'node:path';
 export default defineConfig({
   root: __dirname,
   plugins: [react(), basicSsl()],
+  optimizeDeps: {
+    include: ['@react-oauth/google', 'jwt-decode']
+  },
   server: {
     host: true,
     headers: {

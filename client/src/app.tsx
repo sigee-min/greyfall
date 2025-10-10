@@ -100,7 +100,7 @@ function App() {
   });
 
   const musicPlayEnabled = preferencesLoaded && musicEnabled;
-  const missionState = useMissionStore((s) => s.state);
+  const _missionState = useMissionStore((s) => s.state);
   // Dynamic world media (bg/music) in game scene
   const worldMedia = useWorldMedia(localParticipantId);
   const activeTracks = scene === 'game' ? worldMedia.tracks : LOBBY_TRACKS;
@@ -330,7 +330,10 @@ function App() {
     setOptionsOpen(false);
     setDeveloperOpen(false);
     dismissError();
-  }, [changeScene, dismissError, leaveSession]);
+    if (sessionMeta?.mode === 'host') {
+      missionStateSync.host.set({ state: 'safe', since: Date.now(), version: 1 }, 'mission:state:safe');
+    }
+  }, [changeScene, dismissError, leaveSession, sessionMeta?.mode]);
 
   const startMission = useCallback(() => {
     if (!startMissionReady) return;
@@ -369,6 +372,8 @@ function App() {
       setSettingsOpen(false);
       setOptionsOpen(false);
       setDeveloperOpen(false);
+      // Ensure mission state resets to safe when session ends (host only)
+      missionStateSync.host.set({ state: 'safe', since: Date.now(), version: 1 }, 'mission:state:safe');
     }
   }, [changeScene, scene, sessionMeta]);
 

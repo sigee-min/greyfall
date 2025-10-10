@@ -657,6 +657,15 @@ export const llmLogUpdateBodySchema = z
   .passthrough();
 export type LlmLogUpdateBody = z.infer<typeof llmLogUpdateBodySchema>;
 
+// Users/admin schemas
+export const userRoleSchema = z.enum(['user', 'admin', 'sysadmin']);
+export type UserRole = z.infer<typeof userRoleSchema>;
+
+export const userRoleUpdateSchema = z
+  .object({ role: userRoleSchema })
+  .strict();
+export type UserRoleUpdate = z.infer<typeof userRoleUpdateSchema>;
+
 export function createLobbyMessage<K extends LobbyMessageKind>(
   kind: K,
   body: LobbyMessageBodies[K]

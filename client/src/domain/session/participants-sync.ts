@@ -28,10 +28,12 @@ const participantsModel = defineSyncModel<ParticipantsSnapshot>({
         if (!body || typeof body !== 'object') return null;
         const p = (body as any).participant;
         if (!p || typeof p !== 'object') return null;
-        const { id, name, tag, ready, role } = p as any;
+        const { id, name, tag, ready, role, avatarUrl } = p as any;
         if (typeof id !== 'string' || typeof name !== 'string' || typeof tag !== 'string') return null;
         if (typeof ready !== 'boolean' || (role !== 'host' && role !== 'guest')) return null;
-        return { id, name, tag, ready, role } as any;
+        const out: any = { id, name, tag, ready, role };
+        if (avatarUrl && typeof avatarUrl === 'string') out.avatarUrl = avatarUrl;
+        return out;
       },
       handle: ({ payload, context }) => {
         // Update host lobby store and broadcast

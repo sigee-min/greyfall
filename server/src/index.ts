@@ -2,14 +2,19 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { loadConfig } from './config.js';
 import { checkAuthUnified } from './middleware/auth.js';
 import { handleAuthRoutes } from './routes/auth.js';
-import { sendError } from './lib/http.js';
+import { sendError, sendOk } from './lib/http.js';
 import { validate } from './lib/validate.js';
 import { llmLogCreateSchema, llmLogCreateBatchSchema, typesQuerySchema, logsListQuerySchema, logsReadByIdQuerySchema, downloadQuerySchema, logsUpdateQuerySchema, logsDeleteQuerySchema, llmLogUpdateBodySchema } from '@shared/protocol';
 import { LlmStorage } from './storage.js';
 import { logger, genRequestId } from './lib/logger.js';
 import { attachContext } from './middleware/ctx.js';
 import { isIsoDateString, parseBody, parseUrl, sanitizeType, sendJson, utcDateFolder } from './utils.js';
+import { requireRole } from './middleware/authorize.js';
 import { route } from './lib/route.js';
+import { handleUserRoutes } from './routes/users.js';
+import { migrate } from './db/migrate.js';
+import { getDb } from './db/connection.js';
+import { listUsers } from './users/repo.js';
 import type { LlmLogInput, LlmLogRecord, ChatMessage } from './types.js';
 
 function notFound(res: ServerResponse) {
@@ -145,6 +150,7 @@ function trimMessages(messages: ChatMessage[], maxTurns: number | null): ChatMes
 
 async function main() {
   const cfg = await loadConfig();
+  await migrate(cfg);
   const storage = new LlmStorage(cfg);
 
   const server = http.createServer(async (req, res) => {
@@ -180,6 +186,10 @@ async function main() {
         const auth = checkAuthUnified(req, res, cfg);
         if (!auth.ok) return; // response already sent
       }
+      if (pathname.startsWith('/api/users/')) {
+        const handledUsers = await handleUserRoutes(req, res, pathname);
+        if (handledUsers) return;
+      }
 
       // Dashboard base path
       const isDash = (p: string) => p === '/dashboard' || p.startsWith('/dashboard/');
@@ -187,6 +197,8 @@ async function main() {
 
       // Dashboard (home)
       if (req.method === 'GET' && (pathname === '/' || pathname === '/dashboard')) {
+        // Admin or higher only
+        if (!requireRole('admin')(req, res, cfg)) return;
         const body = `
           <div class="card">
             <h2>Getting started</h2>
@@ -198,8 +210,58 @@ async function main() {
         return;
       }
 
+      // Dashboard: users (sysadmin only)
+      if (req.method === 'GET' && pathname === '/dashboard/users') {
+        if (!requireRole('sysadmin')(req, res, cfg)) return;
+        const db = await getDb(cfg);
+        const users = listUsers(db as any, 200, 0);
+        const options = (sel: string) => `
+          <option value="user" ${sel==='user'?'selected':''}>user</option>
+          <option value="admin" ${sel==='admin'?'selected':''}>admin</option>
+          <option value="sysadmin" ${sel==='sysadmin'?'selected':''}>sysadmin</option>`;
+        const rows = users.map((u: any) => `
+          <tr>
+            <td>${escHtml(String(u.id))}</td>
+            <td>${escHtml(u.name || '(unknown)')}</td>
+            <td>${u.picture ? `<img src="${escHtml(u.picture)}" alt="avatar" style="width:28px;height:28px;border-radius:50%"/>` : '<span class="muted">—</span>'}</td>
+            <td>
+              <select data-id="${escHtml(String(u.id))}">
+                ${options(String(u.role||''))}
+              </select>
+            </td>
+            <td><button data-action="update-role" data-id="${escHtml(String(u.id))}">Update</button></td>
+          </tr>`).join('');
+        const body = `
+          <div class="card">
+            <h2>Users</h2>
+            <p class="muted">Sysadmin 전용 사용자 관리. 역할 변경은 즉시 적용됩니다.</p>
+            <table><thead><tr><th>id</th><th>name</th><th>avatar</th><th>role</th><th>actions</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5" class="muted">No users</td></tr>'}</tbody></table>
+          </div>
+          <script>
+            addEventListener('click', async (ev) => {
+              const el = ev.target;
+              if (!(el instanceof HTMLElement)) return;
+              if (el.dataset.action === 'update-role') {
+                const id = el.dataset.id;
+                const sel = document.querySelector('select[data-id="'+id+'"]');
+                const role = sel && (sel).value;
+                try {
+                  const res = await fetch('/api/users/'+id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+                  if (res.ok) { location.reload(); }
+                  else { alert('Failed to update role: '+res.status); }
+                } catch (e) { alert('Error: '+e); }
+              }
+            });
+          </script>`;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(page('Users', body));
+        return;
+      }
+
       // Dashboard: dates
       if (req.method === 'GET' && pathname === '/dashboard/dates') {
+        if (!requireRole('admin')(req, res, cfg)) return;
         const dates = await storage.listDates();
         const list = dates.map((d) => `<li><a href="${dashBase}/date/${d}">${escHtml(d)}</a></li>`).join('') || '<li class="muted">No data</li>';
         const body = `<div class="card"><h2>Dates</h2><ul>${list}</ul></div>`;
@@ -210,6 +272,7 @@ async function main() {
 
       // Dashboard: types by date
       if (req.method === 'GET' && pathname.startsWith('/dashboard/date/')) {
+        if (!requireRole('admin')(req, res, cfg)) return;
         const parts = pathname.split('/');
         const dateStr = decodeURIComponent(parts[parts.length - 1] || '');
         if (!isIsoDateString(dateStr)) {
@@ -227,6 +290,7 @@ async function main() {
 
       // Dashboard: logs list
       if (req.method === 'GET' && pathname === '/dashboard/logs') {
+        if (!requireRole('admin')(req, res, cfg)) return;
         const dateStr = (query.date || '') as string;
         const type = (query.request_type || '') as string;
         const q = (query.q || '') as string;
@@ -288,6 +352,9 @@ async function main() {
                 ${start+pageSize<filtered.length?`<a href="${dashBase}/logs?date=${encodeURIComponent(dateStr)}&request_type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&complete=${onlyComplete?'1':'0'}&latest=${latestOnly?'1':'0'}&page=${pageNum+1}&page_size=${pageSize}">Next</a>`:''}
               </div>
             </div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <a href="/dashboard/users">Users</a>
           </div>`;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(page('Logs', body));
@@ -296,6 +363,7 @@ async function main() {
 
       // Dashboard: log detail
       if (req.method === 'GET' && pathname.startsWith('/dashboard/logs/')) {
+        if (!requireRole('admin')(req, res, cfg)) return;
         const id = decodeURIComponent(pathname.split('/').pop() || '');
         const dateStr = (query.date || '') as string;
         const type = (query.request_type || '') as string;
@@ -331,6 +399,7 @@ async function main() {
               <a href="${dashBase}/logs?date=${encodeURIComponent(dateStr)}&request_type=${encodeURIComponent(type)}">← Back to list</a>
               <a style="margin-left:auto" href="/api/llm/logs/${encodeURIComponent(id)}?date=${encodeURIComponent(dateStr)}&request_type=${encodeURIComponent(type)}">API JSON</a>
               <a href="/api/download?date=${encodeURIComponent(dateStr)}&request_type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&format=train-jsonl&latest=1&filter=complete">Export TRAIN-JSONL</a>
+              <a href="/dashboard/users" style="margin-left:12px">Users</a>
             </div>
           </div>
           ${histHtml}`;
@@ -341,20 +410,22 @@ async function main() {
 
       // Health
       if (req.method === 'GET' && pathname === '/api/health') {
-        return sendJson(res, 200, { ok: true, ts: Date.now() });
+        sendOk(res, { ts: Date.now() });
+        return;
       }
 
       // Dates
       if (req.method === 'GET' && pathname === '/api/dates') {
         const list = await storage.listDates();
-        return sendJson(res, 200, { ok: true, dates: list });
+        sendOk(res, { dates: list });
+        return;
       }
 
       // Types for date (route wrapper)
       if (await route(req, res, { pathname, query }, { method: 'GET', path: '/api/types', querySchema: typesQuerySchema }, async ({ query: qv }) => {
         const dateStr = (qv as any).date as string;
         const types = await storage.listTypes(dateStr);
-        sendJson(res, 200, { ok: true, date: dateStr, types });
+        sendOk(res, { date: dateStr, types });
       })) return;
 
       // Create/append logs (route wrapper)
@@ -390,7 +461,7 @@ async function main() {
             const r = await storage.append(dateStr, type, record);
             results.push({ request_id: raw.request_id, file: r.file, rev: r.rev });
           }
-          sendJson(res, 200, { ok: true, date: dateStr, results });
+          sendOk(res, { date: dateStr, results });
         }
       )) return;
 
@@ -424,7 +495,7 @@ async function main() {
             received_at: new Date().toISOString(),
           };
           const r = await storage.append(dateStr, type, record);
-          sendJson(res, 200, { ok: true, date: dateStr, request_id: id, file: r.file, rev: r.rev });
+          sendOk(res, { date: dateStr, request_id: id, file: r.file, rev: r.rev });
         }
       )) return;
 
@@ -450,7 +521,7 @@ async function main() {
             received_at: new Date().toISOString(),
           } as LlmLogRecord;
           const r = await storage.append(dateStr, type, record);
-          sendJson(res, 200, { ok: true, date: dateStr, request_id: id, file: r.file, rev: r.rev });
+          sendOk(res, { date: dateStr, request_id: id, file: r.file, rev: r.rev });
         }
       )) return;
 
@@ -470,8 +541,8 @@ async function main() {
           const filtered = qtext ? records.filter((r) => recordMatchesQuery(r, qtext)) : records;
           const start = (page - 1) * pageSize;
           const slice = filtered.slice(start, start + pageSize);
-          sendJson(res, 200, { ok: true, total: filtered.length, page, page_size: pageSize, items: slice });
-        }
+          sendOk(res, { total: filtered.length, page, page_size: pageSize, items: slice });
+        } 
       )) return;
 
       // Read by id (route wrapper)
@@ -486,7 +557,7 @@ async function main() {
           const history = records.filter((r) => r.request_id === id).sort((a, b) => a.rev - b.rev);
           if (history.length === 0) { notFound(res); return; }
           const latest = history[history.length - 1];
-          sendJson(res, 200, { ok: true, id, date: (qv as any).date, type: (qv as any).request_type, latest, history });
+          sendOk(res, { id, date: (qv as any).date, type: (qv as any).request_type, latest, history });
         }
       )) return;
 

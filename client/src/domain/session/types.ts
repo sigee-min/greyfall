@@ -7,6 +7,7 @@ export type SessionParticipant = {
   tag: string;
   ready: boolean;
   role: SessionRole;
+  avatarUrl?: string | null;
   isSelf?: boolean;
 };
 

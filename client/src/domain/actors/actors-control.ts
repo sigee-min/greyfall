@@ -4,6 +4,7 @@ import { WORLD_ACTORS_OBJECT_ID, WORLD_POSITIONS_OBJECT_ID } from '../net-object
 import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
 import { requestAICommand } from '../ai/ai-gateway';
+import { EQUIP_COOLDOWN_MS } from '../equipment/policy';
 import { CHAT_OBJECT_ID, type ChatEntry } from '../net-objects/chat.js';
 import type { HostObject } from '../net-objects/types';
 
@@ -66,6 +67,12 @@ const actorsControl = defineSyncModel<VoidState>({
         if (typeof actorId !== 'string' || typeof key !== 'string') return null;
         return { actorId, key };
       },
+      authorize: ({ payload, senderId }) => {
+        // Only allow self-equips and apply a basic cooldown per actor
+        if (senderId && senderId !== (payload as { actorId: string }).actorId) return false;
+        const ok = equipCooldownAllow((payload as { actorId: string }).actorId);
+        return ok;
+      },
       handle: ({ payload }) => {
         const { actorId, key } = payload as { actorId: string; key: string };
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
@@ -81,6 +88,11 @@ const actorsControl = defineSyncModel<VoidState>({
         const { actorId, key } = body as { actorId?: unknown; key?: unknown };
         if (typeof actorId !== 'string' || typeof key !== 'string') return null;
         return { actorId, key };
+      },
+      authorize: ({ payload, senderId }) => {
+        if (senderId && senderId !== (payload as { actorId: string }).actorId) return false;
+        const ok = equipCooldownAllow((payload as { actorId: string }).actorId);
+        return ok;
       },
       handle: ({ payload }) => {
         const { actorId, key } = payload as { actorId: string; key: string };
@@ -133,4 +145,13 @@ function newId(): string {
     if (c && 'randomUUID' in c) return (c as Crypto & { randomUUID: () => string }).randomUUID();
   } catch {}
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+const EQUIP_LAST_AT = new Map<string, number>();
+function equipCooldownAllow(actorId: string): boolean {
+  const now = Date.now();
+  const last = EQUIP_LAST_AT.get(actorId) ?? 0;
+  if (now - last < EQUIP_COOLDOWN_MS) return false;
+  EQUIP_LAST_AT.set(actorId, now);
+  return true;
 }

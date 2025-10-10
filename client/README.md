@@ -164,6 +164,13 @@ npm run dev
 
 터미널에 표시된 주소로 접속하면 로비, 준비실, 전술 스테이지를 바로 탐색할 수 있습니다.
 
+### Troubleshooting (Vite optimize deps)
+
+- 오류: `Outdated Optimize Dep` 또는 `net::ERR_ABORTED 504`(예: `@react-oauth/google`)
+  - 해결 1) 개발 서버 종료 후 캐시 삭제: `rm -rf client/node_modules/.vite`
+  - 해결 2) 강제 프리번들: `npm -w client run dev -- --force`
+  - 본 repo는 `optimizeDeps.include`에 `@react-oauth/google`, `jwt-decode`를 지정해 문제를 줄였습니다.
+
 ## Environment Variables
 
 - `VITE_GOOGLE_CLIENT_ID` (required for Google 로그인)

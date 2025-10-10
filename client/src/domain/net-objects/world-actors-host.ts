@@ -9,6 +9,7 @@ import { computeEquipmentSnapshot } from '../equipment/aggregator';
 import { getItemEffects } from '../equipment/effect-registry';
 import { RULES_VERSION } from '../equipment/rules';
 import type { StatKey } from '../stats/keys';
+import { initEquipmentEffects } from '../equipment/bootstrap';
 
 export { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 
@@ -16,6 +17,7 @@ export class HostWorldActorsObject implements HostObject {
   readonly id = WORLD_ACTORS_OBJECT_ID;
   private readonly list: HostKeyedListObject<ActorEntry>;
   constructor(private deps: CommonDeps) {
+    initEquipmentEffects();
     this.list = new HostKeyedListObject<ActorEntry>(deps, this.id, { path: 'list', initial: [], context: 'world:actors:init' });
   }
 
@@ -156,8 +158,8 @@ export class HostWorldActorsObject implements HostObject {
         Dexterity: 0,
         Medicine: 0
       } as Record<StatKey, number>;
-      const snap = computeEquipmentSnapshot({ base, equipped, effectsByItem, rulesVersion: RULES_VERSION }, { includeDerived: false, trace: false });
-      const next: ActorEntry = { ...e, modifiers: snap.modifiers, effectsHash: snap.effectsHash, schemaVersion: 1 } as any;
+      const snap = computeEquipmentSnapshot({ base, equipped, effectsByItem, rulesVersion: RULES_VERSION }, { includeDerived: true, trace: false });
+      const next: ActorEntry = { ...e, modifiers: snap.modifiers, derived: snap.derived, effectsHash: snap.effectsHash, schemaVersion: 1 } as any;
       this.list.upsertMany([next], 'actors:equipment:snapshot');
     } catch {}
   }

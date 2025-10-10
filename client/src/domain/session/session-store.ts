@@ -46,7 +46,8 @@ export function useLobbyStore(): LobbyStore {
     name: participant.name,
     tag: participant.tag,
     ready: participant.ready,
-    role: participant.role
+    role: participant.role,
+    avatarUrl: participant.avatarUrl || undefined
   }), []);
 
   const snapshotWire = useCallback(() => participantsRef.current.map(toWire), [toWire]);
