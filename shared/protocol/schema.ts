@@ -523,7 +523,11 @@ export type LobbyMessageBodies = {
 // =====================
 
 export const authSigninRequestSchema = z
-  .object({ credential: z.string().min(10) })
+  .object({
+    credential: z.string().min(10),
+    // Optional nonce to mitigate replay; when provided, server must match payload.nonce
+    nonce: z.string().min(8).max(255).optional()
+  })
   .strict();
 export type AuthSigninRequest = z.infer<typeof authSigninRequestSchema>;
 

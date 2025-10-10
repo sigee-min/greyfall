@@ -8,6 +8,7 @@ import { logger } from '../lib/logger.js';
 import { getContext } from '../middleware/ctx.js';
 import { verifyGoogleIdToken } from '../auth/google.js';
 import { createSessionToken, parseCookie, verifySessionToken } from '../auth/session.js';
+import { upsertGoogleUser } from '../users/service.js';
 
 function setSessionCookie(res: ServerResponse, cfg: AppConfig, token: string, maxAgeSec: number) {
   const parts = [
@@ -25,7 +26,7 @@ export async function handleAuthRoutes(req: IncomingMessage, res: ServerResponse
   if (!pathname.startsWith('/api/auth/')) return false;
   const cfg = await loadConfig();
 
-  // POST /api/auth/google/signin { credential }
+  // POST /api/auth/google/signin { credential, nonce? }
   if (pathname === '/api/auth/google/signin' && req.method === 'POST') {
     const body = await parseBody<any>(req);
     try {
@@ -35,17 +36,19 @@ export async function handleAuthRoutes(req: IncomingMessage, res: ServerResponse
       return true;
     }
     const credential: string | undefined = body?.credential;
+    const expectedNonce: string | undefined = typeof body?.nonce === 'string' ? body.nonce : undefined;
     const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
     if (!googleClientId) { sendError(res, { code: 'CONFIG', status: 500, message: 'Missing GOOGLE_CLIENT_ID' }); return true; }
-    const gp = await verifyGoogleIdToken(credential as string, googleClientId);
+    const gp = await verifyGoogleIdToken(credential as string, googleClientId, expectedNonce);
     if (!gp) { logger.warn('signin-failed', { reqId: getContext(req)?.reqId, reason: 'invalid-google-token' }); sendError(res, { code: 'UNAUTHORIZED', status: 401, message: 'Invalid Google token' }); return true; }
     const sub = `google:${gp.sub}`;
-    const user = { sub, email: gp.email, name: gp.name, picture: gp.picture, iss: 'greyfall', role: 'user' as const };
-    const token = createSessionToken(user, cfg);
+    const stored = await upsertGoogleUser(cfg, { sub, email: gp.email, name: gp.name, picture: gp.picture });
+    const jwtUser = { sub, iss: 'greyfall', role: stored.role as any };
+    const token = createSessionToken(jwtUser as any, cfg);
     setSessionCookie(res, cfg, token, cfg.sessionTtlSec);
-    try { validate(authSigninResponseSchema, { ok: true, user, token }); } catch {}
+    try { validate(authSigninResponseSchema, { ok: true, user: { sub, name: stored.name ?? undefined, picture: stored.picture ?? undefined, role: stored.role as any }, token }); } catch {}
     logger.info('signin-ok', { reqId: getContext(req)?.reqId, sub });
-    sendOk(res, { user, token });
+    sendOk(res, { user: { sub, name: stored.name ?? undefined, picture: stored.picture ?? undefined, role: stored.role as any }, token });
     return true;
   }
 

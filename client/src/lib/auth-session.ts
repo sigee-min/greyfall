@@ -1,11 +1,11 @@
 import type { AuthUser } from './auth';
 
-export async function signinWithGoogle(credential: string): Promise<{ ok: boolean; user?: AuthUser; token?: string }>
+export async function signinWithGoogle(credential: string, nonce?: string): Promise<{ ok: boolean; user?: AuthUser; token?: string }>
 {
   const res = await fetch('/api/auth/google/signin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credential })
+    body: JSON.stringify({ credential, ...(nonce ? { nonce } : {}) })
   });
   if (!res.ok) return { ok: false };
   const json = (await res.json()) as { ok: boolean; user?: AuthUser; token?: string };
@@ -29,4 +29,3 @@ export async function logout(): Promise<boolean> {
     return false;
   }
 }
-

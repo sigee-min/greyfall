@@ -20,12 +20,13 @@ function getClient(clientId: string) {
   return cli;
 }
 
-export async function verifyGoogleIdToken(idToken: string, googleClientId: string): Promise<GoogleProfile | null> {
+export async function verifyGoogleIdToken(idToken: string, googleClientId: string, expectedNonce?: string): Promise<GoogleProfile | null> {
   try {
     const client = getClient(googleClientId);
     const ticket = await client.verifyIdToken({ idToken, audience: googleClientId });
     const payload = ticket.getPayload();
     if (!payload || !payload.sub) return null;
+    if (expectedNonce && payload.nonce !== expectedNonce) return null;
     return {
       sub: payload.sub,
       email: payload.email ?? undefined,
@@ -39,4 +40,3 @@ export async function verifyGoogleIdToken(idToken: string, googleClientId: strin
     return null;
   }
 }
-
