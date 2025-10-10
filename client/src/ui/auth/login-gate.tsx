@@ -46,8 +46,8 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[1000]">
-      {/* Live lobby remains visible; apply a subtle scrim for readability */}
-      <div className="absolute inset-0 bg-black/50" />
+      {/* Live lobby remains visible; darker scrim + blur for focus */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md supports-[backdrop-filter]:bg-black/60" />
 
       <div className="relative grid h-full place-items-center p-6">
         <div className="w-[min(560px,94vw)] overflow-hidden rounded-xl border border-border/60 bg-background/70 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-background/60">
