@@ -50,7 +50,7 @@ import { LoginGate } from './ui/auth/login-gate';
 
 const LOBBY_TRACKS: string[] = ['/assets/audio/lobby/main-theme.wav', '/assets/audio/lobby/main-theme.mp3'];
 
-function App() {
+function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
   const { t } = useI18n();
   useUiSfx();
   useCustomCursor();
@@ -581,7 +581,7 @@ function App() {
   return (
     <>
       {content}
-      {scene === 'mainLobby' && !authUser && Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID) && (
+      {scene === 'mainLobby' && !authUser && hasGoogleClient && (
         <LoginGate onSignedIn={(u) => setAuthUserState(u)} />
       )}
       <OptionsDialog

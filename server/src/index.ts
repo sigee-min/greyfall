@@ -178,6 +178,13 @@ async function main() {
       const isOpenIngest = req.method === 'POST' && pathname === '/api/llm/logs';
       const isHealth = req.method === 'GET' && pathname === '/api/health';
       const isAuth = pathname.startsWith('/api/auth/');
+
+      // Public runtime config (no auth)
+      if (req.method === 'GET' && pathname === '/api/config') {
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+        sendOk(res, { googleClientId: googleClientId || undefined });
+        return;
+      }
       if (isAuth) {
         const handled = await handleAuthRoutes(req, res, pathname);
         if (handled) return;
