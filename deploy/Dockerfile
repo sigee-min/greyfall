@@ -39,7 +39,8 @@ COPY signal/package.json signal/package-lock.json ./
 RUN npm ci
 
 COPY signal/ ./
-COPY shared/protocol /shared/protocol
+# Keep shared protocol inside the signal workspace so TS can resolve external deps
+COPY shared/protocol ./shared/protocol
 RUN npm run build
 
 # Install only production deps for runtime

@@ -10,10 +10,17 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@shared/protocol": ["../shared/protocol/schema.ts"],
+      "@shared/protocol": [
+        "../shared/protocol/schema.ts",
+        "./shared/protocol/schema.ts"
+      ],
       "zod": ["./node_modules/zod"]
     }
   },
-  "include": ["src", "../shared/protocol/schema.ts"],
+  "include": [
+    "src",
+    "../shared/protocol/schema.ts",
+    "./shared/protocol/schema.ts"
+  ],
   "exclude": ["dist"]
 }
