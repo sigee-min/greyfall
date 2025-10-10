@@ -82,7 +82,7 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-[13px] leading-relaxed text-muted-foreground">
                 <p>Google 계정으로 인증 후 로비에 입장합니다.</p>
-                <p className="mt-1 text-[11px]">일회용 nonce로 인증 요청을 보호합니다.</p>
+                <p className="mt-1 text-[11px]">로딩이 끝나면 회랑의 문이 열립니다.</p>
               </div>
               <div className="flex items-center gap-3">
                 <GoogleLogin onSuccess={handleSuccess} useOneTap={false} auto_select={false} nonce={nonceData.nonce} />
