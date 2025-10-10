@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "sh -c 'tsc -p tsconfig.server.json -w & while [ ! -f dist/index.js ]; do sleep 0.2; done; node --watch dist/index.js'",
     "build": "tsc -p tsconfig.server.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "npm run build && node --test tests/contract.test.mjs"
+  },
+  "dependencies": {
+    "@shared/auth": "*",
+    "google-auth-library": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",

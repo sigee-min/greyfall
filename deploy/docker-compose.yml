@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  client:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.client
+      # args:
+      #   VITE_SIGNAL_SERVER_URL: "https://your-signal-host" # optional, defaults to same host via proxy
+    image: greyfall-client:local
+    ports:
+      - "8080:8080"   # http://localhost:8080
+    depends_on:
+      - signal
+      - app
+
+  signal:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.signal
+    image: greyfall-signal:local
+    expose:
+      - "8787"
+    environment:
+      - SIGNAL_PORT=8787
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    image: greyfall-app:local
+    expose:
+      - "8080"
+    environment:
+      - PORT=8080
+      - DATA_ROOT=/data/llm-logs
+      - SESSION_TTL_SEC=18000
+      - SESSION_REFRESH_SKEW_SEC=900
+      - COOKIE_NAME=SID
+      - JWT_SECRET=change-me
+    volumes:
+      - ./app-data:/data/app-data
+    restart: unless-stopped
+
+networks:
+  default:
+    name: greyfall_net

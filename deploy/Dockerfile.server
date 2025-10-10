@@ -1,0 +1,29 @@
+## App server image: builds TypeScript API, runs with Node
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY server/package.json ./server/package.json
+COPY server/tsconfig.server.json ./server/tsconfig.server.json
+COPY server/src ./server/src
+
+RUN cd server && npm install --no-audit --no-fund && npm run build
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/server/dist ./dist
+COPY server/package.json ./package.json
+
+ENV PORT=8080
+ENV DATA_ROOT=/data/app-data
+ENV SESSION_TTL_SEC=18000
+ENV COOKIE_NAME=SID
+ENV JWT_SECRET=change-me
+
+EXPOSE 8080
+VOLUME ["/data/app-data"]
+
+CMD ["node", "dist/index.js"]

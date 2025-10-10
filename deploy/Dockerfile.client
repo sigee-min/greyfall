@@ -1,0 +1,49 @@
+## Client image: builds Vite app then serves with Nginx, proxying to signal/logs services
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy shared protocol for TS imports during build
+COPY shared/protocol ./shared/protocol
+
+# Copy client workspace
+COPY client/package.json ./client/package.json
+COPY client/vite.config.ts ./client/vite.config.ts
+COPY client/postcss.config.cjs ./client/postcss.config.cjs
+COPY client/tailwind.config.ts ./client/tailwind.config.ts
+COPY client/index.html ./client/index.html
+COPY client/public ./client/public
+COPY client/src ./client/src
+
+# Install deps and build
+RUN cd client && npm install --no-audit --no-fund
+
+ARG VITE_SIGNAL_SERVER_URL
+RUN if [ -n "$VITE_SIGNAL_SERVER_URL" ]; then \
+      echo "[client-build] using VITE_SIGNAL_SERVER_URL=$VITE_SIGNAL_SERVER_URL"; \
+      VITE_SIGNAL_SERVER_URL="$VITE_SIGNAL_SERVER_URL" npm --prefix client run build; \
+    else \
+      echo "[client-build] using same-network signal server"; \
+      npm --prefix client run build; \
+    fi
+
+FROM nginx:alpine AS runtime
+WORKDIR /
+
+# Copy static assets
+COPY --from=builder /app/client/dist /usr/share/nginx/html
+
+# Nginx config that proxies to internal service names `signal` and `app`
+COPY deploy/nginx.client.conf /etc/nginx/nginx.conf
+
+# Non-root optimization: ensure nginx can read/write runtime dirs
+RUN addgroup -S web && adduser -S web -G web \
+ && chown -R web:web /var/cache/nginx /var/log/nginx /usr/share/nginx/html
+USER web
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

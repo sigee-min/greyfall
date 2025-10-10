@@ -1,0 +1,85 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { loadConfig, type AppConfig } from '../config.js';
+import { parseBody, parseUrl } from '../utils.js';
+import { sendOk, sendError } from '../lib/http.js';
+import { validate } from '../lib/validate.js';
+import { authSigninRequestSchema, authSigninResponseSchema, authMeResponseSchema } from '@shared/protocol';
+import { logger } from '../lib/logger.js';
+import { getContext } from '../middleware/ctx.js';
+import { verifyGoogleIdToken } from '../auth/google.js';
+import { createSessionToken, parseCookie, verifySessionToken } from '../auth/session.js';
+
+function setSessionCookie(res: ServerResponse, cfg: AppConfig, token: string, maxAgeSec: number) {
+  const parts = [
+    `${cfg.cookieName}=${encodeURIComponent(token)}`,
+    'Path=/',
+    `Max-Age=${Math.max(1, maxAgeSec)}`,
+    'HttpOnly',
+    'SameSite=Lax'
+  ];
+  if (String(process.env.NODE_ENV).toLowerCase() === 'production') parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+export async function handleAuthRoutes(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<boolean> {
+  if (!pathname.startsWith('/api/auth/')) return false;
+  const cfg = await loadConfig();
+
+  // POST /api/auth/google/signin { credential }
+  if (pathname === '/api/auth/google/signin' && req.method === 'POST') {
+    const body = await parseBody<any>(req);
+    try {
+      validate(authSigninRequestSchema, body);
+    } catch (e: any) {
+      sendError(res, { code: 'VALIDATION_ERROR', status: 400, details: e?.details });
+      return true;
+    }
+    const credential: string | undefined = body?.credential;
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+    if (!googleClientId) { sendError(res, { code: 'CONFIG', status: 500, message: 'Missing GOOGLE_CLIENT_ID' }); return true; }
+    const gp = await verifyGoogleIdToken(credential as string, googleClientId);
+    if (!gp) { logger.warn('signin-failed', { reqId: getContext(req)?.reqId, reason: 'invalid-google-token' }); sendError(res, { code: 'UNAUTHORIZED', status: 401, message: 'Invalid Google token' }); return true; }
+    const sub = `google:${gp.sub}`;
+    const user = { sub, email: gp.email, name: gp.name, picture: gp.picture, iss: 'greyfall', role: 'user' as const };
+    const token = createSessionToken(user, cfg);
+    setSessionCookie(res, cfg, token, cfg.sessionTtlSec);
+    try { validate(authSigninResponseSchema, { ok: true, user, token }); } catch {}
+    logger.info('signin-ok', { reqId: getContext(req)?.reqId, sub });
+    sendOk(res, { user, token });
+    return true;
+  }
+
+  // GET /api/auth/me
+  if (pathname === '/api/auth/me' && req.method === 'GET') {
+    const bearer = Array.isArray(req.headers['authorization']) ? req.headers['authorization'][0] : req.headers['authorization'];
+    const token = (bearer && /^Bearer\s+(.+)$/i.exec(bearer)?.[1]) || parseCookie(req, (await loadConfig()).cookieName);
+    if (!token) { sendError(res, { code: 'UNAUTHORIZED', status: 401, message: 'No session' }); return true; }
+    const user = verifySessionToken(token, cfg);
+    if (!user) { sendError(res, { code: 'UNAUTHORIZED', status: 401, message: 'Invalid session' }); return true; }
+    // Optional: include refreshed token when requested or nearing expiry (sliding session)
+    const { query } = parseUrl(req);
+    const withToken = String(query.with_token || '0') === '1';
+    let outToken: string | undefined;
+    const now = Math.floor(Date.now() / 1000);
+    const exp = typeof (user as any).exp === 'number' ? (user as any).exp : 0;
+    const nearExpiry = exp && (exp - now) < Math.max(60, Math.min(cfg.sessionTtlSec / 2, cfg.refreshSkewSec));
+    if (withToken || nearExpiry) {
+      const fresh = createSessionToken(user, cfg);
+      setSessionCookie(res, cfg, fresh, cfg.sessionTtlSec);
+      outToken = fresh;
+    }
+    try { validate(authMeResponseSchema, { ok: true, user, ...(outToken ? { token: outToken } : {}) }); } catch {}
+    sendOk(res, { user, ...(outToken ? { token: outToken } : {}) });
+    return true;
+  }
+
+  // POST /api/auth/logout
+  if (pathname === '/api/auth/logout' && req.method === 'POST') {
+    // Invalidate cookie client-side (stateless tokens). For stateful revoke, implement denylist.
+    res.setHeader('Set-Cookie', `${cfg.cookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax` + (String(process.env.NODE_ENV).toLowerCase() === 'production' ? '; Secure' : ''));
+    sendOk(res, {});
+    return true;
+  }
+
+  return false;
+}

@@ -1,0 +1,38 @@
+## Signal image: builds TypeScript + embeds @shared/protocol into node_modules
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Install signal deps (includes TypeScript as devDep)
+COPY signal/package.json ./package.json
+RUN npm install --no-audit --no-fund
+
+# Copy sources
+COPY signal/ ./
+
+# Build shared/protocol and stage as a node_modules package
+COPY shared/protocol ./shared/protocol
+RUN npm --prefix ./shared/protocol install --no-audit --no-fund \
+ && npm --prefix ./shared/protocol run build \
+ && mkdir -p node_modules/@shared/protocol \
+ && cp -R ./shared/protocol/dist ./node_modules/@shared/protocol/dist \
+ && cp ./shared/protocol/package.json ./node_modules/@shared/protocol/package.json
+
+# Build signal
+RUN npm run build
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Copy build output and runtime deps from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+ENV SIGNAL_PORT=8787
+EXPOSE 8787
+
+CMD ["node", "dist/index.js"]
+
