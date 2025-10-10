@@ -42,18 +42,23 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
   };
 
   const existing = getAuthUser();
-  const heroUrl = (import.meta.env.VITE_LOGIN_HERO_URL as string | undefined) || undefined;
+  // Hardcoded hero image path; place file at client/public/images/login-hero.webp
+  const heroUrl = '/images/login-hero.webp';
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[1000]">
       {/* Subtle, weighty backdrop */}
       <div className="absolute inset-0 bg-slate-950" />
-      {heroUrl ? (
-        <div className="absolute inset-0 overflow-hidden">
-          <img src={heroUrl} alt="" className="h-full w-full object-cover opacity-35" decoding="async" />
-          <div className="absolute inset-0 bg-black/40" />
-        </div>
-      ) : null}
+      <div className="absolute inset-0 overflow-hidden">
+        <img
+          src={heroUrl}
+          alt=""
+          className="h-full w-full object-cover opacity-35"
+          decoding="async"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_400px_at_50%_-10%,rgba(148,163,184,0.06),transparent_60%)]" />
 
       <div className="relative grid h-full place-items-center p-6">

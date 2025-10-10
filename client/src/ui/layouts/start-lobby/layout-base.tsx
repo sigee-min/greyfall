@@ -195,14 +195,25 @@ function StartLobbyLayoutBase({
                         >
                           {participant.role === 'host' ? 'HOST' : 'GUEST'}
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-foreground">
-                            {participant.name}{' '}
-                            <span className="text-xs text-muted-foreground">{participant.tag}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {participant.isSelf ? '나 (You)' : participant.role === 'host' ? '세션 관리자' : '접속자'}
-                          </p>
+                        <div className="min-w-0 flex items-center gap-3">
+                          <div className="h-9 w-9 overflow-hidden rounded-full border border-border/60 bg-background/60">
+                            {participant.avatarUrl ? (
+                              <img src={participant.avatarUrl} alt={participant.name} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                                {(participant.name?.[0] ?? 'P').toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-foreground">
+                              {participant.name}{' '}
+                              <span className="text-xs text-muted-foreground">{participant.tag}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {participant.isSelf ? '나 (You)' : participant.role === 'host' ? '세션 관리자' : '접속자'}
+                            </p>
+                          </div>
                         </div>
                         <span
                           className={cn(
@@ -439,6 +450,8 @@ function StartLobbyLayoutBase({
                     hour: '2-digit',
                     minute: '2-digit'
                   });
+                  const author = participants.find((p) => p.id === message.authorId);
+                  const avatar = author?.avatarUrl || null;
                   return (
                     <div
                       key={message.id}
@@ -455,6 +468,15 @@ function StartLobbyLayoutBase({
                         >
                           {message.authorRole === 'host' ? t('ready.chat.host') : t('ready.chat.guest')}
                         </span>
+                        <div className="h-6 w-6 overflow-hidden rounded-full border border-border/60 bg-background/60">
+                          {avatar ? (
+                            <img src={avatar} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                              {(message.authorName?.[0] ?? 'P').toUpperCase()}
+                            </div>
+                          )}
+                        </div>
                         <span className="text-xs font-semibold tracking-[0.2em] text-foreground">
                           {message.authorName}{' '}
                           <span className="text-muted-foreground">{message.authorTag}</span>
