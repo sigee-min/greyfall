@@ -11,11 +11,30 @@ export default defineConfig({
   },
   server: {
     host: true,
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Resource-Policy': 'same-origin',
-      'X-Content-Type-Options': 'nosniff'
+    // Dynamic COOP/COEP headers based on auth cookie presence (Option B)
+    // GREYFALLID present → apply cross-origin isolation; otherwise relax for Google Sign-In
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        try {
+          const cookie = req.headers['cookie'] || '';
+          const hasSession = typeof cookie === 'string' && /(?:^|;\s*)GREYFALLID=/.test(cookie);
+          res.setHeader('Vary', 'Cookie');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Cross-Origin-Opener-Policy', hasSession ? 'same-origin' : 'same-origin-allow-popups');
+          if (hasSession) {
+            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+          } else {
+            // Clear COEP when unauthenticated to allow GSI popup/redirect messaging
+            if ('removeHeader' in res) {
+              // @ts-expect-error Node ServerResponse
+              res.removeHeader('Cross-Origin-Embedder-Policy');
+            } else {
+              res.setHeader('Cross-Origin-Embedder-Policy', '');
+            }
+          }
+        } catch {}
+        next();
+      });
     },
     // no need to allow parent now that files are inside client/
     proxy: {

@@ -88,6 +88,19 @@ export function OptionsDialog({ open, onClose, scene, onEnableMusic, onPreviewMu
     }
   }, [open]);
 
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   useEffect(() => {
     if (!open) {
       flushMusicVolume();

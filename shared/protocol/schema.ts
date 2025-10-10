@@ -446,6 +446,27 @@ const lobbyActorsUnequipRequestSchema = lobbyEnvelopeSchema.extend({
   body: z.object({ actorId: z.string().min(1), key: z.string().min(1) })
 });
 
+// Result broadcast (host -> all)
+const lobbyActorsEquipResultSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:equip:result'),
+  body: z.object({
+    actorId: z.string().min(1),
+    key: z.string().min(1),
+    ok: z.boolean(),
+    reason: z.enum(['unauthorized', 'cooldown', 'unavailable']).optional()
+  })
+});
+
+const lobbyActorsUnequipResultSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('actors:unequip:result'),
+  body: z.object({
+    actorId: z.string().min(1),
+    key: z.string().min(1),
+    ok: z.boolean(),
+    reason: z.enum(['unauthorized', 'cooldown', 'unavailable']).optional()
+  })
+});
+
 export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyHelloSchema,
   lobbyStateSchema,
@@ -478,7 +499,9 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyActorsHpAddRequestSchema,
   lobbyActorsInventoryTransferRequestSchema,
   lobbyActorsEquipRequestSchema,
-  lobbyActorsUnequipRequestSchema
+  lobbyActorsUnequipRequestSchema,
+  lobbyActorsEquipResultSchema,
+  lobbyActorsUnequipResultSchema
 ]);
 
 export type LobbyMessage = z.infer<typeof lobbyMessageSchema>;
@@ -517,6 +540,8 @@ export type LobbyMessageBodies = {
   'actors:inventory:transfer:request': { fromId: string; toId: string; key: string; count?: number };
   'actors:equip:request': { actorId: string; key: string };
   'actors:unequip:request': { actorId: string; key: string };
+  'actors:equip:result': { actorId: string; key: string; ok: boolean; reason?: 'unauthorized' | 'cooldown' | 'unavailable' };
+  'actors:unequip:result': { actorId: string; key: string; ok: boolean; reason?: 'unauthorized' | 'cooldown' | 'unavailable' };
 };
 
 // =====================

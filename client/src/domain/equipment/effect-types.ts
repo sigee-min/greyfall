@@ -34,5 +34,13 @@ export type EquipmentAggregationResult = {
   derived?: Partial<Record<StatKey, number>>;
   effectsHash: string;
   trace?: Array<{ itemKey: string; effectIndex: number }>;
+  setsProgress?: SetsProgress[];
 };
 
+export type SetsProgress = {
+  setId: string;
+  count: number;
+  tiers: number[];
+  achieved: number[];
+  nextTier?: number;
+};

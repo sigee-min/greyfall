@@ -1,4 +1,5 @@
-import type { EffectSpec } from '../../domain/equipment/effect-types';
+import type { EffectSpec, SetsProgress } from '../../domain/equipment/effect-types';
+import { getSetName } from '../../domain/equipment/sets-catalog';
 import type { StatKey } from '../../domain/stats/keys';
 
 export function formatEffect(spec: EffectSpec, locale: 'ko' | 'en' = 'ko'): string {
@@ -46,6 +47,33 @@ export function formatResists(resists: Record<string, number>, locale: 'ko' | 'e
     parts.push(`${tResist(k, locale)} ${sign}${v}%`);
   }
   return parts.join(' / ');
+}
+
+export function formatSetsProgress(list: SetsProgress[], locale: 'ko' | 'en' = 'ko'): string {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  const parts: string[] = [];
+  for (const sp of list) {
+    const name = getSetName(sp.setId, locale);
+    const achievedCount = sp.achieved.length;
+    const dots = `${'●'.repeat(achievedCount)}${'○'.repeat(Math.max(0, 3 - achievedCount))}`;
+    const hint = typeof sp.nextTier === 'number' ? (locale === 'ko' ? `→ ${sp.nextTier}` : `→ ${sp.nextTier}`) : '';
+    parts.push(`${name} ${dots}${hint ? ' ' + hint : ''}`);
+  }
+  const label = locale === 'ko' ? '세트' : 'Sets';
+  return `${label} ${parts.join(' / ')}`;
+}
+
+export function reasonToMessageKey(reason: string): string {
+  switch (reason) {
+    case 'slot-capacity': return 'equip.reason.slotCapacity';
+    case 'combat-restricted': return 'equip.reason.combatRestricted';
+    case 'unavailable': return 'equip.reason.unavailable';
+    case 'cooldown': return 'equip.reason.cooldown';
+    case 'unauthorized': return 'equip.reason.unauthorized';
+    case 'duplicate': return 'equip.reason.duplicate';
+    case 'publish-failed': return 'equip.reason.publishFailed';
+    default: return 'equip.reason.unknown';
+  }
 }
 
 function tStat(key: string, locale: 'ko' | 'en'): string {

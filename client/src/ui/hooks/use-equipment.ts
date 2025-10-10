@@ -5,7 +5,8 @@ import type { StatKey } from '../../domain/stats/keys';
 import { useCharacterLoadouts } from '../../domain/character/character-sync';
 import type { PublishLobbyMessage } from '../../domain/chat/use-lobby-chat';
 import type { LobbyMessageBodies } from '../../protocol';
-import { canEquipSlotOnly } from '../../app/services/equipment-service';
+import { canEquip } from '../../app/services/equipment-service';
+import { netBus } from '../../bus/net-bus';
 
 export function useEquipmentSnapshot(actorId: string | null) {
   const [entry, setEntry] = useState(() => (actorId ? readActor(actorId) : null));
@@ -19,7 +20,8 @@ export function useEquipmentSnapshot(actorId: string | null) {
     inventory: entry?.inventory ?? [],
     modifiers: entry?.modifiers,
     derived: entry?.derived,
-    effectsHash: entry?.effectsHash
+    effectsHash: entry?.effectsHash,
+    setsProgress: entry?.setsProgress
   }), [entry]);
 }
 
@@ -47,13 +49,18 @@ export function useEquipActions(actorId: string | null, publish: PublishLobbyMes
   const [busy, setBusy] = useState(false);
   async function equip(itemKey: string) {
     if (!actorId || !publish) return { ok: false, reason: 'unavailable' } as const;
-    const check = canEquipSlotOnly(actorId, itemKey);
+    const check = canEquip(actorId, itemKey, { idempotencyKey: `${Date.now()}-${Math.random().toString(16).slice(2)}` });
     if (!check.allowed) return { ok: false, reason: check.reason } as const;
     setBusy(true);
     try {
       const body: LobbyMessageBodies['actors:equip:request'] = { actorId, key: itemKey };
+      netBus.publish('equip:request', { actorId, key: itemKey });
       const ok = publish('actors:equip:request', body, 'ui:equip');
-      return ok ? { ok: true } as const : { ok: false, reason: 'publish-failed' } as const;
+      if (!ok) {
+        netBus.publish('equip:publishFailed', { actorId, key: itemKey });
+        return { ok: false, reason: 'publish-failed' } as const;
+      }
+      return { ok: true } as const;
     } finally { setBusy(false); }
   }
   async function unequip(itemKey: string) {

@@ -5,6 +5,7 @@ import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
 import { requestAICommand } from '../ai/ai-gateway';
 import { EQUIP_COOLDOWN_MS } from '../equipment/policy';
+import { netBus } from '../../bus/net-bus';
 import { CHAT_OBJECT_ID, type ChatEntry } from '../net-objects/chat.js';
 import type { HostObject } from '../net-objects/types';
 
@@ -67,18 +68,36 @@ const actorsControl = defineSyncModel<VoidState>({
         if (typeof actorId !== 'string' || typeof key !== 'string') return null;
         return { actorId, key };
       },
-      authorize: ({ payload, senderId }) => {
-        // Only allow self-equips and apply a basic cooldown per actor
-        if (senderId && senderId !== (payload as { actorId: string }).actorId) return false;
-        const ok = equipCooldownAllow((payload as { actorId: string }).actorId);
-        return ok;
-      },
-      handle: ({ payload }) => {
+      authorize: () => true,
+      handle: ({ payload, context }) => {
         const { actorId, key } = payload as { actorId: string; key: string };
+        const sender = context.senderId ?? null;
+        if (!sender || sender !== actorId) {
+          context.router.sendLobbyMessage('actors:equip:result', { actorId, key, ok: false, reason: 'unauthorized' }, 'actors:equip:unauthorized');
+          try { netBus.publish('equip:rejected', { actorId, key, reason: 'unauthorized' }); } catch {}
+          return;
+        }
+        if (!equipCooldownAllow(actorId)) {
+          context.router.sendLobbyMessage('actors:equip:result', { actorId, key, ok: false, reason: 'cooldown' }, 'actors:equip:cooldown');
+          try { netBus.publish('equip:rejected', { actorId, key, reason: 'cooldown' }); } catch {}
+          return;
+        }
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         actors?.ensure(actorId);
+        // inventory availability check
+        const have = (actors?.getAll().find((a) => a.id === actorId)?.inventory ?? []).find((i) => i.key === key)?.count ?? 0;
+        if (have <= 0) {
+          context.router.sendLobbyMessage('actors:equip:result', { actorId, key, ok: false, reason: 'unavailable' }, 'actors:equip:unavailable');
+          try { netBus.publish('equip:rejected', { actorId, key, reason: 'unavailable' }); } catch {}
+          return;
+        }
         const ok = actors?.equipItem(actorId, key);
-        if (ok) void narrateEffects([`equip p:${actorId} ${key}`]);
+        if (ok) {
+          context.router.sendLobbyMessage('actors:equip:result', { actorId, key, ok: true }, 'actors:equip:applied');
+          void narrateEffects([`equip p:${actorId} ${key}`]);
+        } else {
+          context.router.sendLobbyMessage('actors:equip:result', { actorId, key, ok: false, reason: 'unavailable' }, 'actors:equip:failed');
+        }
       }
     },
     {
@@ -89,17 +108,32 @@ const actorsControl = defineSyncModel<VoidState>({
         if (typeof actorId !== 'string' || typeof key !== 'string') return null;
         return { actorId, key };
       },
-      authorize: ({ payload, senderId }) => {
-        if (senderId && senderId !== (payload as { actorId: string }).actorId) return false;
-        const ok = equipCooldownAllow((payload as { actorId: string }).actorId);
-        return ok;
-      },
-      handle: ({ payload }) => {
+      authorize: () => true,
+      handle: ({ payload, context }) => {
         const { actorId, key } = payload as { actorId: string; key: string };
+        const sender = context.senderId ?? null;
+        if (!sender || sender !== actorId) {
+          context.router.sendLobbyMessage('actors:unequip:result', { actorId, key, ok: false, reason: 'unauthorized' }, 'actors:unequip:unauthorized');
+          return;
+        }
+        if (!equipCooldownAllow(actorId)) {
+          context.router.sendLobbyMessage('actors:unequip:result', { actorId, key, ok: false, reason: 'cooldown' }, 'actors:unequip:cooldown');
+          return;
+        }
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         actors?.ensure(actorId);
+        const eq = (actors?.getAll().find((a) => a.id === actorId)?.equipment ?? []);
+        if (!eq.includes(key)) {
+          context.router.sendLobbyMessage('actors:unequip:result', { actorId, key, ok: false, reason: 'unavailable' }, 'actors:unequip:not-equipped');
+          return;
+        }
         const ok = actors?.unequipItem(actorId, key);
-        if (ok) void narrateEffects([`unequip p:${actorId} ${key}`]);
+        if (ok) {
+          context.router.sendLobbyMessage('actors:unequip:result', { actorId, key, ok: true }, 'actors:unequip:applied');
+          void narrateEffects([`unequip p:${actorId} ${key}`]);
+        } else {
+          context.router.sendLobbyMessage('actors:unequip:result', { actorId, key, ok: false, reason: 'unavailable' }, 'actors:unequip:failed');
+        }
       }
     }
   ]

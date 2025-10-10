@@ -83,16 +83,17 @@ You only need Node.js 18+ and npm 9+ to run the watchpost locally:
 
 ```bash
 npm install
-npm run dev   # protocol only (shared types watch)
+npm run dev shared   # watch shared packages (@shared/*)
 ```
 
-To run app and servers, use separate terminals:
+To run app and servers, you can use a single entry with a target:
 
 ```
-npm -w shared/protocol run dev   # build/watch shared types
-npm -w client run dev            # web app (https://localhost:5173)
-npm -w server run dev            # app API (http://localhost:8080)
-npm -w signal run dev            # signaling (ws://localhost:8787)
+npm run dev client      # web app (https://localhost:5173)
+npm run dev server      # app API (http://localhost:8080)
+npm run dev signal      # signaling (ws://localhost:8787)
+npm run dev all         # shared + server + signal + client
+```
 
 ### Docker: Monolithic (CI default)
 

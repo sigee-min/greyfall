@@ -27,6 +27,7 @@ import { useBackgroundMusic } from './lib/background-music';
 import { useCustomCursor } from './lib/use-custom-cursor';
 import { useDisableAutofill } from './lib/use-disable-autofill';
 import { useGlobalBus } from './bus/global-bus';
+import { netBus } from './bus/net-bus';
 import { useGameBus } from './bus/game-bus';
 import type { SceneKey } from './types/scenes';
 import { useWorldMedia } from './domain/world/use-world-media';
@@ -39,9 +40,12 @@ import { EquipmentPanel } from './ui/character/equipment-panel';
 import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
 import { useI18n } from './i18n';
+import { reasonToMessageKey } from './app/services/equipment-formatter';
 import { setToolsProviders } from './llm/tools/providers';
 import { LlmMonitor } from './ui/dev/llm-monitor';
 import { useAssetPreload } from './domain/assets/use-asset-preload';
+import { getItem } from './domain/items/registry';
+import { itemSlot } from './domain/world/equipment-rules';
 import { missionStateSync } from './domain/mission/mission-sync';
 import { useMissionStore } from './domain/mission/state';
 import { getAuthUser, setAuthUser, clearAuthUser, type AuthUser } from './lib/auth';
@@ -135,6 +139,58 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
     };
   }, [globalBus]);
 
+  // Equip toasts via domain telemetry
+  useEffect(() => {
+    const unsub1 = netBus.subscribe('equip:applied', ({ actorId, key }) => {
+      const name = getItem(key)?.names?.[0]?.text ?? key;
+      const slot = itemSlot(key);
+      globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${actorId})`, durationMs: 1500 });
+    });
+    const unsub2 = netBus.subscribe('equip:rejected', ({ reason }) => {
+      const map: Record<string, string> = {
+        unauthorized: 'equip.reason.unauthorized',
+        cooldown: 'equip.reason.cooldown'
+      };
+      globalBus.publish('toast:show', { status: 'warning', title: t('equip.toast.rejected'), message: t(map[reason]), durationMs: 2000 });
+    });
+    const unsub3 = netBus.subscribe('equip:publishFailed', () => {
+      globalBus.publish('toast:show', { status: 'error', title: t('equip.toast.rejected'), message: t('equip.reason.publishFailed'), durationMs: 2000 });
+    });
+    return () => { unsub1(); unsub2(); unsub3(); };
+  }, [globalBus, t]);
+
+  // Equip toasts via lobby broadcast (host → all peers)
+  useEffect(() => {
+    const unsub = registerLobbyHandler('actors:equip:result', (msg) => {
+      const { actorId, key, ok, reason } = msg.body;
+      const name = getItem(key)?.names?.[0]?.text ?? key;
+      const slot = itemSlot(key);
+      if (ok) {
+        globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${actorId})`, durationMs: 1500 });
+      } else {
+        const k = reason ? reasonToMessageKey(reason) : 'equip.reason.unknown';
+        globalBus.publish('toast:show', { status: 'warning', title: t('equip.toast.rejected'), message: t(k), durationMs: 2000 });
+      }
+    });
+    return unsub;
+  }, [globalBus, registerLobbyHandler, t]);
+
+  // Unequip toasts via lobby broadcast
+  useEffect(() => {
+    const unsub = registerLobbyHandler('actors:unequip:result', (msg) => {
+      const { actorId, key, ok, reason } = msg.body;
+      const name = getItem(key)?.names?.[0]?.text ?? key;
+      const slot = itemSlot(key);
+      if (ok) {
+        globalBus.publish('toast:show', { status: 'success', title: t('unequip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${actorId})`, durationMs: 1500 });
+      } else {
+        const k = reason ? reasonToMessageKey(reason) : 'equip.reason.unknown';
+        globalBus.publish('toast:show', { status: 'warning', title: t('unequip.toast.rejected'), message: t(k), durationMs: 2000 });
+      }
+    });
+    return unsub;
+  }, [globalBus, registerLobbyHandler, t]);
+
   // Remote mission start → transition for all clients
   useEffect(() => {
     const unsub = registerLobbyHandler('mission:start', () => {
@@ -170,14 +226,21 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
   useEffect(() => {
     // Validate server session and sync local auth state
     const validateSession = async () => {
-      const json = await getMeDedup(false);
-      if (!json.ok || !json.user?.sub) {
+      try {
+        const json = await getMeDedup(false);
+        if (!json.ok || !json.user?.sub) {
+          clearAuthUser();
+          setAuthUserState(null);
+          return;
+        }
+        setAuthUser(json.user);
+        setAuthUserState(json.user);
+      } catch (err) {
+        // Treat network/unknown failure as not logged in to ensure LoginGate renders
         clearAuthUser();
         setAuthUserState(null);
-        return;
+        console.warn('[auth] validation failed', err);
       }
-      setAuthUser(json.user);
-      setAuthUserState(json.user);
     };
     void validateSession();
   }, []);
@@ -244,13 +307,15 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      // If any modal/dialog is open, do not open settings
+      if (optionsOpen || developerOpen || netmonOpen || errorMessage) return;
       event.preventDefault();
       setSettingsOpen(true);
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [scene]);
+  }, [scene, optionsOpen, developerOpen, netmonOpen, errorMessage]);
 
   // Backquote(`) → 네트워크 / LLM 모니터 토글 (디버그 허용 시)
   useEffect(() => {
@@ -581,8 +646,8 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
   return (
     <>
       {content}
-      {scene === 'mainLobby' && !authUser && hasGoogleClient && (
-        <LoginGate onSignedIn={(u) => setAuthUserState(u)} />
+      {scene === 'mainLobby' && !authUser && (
+        <LoginGate providerReady={hasGoogleClient} onSignedIn={(u) => setAuthUserState(u)} />
       )}
       <OptionsDialog
         open={optionsOpen}

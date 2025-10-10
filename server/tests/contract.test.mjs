@@ -31,7 +31,7 @@ test('contract suite', { timeout: 20000 }, async (t) => {
     env: {
       ...process.env,
       NODE_ENV: 'test',
-      PORT: String(PORT),
+      SERVER_PORT: String(PORT),
       DATA_ROOT: TMP,
       JWT_SECRET: 'test-secret',
       GOOGLE_CLIENT_ID: 'test-client-id'

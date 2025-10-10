@@ -1,6 +1,7 @@
 import {} from 'react';
 import { useEquipmentSnapshot } from '../hooks/use-equipment';
-import { formatDerived, formatResists } from '../../app/services/equipment-formatter';
+import { formatDerived, formatResists, formatSetsProgress } from '../../app/services/equipment-formatter';
+import type { SetsProgress } from '../../domain/equipment/effect-types';
 import type { StatKey } from '../../domain/stats/keys';
 
 type Props = { actorId: string | null };
@@ -10,9 +11,13 @@ export function EquipmentHudBadge({ actorId }: Props) {
   const line = (() => {
     const derived = snap.derived as Partial<Record<StatKey, number>> | undefined;
     const resists = snap.modifiers?.resists ?? {};
+    const sets: SetsProgress[] = Array.isArray((snap as { setsProgress?: SetsProgress[] }).setsProgress)
+      ? ((snap as { setsProgress?: SetsProgress[] }).setsProgress as SetsProgress[])
+      : [];
     const d = derived ? formatDerived(derived, 'ko') : '';
     const r = Object.keys(resists).length ? formatResists(resists, 'ko') : '';
-    return [d, r].filter(Boolean).join(' • ');
+    const s = sets.length ? formatSetsProgress(sets, 'ko') : '';
+    return [d, r, s].filter(Boolean).join(' • ');
   })();
   if (!line) return null;
   return (

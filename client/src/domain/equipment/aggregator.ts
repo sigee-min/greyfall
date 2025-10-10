@@ -1,5 +1,6 @@
 import { ALL_STAT_KEYS, type StatKey } from '../stats/keys';
-import type { EffectSpec, EquipmentAggregationInput, EquipmentAggregationResult, Modifiers } from './effect-types';
+import type { EffectSpec, EquipmentAggregationInput, EquipmentAggregationResult, Modifiers, SetsProgress } from './effect-types';
+import { getSetTierEffects } from './sets-catalog';
 
 function emptyModifiers(): Modifiers {
   const stats = Object.create(null) as Modifiers['stats'];
@@ -49,7 +50,7 @@ function applyEffect(mods: Modifiers, e: EffectSpec): void {
   }
 }
 
-function resolveSetBonuses(effectsByItem: Record<string, EffectSpec[]>, equipped: string[]): EffectSpec[] {
+function countSets(effectsByItem: Record<string, EffectSpec[]>, equipped: string[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const key of equipped) {
     const list = effectsByItem[key] ?? [];
@@ -57,17 +58,36 @@ function resolveSetBonuses(effectsByItem: Record<string, EffectSpec[]>, equipped
       if (e.setId) counts.set(e.setId, (counts.get(e.setId) ?? 0) + 1);
     }
   }
+  return counts;
+}
+
+function resolveSetBonuses(effectsByItem: Record<string, EffectSpec[]>, equipped: string[]): EffectSpec[] {
+  const counts = countSets(effectsByItem, equipped);
   const out: EffectSpec[] = [];
   for (const [setId, n] of counts) {
     const tiers: Array<2 | 4 | 6> = [2, 4, 6];
     for (const t of tiers) {
       if (n >= t) {
-        const bonus = { kind: 'TAG', tags: [`set:${setId}:${t}`] } as EffectSpec;
-        out.push(bonus);
+        // Keep a tag for debugging/trace and apply catalog-defined effects
+        out.push({ kind: 'TAG', tags: [`set:${setId}:${t}`], value: 1 } as EffectSpec);
+        const effects = getSetTierEffects(setId, t);
+        for (const e of effects) out.push(e);
       }
     }
   }
   return out;
+}
+
+function buildSetsProgress(effectsByItem: Record<string, EffectSpec[]>, equipped: string[]): SetsProgress[] {
+  const counts = countSets(effectsByItem, equipped);
+  const tiers = [2, 4, 6];
+  const list: SetsProgress[] = [];
+  for (const [setId, count] of counts) {
+    const achieved = tiers.filter((t) => count >= t);
+    const nextTier = tiers.find((t) => count < t);
+    list.push({ setId, count, tiers, achieved, nextTier });
+  }
+  return list;
 }
 
 function effectsHash(input: EquipmentAggregationInput): string {
@@ -107,6 +127,6 @@ export function computeEquipmentSnapshot(input: EquipmentAggregationInput, opts?
       derived[k] = v;
     }
   }
-  return { modifiers: mods, derived: opts?.includeDerived ? derived : undefined, effectsHash: effectsHash(input), trace: opts?.trace ? trace : undefined };
+  const setsProgress = buildSetsProgress(effectsByItem, orderedKeys);
+  return { modifiers: mods, derived: opts?.includeDerived ? derived : undefined, effectsHash: effectsHash(input), trace: opts?.trace ? trace : undefined, setsProgress };
 }
-

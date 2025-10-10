@@ -7,9 +7,10 @@ import { selectAssetPreloadSnapshot, useAssetPreloadStore } from '../../domain/a
 
 export type LoginGateProps = {
   onSignedIn?: (user: AuthUser) => void;
+  providerReady?: boolean;
 };
 
-export function LoginGate({ onSignedIn }: LoginGateProps) {
+export function LoginGate({ onSignedIn, providerReady = false }: LoginGateProps) {
   const snapshot = useAssetPreloadStore(selectAssetPreloadSnapshot);
 
   const progress = useMemo(() => {
@@ -36,6 +37,8 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
       if (!result.ok || !result.user?.sub) return;
       setAuthUser(result.user);
       onSignedIn?.(result.user);
+      // Reload to re-negotiate COOP/COEP headers (Option B: cookie-based isolation)
+      try { window.location.reload(); } catch {}
     } catch (err) {
       console.warn('[auth] signin error', err);
     }
@@ -43,6 +46,8 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
 
   const existing = getAuthUser();
   // Use live main lobby as background (no static hero image)
+  // Profile emblem (transparent PNG) shown in header if available
+  const [emblemSrc, setEmblemSrc] = useState<string>('/assets/icons/profile-nobg.png');
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[1000]">
@@ -54,10 +59,15 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
           {/* Header */}
           <div className="relative border-b border-border/60 px-6 py-5">
             <div className="flex items-center gap-3">
-              {/* Minimal glyph (muted) */}
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="text-slate-400">
-                <path d="M12 3l2.2 4.5L19.5 9l-3.7 3.6.8 4.8L12 15.4 7.4 17.4l.8-4.8L4.5 9l5.3-1.5L12 3z" stroke="currentColor" strokeWidth="1.1" fill="none" />
-              </svg>
+              {/* Emblem image (transparent PNG). Fallback to generic icon if missing */}
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-border/60 bg-muted/20">
+                <img
+                  src={emblemSrc}
+                  onError={() => setEmblemSrc('/assets/icons/image.png')}
+                  alt="Greyfall emblem"
+                  className="h-full w-full object-contain p-1 drop-shadow-[0_1px_4px_rgba(0,229,196,0.35)]"
+                />
+              </div>
               <div>
                 <h2 className="text-[15px] font-semibold tracking-[0.12em] text-foreground uppercase">Greyfall</h2>
                 <p className="text-[11px] text-muted-foreground">세션 준비 중 · 인증 필요</p>
@@ -85,12 +95,33 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
                 <p className="mt-1 text-[11px]">로딩이 끝나면 회랑의 문이 열립니다.</p>
               </div>
               <div className="flex items-center gap-3">
-                <GoogleLogin onSuccess={handleSuccess} useOneTap={false} auto_select={false} nonce={nonceData.nonce} />
+                {providerReady ? (
+                  <GoogleLogin onSuccess={handleSuccess} useOneTap={false} auto_select={false} nonce={nonceData.nonce} />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled
+                      className="cursor-not-allowed rounded-md border border-border/60 bg-background/60 px-3 py-1.5 text-[12px] font-medium text-foreground/70"
+                      title="서버에서 로그인 구성을 불러오는 중"
+                    >
+                      Google로 계속하기
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-border/60 bg-background/60 px-2.5 py-1.5 text-[12px] text-foreground/90 hover:border-foreground/30"
+                      onClick={() => { try { window.location.reload(); } catch {} }}
+                      title="구성 다시 불러오기"
+                    >
+                      재시도
+                    </button>
+                  </div>
+                )}
                 {existing && (
                   <button
                     type="button"
                     className="rounded-md border border-border/60 bg-background/60 px-3 py-1.5 text-[12px] font-medium text-foreground/90 hover:border-foreground/30"
-                    onClick={() => onSignedIn?.(existing)}
+                    onClick={() => { onSignedIn?.(existing); try { window.location.reload(); } catch {} }}
                     title={existing.name ? `${existing.name}로 계속` : '계속'}
                   >
                     계속

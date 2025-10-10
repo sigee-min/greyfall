@@ -55,7 +55,7 @@ export function LobbyForm({
     <div className={cn('w-full max-w-sm space-y-6 sm:max-w-sm', classes?.container)}>
       <div className={cn('space-y-2', classes?.panel)}>
         <label htmlFor="player-name" className={cn(baseLabel, classes?.label)}>
-          {t('lobby.callsign')} <span className="ml-1 text-[0.65rem] lowercase text-muted-foreground">(Google)</span>
+          {t('lobby.profile')}
         </label>
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 overflow-hidden rounded-full border border-border/60 bg-background/60">
@@ -65,20 +65,13 @@ export function LobbyForm({
               <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{playerName?.[0] ?? 'P'}</div>
             )}
           </div>
-          <input
+          <p
             id="player-name"
-            name="greyfall-callsign"
-            value={playerName}
-            readOnly
-            disabled
-            placeholder={t('lobby.callsign.placeholder')}
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            autoCapitalize="off"
-            inputMode="text"
-            className={cn(baseInput, 'cursor-not-allowed opacity-80', classes?.input)}
-          />
+            title={playerName || t('lobby.callsign.placeholder')}
+            className={cn('min-h-[2.5rem] w-full truncate rounded-md px-1.5 py-1.5 text-sm text-slate-100', classes?.input)}
+          >
+            {playerName || t('lobby.callsign.placeholder')}
+          </p>
         </div>
       </div>
 

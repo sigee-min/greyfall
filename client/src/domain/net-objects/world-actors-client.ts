@@ -1,7 +1,7 @@
 import type { ClientObject } from './types';
 import { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 import type { PositionEntry } from './world-positions-client';
-import type { Modifiers } from '../equipment/effect-types';
+import type { Modifiers, SetsProgress } from '../equipment/effect-types';
 import type { StatKey } from '../stats/keys';
 
 export type ActorInventoryItem = { key: string; count: number };
@@ -16,6 +16,7 @@ export type ActorEntry = {
   derived?: Partial<Record<StatKey, number>>;
   effectsHash?: string;
   schemaVersion?: number;
+  setsProgress?: SetsProgress[];
 };
 
 type Subscriber = (list: ActorEntry[]) => void;
@@ -63,7 +64,8 @@ function normalizeEntry(raw: any): ActorEntry {
   const derived = raw?.derived && typeof raw.derived === 'object' ? (raw.derived as Partial<Record<StatKey, number>>) : undefined;
   const effectsHash = typeof raw?.effectsHash === 'string' ? raw.effectsHash : undefined;
   const schemaVersion = typeof raw?.schemaVersion === 'number' ? raw.schemaVersion : undefined;
-  return { id: String(raw?.id ?? ''), hp, inventory: inv, equipment: eq, status, modifiers, derived, effectsHash, schemaVersion };
+  const setsProgress = Array.isArray(raw?.setsProgress) ? (raw.setsProgress as SetsProgress[]) : undefined;
+  return { id: String(raw?.id ?? ''), hp, inventory: inv, equipment: eq, status, modifiers, derived, effectsHash, schemaVersion, setsProgress };
 }
 
 export const worldActorsClient = new ClientWorldActors();

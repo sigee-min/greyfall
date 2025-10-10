@@ -17,10 +17,10 @@ ENV NODE_ENV=production
 COPY --from=builder /app/server/dist ./dist
 COPY server/package.json ./package.json
 
-ENV PORT=8080
+ENV SERVER_PORT=8080
 ENV DATA_ROOT=/data/app-data
 ENV SESSION_TTL_SEC=18000
-ENV COOKIE_NAME=SID
+# Cookie name is fixed to GREYFALLID in the app
 ENV JWT_SECRET=change-me
 
 EXPOSE 8080

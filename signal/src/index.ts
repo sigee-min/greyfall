@@ -32,7 +32,8 @@ const sessions = new Map<string, Session>();
 const MAX_GUESTS = 3; // host + 3 guests = 4 players
 
 const SESSION_TTL_MS = 1000 * 60 * 30; // 30 minutes
-const SIGNAL_PORT = Number(process.env.SIGNAL_PORT ?? process.env.PORT ?? 8787);
+// Use dedicated env var to avoid clashing with other services
+const SIGNAL_PORT = Number(process.env.SIGNAL_PORT ?? 8787);
 
 const app = express();
 app.use(cors({

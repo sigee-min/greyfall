@@ -3,16 +3,16 @@ Greyfall LLM Logs Server — 사용법
 개요
 - 역할: LLM 요청/응답을 날짜/타입별(NDJSON)로 저장하고, 세션 인증 기반 대시보드 및 CRUD API를 제공합니다.
 - 저장 규칙: 데이터 루트(DATA_ROOT)/YYYY-MM-DD/{request_type}.json 에 JSON Lines(NDJSON)로 append 저장합니다.
-- 인증: Google 로그인 교환(`/api/auth/google/signin`) → 서버 JWT 발급(쿠키 `SID`), 세션 TTL 기본 5시간.
+- 인증: Google 로그인 교환(`/api/auth/google/signin`) → 서버 JWT 발급(쿠키 `GREYFALLID`), 세션 TTL 기본 5시간.
 
 빠른 시작(로컬)
 1) 환경 변수(.env 예시)
-   - PORT=8080
+   - SERVER_PORT=8080
    - DATA_ROOT=./data/llm-logs
    - MAX_FILE_SIZE_MB=100
    - SESSION_TTL_SEC=18000 # 5시간
    - SESSION_REFRESH_SKEW_SEC=900 # 만료 임박 시 재발급 임계값(초)
-   - COOKIE_NAME=SID
+   - (고정) COOKIE_NAME은 사용하지 않습니다. 쿠키 이름은 `GREYFALLID`로 고정됩니다.
    - JWT_SECRET=change-me
    - JWT_SECRET=change-me
    - GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
@@ -28,7 +28,7 @@ Greyfall LLM Logs Server — 사용법
 
 API 요약
 - 인증: 세션(Bearer 또는 쿠키). 수집 엔드포인트는 예외
-- 인증 교환: `POST /api/auth/google/signin` Body `{ credential }` → `{ ok, user, token }` + `Set-Cookie: SID=...`
+- 인증 교환: `POST /api/auth/google/signin` Body `{ credential }` → `{ ok, user, token }` + `Set-Cookie: GREYFALLID=...`
 - 세션 확인: `GET /api/auth/me` → `{ ok, user }`
 - 로그아웃: `POST /api/auth/logout`
 - 사용자 프로필: `GET /api/users/me` → `{ ok, user: { id, name, picture, role } }`
@@ -105,14 +105,15 @@ API 요약
 
 ## Environment Variables
 
-- `PORT` (기본 8080) — HTTP 포트
+- `SERVER_PORT` (기본 8080) — HTTP 포트
 - `DATA_ROOT` (기본 `./data/llm-logs`) — 데이터 루트 디렉터리
 - `MAX_FILE_SIZE_MB` (기본 100) — 파일 로테이션 임계값(MB)
 - `GOOGLE_CLIENT_ID` (필수) — Google ID 토큰 검증용 클라이언트 ID
 - `JWT_SECRET` (필수/운영) — 서버 세션 JWT 서명 시크릿
 - `SESSION_TTL_SEC` (기본 18000=5h) — 세션 유효기간
 - `SESSION_REFRESH_SKEW_SEC` (기본 900=15m) — 만료 임박 시 갱신 임계값
-- `COOKIE_NAME` (기본 `SID`) — 세션 쿠키 이름
+  
+  COOKIE_NAME은 더 이상 사용하지 않습니다. 세션 쿠키 이름은 `GREYFALLID`로 고정됩니다.
 - `SYSADMIN_EMAILS` — 세미콜론/쉼표/공백 구분. 일치 이메일은 sysadmin 부여
 - `ADMIN_EMAILS` — 세미콜론/쉼표/공백 구분. 일치 이메일은 admin 부여
 - `ALLOWED_EMAIL_DOMAINS` — 도메인 화이트리스트(예: `example.com dev.local`)

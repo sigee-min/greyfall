@@ -21,15 +21,15 @@ unset PORT
 echo "[entrypoint] starting signal server on :$SIGNAL_PORT"
 node /opt/signal/dist/index.js &
 
-# Start logs server (HTTP) on internal port used by nginx /api upstream
-LOGS_PORT=${LOGS_PORT:-8080}
-export PORT=$LOGS_PORT
+# Start app server (HTTP) on internal port used by nginx /api upstream
+SERVER_PORT=${SERVER_PORT:-8080}
+export SERVER_PORT
 export DATA_ROOT=${DATA_ROOT:-/data/llm-logs}
 mkdir -p "$DATA_ROOT"
 export SESSION_TTL_SEC=${SESSION_TTL_SEC:-18000}
-export COOKIE_NAME=${COOKIE_NAME:-SID}
+# Cookie name is fixed in server to GREYFALLID; no env override required
 export JWT_SECRET=${JWT_SECRET:-change-me}
-echo "[entrypoint] starting app server on :$LOGS_PORT (data at $DATA_ROOT)"
+echo "[entrypoint] starting app server on :$SERVER_PORT (data at $DATA_ROOT)"
 node /opt/logs/dist/index.js &
 
 # Start nginx in foreground

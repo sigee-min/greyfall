@@ -71,6 +71,7 @@
   "lobby.title.line2": "Lantern Circle resistance",
   "lobby.description": "Greyfall은 랜턴 서클 레지스탕스가 운영하는 내러티브 감시 거점입니다. 세션을 만들거나 합류해 폭풍을 막아내세요.",
   "lobby.callsign": "식별명",
+  "lobby.profile": "프로필",
   "lobby.callsign.placeholder": "예: 춘식이",
   "lobby.joinCode": "합류 코드",
   "lobby.joinCode.placeholder": "호스트가 제공한 코드",
@@ -117,6 +118,25 @@
   "ready.chat.guest": "GUEST",
   "ready.status.ready": "준비됨",
   "ready.status.standby": "대기",
+
+  "equip.reason.slotCapacity": "해당 슬롯이 가득 찼습니다.",
+  "equip.reason.combatRestricted": "전투 중에는 장비를 교체할 수 없습니다.",
+  "equip.reason.cooldown": "잠시 후 다시 시도하세요.",
+  "equip.reason.duplicate": "이미 처리 중입니다.",
+  "equip.reason.publishFailed": "요청 전송에 실패했습니다.",
+  "equip.reason.unavailable": "장비를 사용할 수 없습니다.",
+  "equip.reason.unauthorized": "권한이 없습니다.",
+  "equip.reason.unknown": "장비 변경이 거부되었습니다.",
+  "equip.toast.applied": "장착 완료",
+  "equip.toast.rejected": "장착 거부",
+  "unequip.toast.applied": "해제 완료",
+  "unequip.toast.rejected": "해제 거부",
+  "slot.head": "머리",
+  "slot.body": "몸통",
+  "slot.mainhand": "주손",
+  "slot.offhand": "보조손",
+  "slot.accessory": "장신구",
+  "slot.misc": "기타",
 
   
 

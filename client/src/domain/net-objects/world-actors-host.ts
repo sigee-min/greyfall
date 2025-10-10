@@ -10,6 +10,8 @@ import { getItemEffects } from '../equipment/effect-registry';
 import { RULES_VERSION } from '../equipment/rules';
 import type { StatKey } from '../stats/keys';
 import { initEquipmentEffects } from '../equipment/bootstrap';
+import { characterLoadoutsHost } from '../character/character-sync';
+import { netBus } from '../../bus/net-bus';
 
 export { WORLD_ACTORS_OBJECT_ID } from './object-ids.js';
 
@@ -150,17 +152,21 @@ export class HostWorldActorsObject implements HostObject {
       const equipped = Array.isArray(e.equipment) ? e.equipment : [];
       const effectsByItem: Record<string, ReturnType<typeof getItemEffects>> = {};
       for (const k of equipped) effectsByItem[k] = getItemEffects(k);
-      // Base stats unknown at this layer → derive zeros to keep modifiers authoritative for now
-      const base: Record<StatKey, number> = {
+      // Try to use authoritative character base stats from loadouts; fallback to zeros
+      const loadouts = characterLoadoutsHost.get();
+      const stats = (loadouts?.byId?.[actorId]?.stats ?? null) as Record<StatKey, number> | null;
+      const base: Record<StatKey, number> = stats ?? ({
         Strength: 0,
         Agility: 0,
         Engineering: 0,
         Dexterity: 0,
         Medicine: 0
-      } as Record<StatKey, number>;
+      } as Record<StatKey, number>);
       const snap = computeEquipmentSnapshot({ base, equipped, effectsByItem, rulesVersion: RULES_VERSION }, { includeDerived: true, trace: false });
-      const next: ActorEntry = { ...e, modifiers: snap.modifiers, derived: snap.derived, effectsHash: snap.effectsHash, schemaVersion: 1 } as any;
+      const next: ActorEntry = { ...e, modifiers: snap.modifiers, derived: snap.derived, effectsHash: snap.effectsHash, schemaVersion: 1, setsProgress: snap.setsProgress } as any;
       this.list.upsertMany([next], 'actors:equipment:snapshot');
+      // Local domain telemetry (host only)
+      try { netBus.publish('equip:applied', { actorId, key: equipped[equipped.length - 1] ?? '', effectsHash: snap.effectsHash }); } catch {}
     } catch {}
   }
 }

@@ -11,7 +11,7 @@ export function initEquipmentEffects(): void {
 
   // Demo effects for a few equipment keys
   registerItemEffects('iron-helm', E([
-    { kind: 'STAT', target: 'Strength', op: 'add', value: 1 }
+    { kind: 'STAT', target: 'Strength', op: 'add', value: 1, setId: 'vanguard' }
   ]));
 
   registerItemEffects('tactical-visor', E([
@@ -20,11 +20,11 @@ export function initEquipmentEffects(): void {
   ]));
 
   registerItemEffects('field-vest', E([
-    { kind: 'RESIST', target: 'pierce', value: 10 }
+    { kind: 'RESIST', target: 'pierce', value: 10, setId: 'vanguard' }
   ]));
 
   registerItemEffects('ring-of-focus', E([
-    { kind: 'STAT', target: 'Dexterity', op: 'add', value: 1 }
+    { kind: 'STAT', target: 'Dexterity', op: 'add', value: 1, setId: 'arcane' }
   ]));
 
   // Additional lineup
@@ -38,11 +38,11 @@ export function initEquipmentEffects(): void {
   ]));
 
   registerItemEffects('storm-robe', E([
-    { kind: 'RESIST', target: 'energy', value: 15 }
+    { kind: 'RESIST', target: 'energy', value: 15, setId: 'arcane' }
   ]));
 
   registerItemEffects('steel-sword', E([
-    { kind: 'STAT', target: 'Strength', op: 'add', value: 1 },
+    { kind: 'STAT', target: 'Strength', op: 'add', value: 1, setId: 'vanguard' },
     { kind: 'TAG', tags: ['melee'], value: 1 }
   ]));
 
@@ -56,7 +56,7 @@ export function initEquipmentEffects(): void {
   ]));
 
   registerItemEffects('storm-staff', E([
-    { kind: 'RESIST', target: 'energy', value: 10 },
+    { kind: 'RESIST', target: 'energy', value: 10, setId: 'arcane' },
     { kind: 'TAG', tags: ['caster'], value: 1 }
   ]));
 

@@ -4,8 +4,10 @@ import { useEquipmentSnapshot, useEquipmentPreview, useEquipActions } from '../h
 import { getItem } from '../../domain/items/registry';
 import { useGlobalBus } from '../../bus/global-bus';
 import { EquipmentTooltip } from './equipment-tooltip';
-import { formatDerived, formatResists } from '../../app/services/equipment-formatter';
+import { formatDerived, formatResists, formatSetsProgress, reasonToMessageKey } from '../../app/services/equipment-formatter';
+import type { SetsProgress } from '../../domain/equipment/effect-types';
 import type { StatKey } from '../../domain/stats/keys';
+import { useI18n } from '../../i18n';
 
 type Props = {
   actorId: string | null;
@@ -13,6 +15,7 @@ type Props = {
 };
 
 export function EquipmentPanel({ actorId, publish }: Props) {
+  const { t } = useI18n();
   const snap = useEquipmentSnapshot(actorId);
   const bus = useGlobalBus();
   const [hoverAdd, setHoverAdd] = useState<string | null>(null);
@@ -24,11 +27,13 @@ export function EquipmentPanel({ actorId, publish }: Props) {
   const eq = snap.equipment;
   const derivedStats: Partial<Record<StatKey, number>> = (preview?.derived ?? snap.derived ?? {}) as Partial<Record<StatKey, number>>;
   const resists: Record<string, number> = (preview?.modifiers?.resists ?? snap.modifiers?.resists ?? {}) as Record<string, number>;
+  const setsProgress: SetsProgress[] | undefined = (preview?.setsProgress ?? (snap as { setsProgress?: SetsProgress[] }).setsProgress);
 
   const title = (() => {
     const d = formatDerived(derivedStats, 'ko');
     const r = formatResists(resists, 'ko');
-    return [d, r].filter(Boolean).join(' • ');
+    const s = Array.isArray(setsProgress) && setsProgress.length ? formatSetsProgress(setsProgress, 'ko') : '';
+    return [d, r, s].filter(Boolean).join(' • ');
   })();
 
   return (
@@ -65,8 +70,9 @@ export function EquipmentPanel({ actorId, publish }: Props) {
                   onClick={async () => {
                     const res = await equip(i.key);
                     if (!res.ok) {
-                      const msg = res.reason === 'slot-capacity' ? '해당 슬롯이 가득 찼습니다.' : res.reason === 'combat-restricted' ? '전투 중에는 장비를 교체할 수 없습니다.' : '장착할 수 없습니다.';
-                      bus.publish('toast:show', { status: 'warning', title: '장착 불가', message: msg, durationMs: 2000 });
+                      const key = reasonToMessageKey(res.reason);
+                      const msg = t(key);
+                      bus.publish('toast:show', { status: 'warning', title: t('equip.toast.rejected'), message: msg, durationMs: 2000 });
                     }
                   }}
                   className="rounded border border-border/60 px-2 py-0.5 text-[11px] hover:border-primary hover:text-primary"

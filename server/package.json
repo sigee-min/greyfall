@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "sh -c 'tsc -p tsconfig.server.json -w & while [ ! -f dist/index.js ]; do sleep 0.2; done; node --watch dist/index.js'",
+    "dev": "sh -c 'tsc -p tsconfig.server.json -w & while [ ! -f dist/index.js ]; do sleep 0.2; done; node --import dotenv/config --watch dist/index.js'",
     "build": "tsc -p tsconfig.server.json",
-    "start": "node dist/index.js",
+    "start": "node --import dotenv/config dist/index.js",
     "test": "npm run build && node --test tests/contract.test.mjs"
   },
   "dependencies": {
     "@shared/auth": "*",
+    "dotenv": "^16.4.5",
     "google-auth-library": "^9.0.0",
     "better-sqlite3": "^9.4.5"
   },

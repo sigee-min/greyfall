@@ -167,4 +167,9 @@ export class HostRouter {
   }
 
   // No travel voting logic here
+
+  // Public method to emit lobby messages from models/handlers
+  sendLobbyMessage<K extends LobbyMessage['kind']>(kind: K, body: Extract<LobbyMessage, { kind: K }>['body'], context?: string): boolean {
+    return this.send(kind, body as any, context);
+  }
 }

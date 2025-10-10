@@ -11,6 +11,11 @@ export type NetBusEvents = {
   'client:patch:applied': { objectId: string; rev: number };
   'client:patch:rejected': { objectId: string; rev: number };
   'client:patch:stalled': { objectId: string; sinceRev?: number };
+  // domain telemetry (optional)
+  'equip:request': { actorId: string; key: string };
+  'equip:publishFailed': { actorId: string; key: string };
+  'equip:applied': { actorId: string; key: string; effectsHash?: string };
+  'equip:rejected': { actorId: string; key: string; reason: 'unauthorized' | 'cooldown' | 'unavailable' };
 };
 
 const bus = createEventBus<NetBusEvents>();

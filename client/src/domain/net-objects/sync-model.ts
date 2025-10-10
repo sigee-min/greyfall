@@ -45,7 +45,7 @@ type HostRef<T> = {
   listeners: Set<(api: SyncModelHostApi<T>) => void>;
 };
 
-type RouterCommandApi = Pick<HostRouter, 'updateParticipantReady'>;
+type RouterCommandApi = Pick<HostRouter, 'updateParticipantReady' | 'sendLobbyMessage'>;
 
 type SyncModelCommandRuntimeContext = {
   peerId?: string;

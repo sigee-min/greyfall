@@ -71,6 +71,7 @@
   "lobby.title.line2": "Lantern Circle resistance",
   "lobby.description": "Greyfall is the narrative watchpost operated by the Lantern Circle resistance. Create or join a session to keep the storm at bay.",
   "lobby.callsign": "Callsign",
+  "lobby.profile": "Profile",
   "lobby.callsign.placeholder": "e.g., Ash-Runner",
   "lobby.joinCode": "Join Code",
   "lobby.joinCode.placeholder": "Host-provided code",
@@ -117,6 +118,25 @@
   "ready.chat.guest": "GUEST",
   "ready.status.ready": "Ready",
   "ready.status.standby": "Standby",
+
+  "equip.reason.slotCapacity": "Slot is full.",
+  "equip.reason.combatRestricted": "Cannot change equipment during combat.",
+  "equip.reason.cooldown": "Please try again shortly.",
+  "equip.reason.duplicate": "Request already in progress.",
+  "equip.reason.publishFailed": "Failed to send request.",
+  "equip.reason.unavailable": "Item unavailable.",
+  "equip.reason.unauthorized": "Not authorized.",
+  "equip.reason.unknown": "Equipment change rejected.",
+  "equip.toast.applied": "Equipment applied",
+  "equip.toast.rejected": "Equip rejected",
+  "unequip.toast.applied": "Unequipped",
+  "unequip.toast.rejected": "Unequip rejected",
+  "slot.head": "Head",
+  "slot.body": "Body",
+  "slot.mainhand": "Main hand",
+  "slot.offhand": "Off hand",
+  "slot.accessory": "Accessory",
+  "slot.misc": "Misc",
 
   
 

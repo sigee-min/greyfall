@@ -84,7 +84,7 @@ RUN chmod +x /entrypoint.sh
 
 # Internal signal server port (do not expose directly)
 ENV SIGNAL_PORT=8787
-ENV LOGS_PORT=8080
+ENV SERVER_PORT=8080
 
 EXPOSE 80 443
 
