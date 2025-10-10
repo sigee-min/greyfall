@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import type { AuthUser } from '../../lib/auth';
 import { getAuthUser, setAuthUser } from '../../lib/auth';
-import { signinWithGoogle } from '../../lib/auth-session';
+import { signinWithGoogle, getAuthNonce } from '../../lib/auth-session';
 import { selectAssetPreloadSnapshot, useAssetPreloadStore } from '../../domain/assets/preload-store';
 
 export type LoginGateProps = {
@@ -18,21 +18,21 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
     return { pct, completed: snapshot.completed, total: snapshot.total };
   }, [snapshot.completed, snapshot.total]);
 
-  // Stable nonce per mount to mitigate replay; passed to Google and server
-  const nonce = useMemo(() => {
-    try {
-      const arr = new Uint8Array(16);
-      crypto.getRandomValues(arr);
-      return Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
-    } catch {
-      return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    }
+  // Fetch server-issued nonce per mount (short-lived)
+  const [nonceData, setNonceData] = useState<{ nonce?: string; token?: string }>({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const r = await getAuthNonce();
+      if (alive && r.ok) setNonceData({ nonce: r.nonce, token: r.nonceToken });
+    })();
+    return () => { alive = false; };
   }, []);
 
   const handleSuccess = async (cr: CredentialResponse) => {
     try {
       if (!cr.credential) return;
-      const result = await signinWithGoogle(cr.credential, nonce);
+      const result = await signinWithGoogle(cr.credential, nonceData.token ?? nonceData.nonce, nonceData.token ? 'token' : 'nonce');
       if (!result.ok || !result.user?.sub) return;
       setAuthUser(result.user);
       onSignedIn?.(result.user);
@@ -60,7 +60,7 @@ export function LoginGate({ onSignedIn }: LoginGateProps) {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <GoogleLogin onSuccess={handleSuccess} useOneTap={false} auto_select={false} nonce={nonce} />
+          <GoogleLogin onSuccess={handleSuccess} useOneTap={false} auto_select={false} nonce={nonceData.nonce} />
           {existing && (
             <div className="text-xs text-muted-foreground">
               {existing.name ? `${existing.name}로 로그인됨` : '로그인됨'}

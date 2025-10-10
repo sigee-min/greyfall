@@ -3,11 +3,12 @@ import { loadConfig, type AppConfig } from '../config.js';
 import { parseBody, parseUrl } from '../utils.js';
 import { sendOk, sendError } from '../lib/http.js';
 import { validate } from '../lib/validate.js';
-import { authSigninRequestSchema, authSigninResponseSchema, authMeResponseSchema } from '@shared/protocol';
+import { authSigninRequestSchema, authSigninResponseSchema, authMeResponseSchema, authNonceResponseSchema } from '@shared/protocol';
 import { logger } from '../lib/logger.js';
 import { getContext } from '../middleware/ctx.js';
 import { verifyGoogleIdToken } from '../auth/google.js';
 import { createSessionToken, parseCookie, verifySessionToken } from '../auth/session.js';
+import { signJwtHS256, verifyJwtHS256 } from '@shared/auth';
 import { upsertGoogleUser } from '../users/service.js';
 
 function setSessionCookie(res: ServerResponse, cfg: AppConfig, token: string, maxAgeSec: number) {
@@ -26,7 +27,20 @@ export async function handleAuthRoutes(req: IncomingMessage, res: ServerResponse
   if (!pathname.startsWith('/api/auth/')) return false;
   const cfg = await loadConfig();
 
-  // POST /api/auth/google/signin { credential, nonce? }
+  // GET /api/auth/nonce → issue short-lived nonce + signed token
+  if (pathname === '/api/auth/nonce' && req.method === 'GET') {
+    const bytes = new Uint8Array(16);
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+    const nonce = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const now = Math.floor(Date.now() / 1000);
+    const payload = { sub: 'nonce', iat: now, exp: now + 120, nonce };
+    const nonceToken = signJwtHS256(payload, cfg.jwtSecret);
+    try { validate(authNonceResponseSchema, { ok: true, nonce, nonceToken }); } catch {}
+    sendOk(res, { nonce, nonceToken });
+    return true;
+  }
+
+  // POST /api/auth/google/signin { credential, nonceToken? (preferred), nonce? (legacy) }
   if (pathname === '/api/auth/google/signin' && req.method === 'POST') {
     const body = await parseBody<any>(req);
     try {
@@ -36,7 +50,16 @@ export async function handleAuthRoutes(req: IncomingMessage, res: ServerResponse
       return true;
     }
     const credential: string | undefined = body?.credential;
-    const expectedNonce: string | undefined = typeof body?.nonce === 'string' ? body.nonce : undefined;
+    const nonceToken: string | undefined = typeof body?.nonceToken === 'string' ? body.nonceToken : undefined;
+    let expectedNonce: string | undefined = typeof body?.nonce === 'string' ? body.nonce : undefined;
+    if (nonceToken) {
+      const vr = verifyJwtHS256(nonceToken, cfg.jwtSecret);
+      if (!vr.ok || typeof (vr.payload as any).nonce !== 'string') {
+        sendError(res, { code: 'UNAUTHORIZED', status: 401, message: 'Invalid nonce token' });
+        return true;
+      }
+      expectedNonce = (vr.payload as any).nonce as string;
+    }
     const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
     if (!googleClientId) { sendError(res, { code: 'CONFIG', status: 500, message: 'Missing GOOGLE_CLIENT_ID' }); return true; }
     const gp = await verifyGoogleIdToken(credential as string, googleClientId, expectedNonce);

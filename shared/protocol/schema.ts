@@ -137,7 +137,8 @@ export const lobbyParticipantSchema = z.object({
   name: z.string().min(1),
   tag: z.string().min(1),
   ready: z.boolean(),
-  role: sessionRoleSchema
+  role: sessionRoleSchema,
+  avatarUrl: z.string().url().optional()
 });
 
 export type LobbyParticipant = z.infer<typeof lobbyParticipantSchema>;
@@ -526,10 +527,17 @@ export const authSigninRequestSchema = z
   .object({
     credential: z.string().min(10),
     // Optional nonce to mitigate replay; when provided, server must match payload.nonce
-    nonce: z.string().min(8).max(255).optional()
+    nonce: z.string().min(8).max(255).optional(),
+    // Preferred: server-issued nonce token (signed & short-lived)
+    nonceToken: z.string().min(10).optional()
   })
   .strict();
 export type AuthSigninRequest = z.infer<typeof authSigninRequestSchema>;
+
+export const authNonceResponseSchema = z
+  .object({ ok: z.literal(true), nonce: z.string().min(8), nonceToken: z.string().min(10) })
+  .strict();
+export type AuthNonceResponse = z.infer<typeof authNonceResponseSchema>;
 
 export const authUserSchema = z
   .object({
