@@ -3,6 +3,7 @@ import { getHostObject } from '../net-objects/registry.js';
 import { WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { computeDamage } from '../combat/damage';
+import { runDialogue } from './pipeline/dialogue';
 
 type VoidState = null;
 
@@ -21,11 +22,10 @@ const npcControl = defineSyncModel<VoidState>({
         return { npcId, fromId, text, mode: m };
       },
       authorize: () => true,
-      handle: ({ payload, context }) => {
-        const { npcId, fromId, text } = payload as { npcId: string; fromId: string; text: string };
-        // Placeholder pipeline: echo-style polite reply
-        const reply = text.length > 0 ? `(${npcId}) 알았다. ${fromId}.` : '...';
-        context.router.sendLobbyMessage('npc:chat:result', { npcId, toId: fromId, text: reply }, 'npc:chat:result');
+      handle: async ({ payload, context }) => {
+        const { npcId, fromId, text, mode } = payload as { npcId: string; fromId: string; text: string; mode?: 'say'|'ask'|'request' };
+        const out = await runDialogue({ npcId, fromId, text, mode });
+        context.router.sendLobbyMessage('npc:chat:result', { npcId, toId: fromId, text: out.text, actions: out.actions }, 'npc:chat:result');
       }
     },
     {

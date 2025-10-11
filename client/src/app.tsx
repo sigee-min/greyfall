@@ -37,6 +37,7 @@ import { InteractionPanel } from './ui/world/interaction-panel';
 import { EquipmentHudBadge } from './ui/hud/equipment-hud-badge';
 import { CharacterBuilder } from './ui/character/character-builder';
 import { EquipmentPanel } from './ui/character/equipment-panel';
+import { NpcPanel } from './ui/npc/npc-panel';
 import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
 import { useI18n } from './i18n';
@@ -554,6 +555,7 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
             <ChatDock />
             <CommandConsole publish={publishLobbyMessage} localParticipantId={localParticipantId} />
             <EquipmentPanel actorId={localParticipantId} publish={publishLobbyMessage} />
+            <NpcPanel localParticipantId={localParticipantId} publish={publishLobbyMessage} register={registerLobbyHandler} />
           </div>
 
           {scene === 'game' && (
