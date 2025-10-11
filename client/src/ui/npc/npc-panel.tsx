@@ -39,6 +39,15 @@ export function NpcPanel({ localParticipantId, publish, register }: Props) {
   const items = useMemo(() => list.slice(0, 5), [list]);
 
   if (items.length === 0) return null;
+  function statusDesc(tag: string): string {
+    switch (tag) {
+      case 'taunted': return '도발: 일정 시간 공격 대상 고정';
+      case 'vulnerable': return '취약: 받는 피해 증가(저항 -10)';
+      case 'defenseUp': return '방어 상승: 저항 +10';
+      case 'attackUp': return '공격 상승: 피해 증가';
+      default: return tag;
+    }
+  }
   return (
     <div className="rounded-xl border border-border/60 bg-background/70 p-3 text-xs">
       <div className="mb-2 flex items-center justify-between">
@@ -56,8 +65,12 @@ export function NpcPanel({ localParticipantId, publish, register }: Props) {
               <div className="text-muted-foreground">{n.stance} · {n.mood}</div>
             </div>
             <div className="mt-1 flex flex-wrap gap-1">
-              {(actors.find((a) => a.id === n.id)?.status ?? []).slice(0, 4).map((s, i) => (
-                <span key={i} className="rounded bg-background/60 px-1 py-0.5 text-[10px] text-foreground/80 border border-border/60">{s}</span>
+              {(actors.find((a) => a.id === n.id)?.status ?? []).slice(0, 6).map((s, i) => (
+                <span
+                  key={i}
+                  title={statusDesc(s)}
+                  className="rounded bg-background/60 px-1 py-0.5 text-[10px] text-foreground/80 border border-border/60"
+                >{s}</span>
               ))}
             </div>
             <div className="mt-2 flex gap-2">

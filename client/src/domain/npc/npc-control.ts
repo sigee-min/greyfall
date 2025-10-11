@@ -1,7 +1,8 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/sync-model.js';
 import { getHostObject } from '../net-objects/registry.js';
 import { worldNpcs } from '../net-objects/world-npcs.js';
-import { WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
+import { WORLD_ACTORS_OBJECT_ID, WORLD_POSITIONS_OBJECT_ID } from '../net-objects/object-ids.js';
+import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
 import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { getProfileByActor } from './profile-registry';
 import { addAggroToEnemies, tauntEnemies, getTickState, startNpcTickScheduler } from './aggro';
@@ -84,6 +85,9 @@ const npcControl = defineSyncModel<VoidState>({
           const npcs = Array.isArray((rawNpcs as { list?: unknown })?.list)
             ? ((rawNpcs as { list: Array<{ id: string; stance: string; faction: string; kind: string }> }).list)
             : [];
+          const positions = getHostObject<HostWorldPositionsObject>(WORLD_POSITIONS_OBJECT_ID)?.getList() ?? [] as Array<{ id: string; mapId?: string; fieldId?: string }>;
+          const posOf = (id: string) => positions.find((p) => p.id === id);
+          const mePos = posOf(npcId);
           if (spec === 'self') return [npcId];
           if (spec === 'ally') {
             if (explicitId) {
@@ -93,7 +97,15 @@ const npcControl = defineSyncModel<VoidState>({
             return [npcId];
           }
           if (spec === 'area') {
-            return npcs.filter((n) => n.stance === 'engage' && (n.faction !== meFaction || n.kind === 'enemy' || n.kind === 'boss')).map((n) => n.id);
+            // Expand beyond same field when tag 'aoe:near' is present → same map targets
+            const nearMap = Boolean(ability?.tags?.includes('aoe:near'));
+            return npcs.filter((n) => {
+              if (!(n.stance === 'engage' && (n.faction !== meFaction || n.kind === 'enemy' || n.kind === 'boss'))) return false;
+              const p = posOf(n.id);
+              if (!mePos || !p) return true; // if unknown, include
+              if (nearMap) return mePos.mapId && p.mapId && mePos.mapId === p.mapId;
+              return mePos.fieldId && p.fieldId && mePos.fieldId === p.fieldId;
+            }).map((n) => n.id);
           }
           // 'enemy' or default
           if (explicitId) return [explicitId];
