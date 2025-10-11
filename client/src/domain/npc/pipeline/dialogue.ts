@@ -1,6 +1,10 @@
 import type { NpcAction } from '../types';
 import { getMemory } from '../memory/store';
 import { retrieveTopFacts } from '../memory/retrieval';
+import { classifyIntent } from './intent';
+import { sketchPlan } from './plan';
+import { extractActionsFromText } from './extract';
+import { redactReply } from './redact';
 import { netBus } from '../../../bus/net-bus';
 
 export type DialogueInput = { npcId: string; fromId: string; text: string; mode?: 'say' | 'ask' | 'request' };
@@ -13,10 +17,15 @@ export async function runDialogue(input: DialogueInput): Promise<DialogueOutput>
   const mem = getMemory(input.npcId);
   const facts = retrieveTopFacts(mem, 3);
   try { netBus.publish('npc:pipeline:stage', { npcId: input.npcId, stage: 'retrieve', ms: performance.now() - t0 }); } catch {}
-  // simple rule-based stub reply that mentions a fact if available
-  const polite = input.mode === 'request' ? '요청을 검토하겠다.' : input.mode === 'ask' ? '질문에 답변하겠다.' : '알았다.';
-  const fact = facts[0]?.content ? ` (기억: ${facts[0].content.slice(0, 24)})` : '';
-  const reply = input.text?.trim() ? `${polite}${fact}` : '...';
+  const intent = classifyIntent(input.text);
+  const plan = sketchPlan(intent, facts[0]?.content);
+  try { netBus.publish('npc:pipeline:stage', { npcId: input.npcId, stage: 'plan', ms: performance.now() - t0 }); } catch {}
+  const polite = input.mode === 'request' ? '요청을 검토하겠다.' : intent === 'ask' ? '질문에 답하겠다.' : intent === 'greet' ? '반갑다.' : '알았다.';
+  const draft = input.text?.trim() ? `${polite} ${plan[0] ?? ''}`.trim() : '...';
   try { netBus.publish('npc:pipeline:stage', { npcId: input.npcId, stage: 'draft', ms: performance.now() - t0 }); } catch {}
-  return { text: reply, actions: [] };
+  const actions = extractActionsFromText(input.npcId, draft);
+  try { netBus.publish('npc:pipeline:stage', { npcId: input.npcId, stage: 'extract', ms: performance.now() - t0 }); } catch {}
+  const text = redactReply(draft);
+  try { netBus.publish('npc:pipeline:stage', { npcId: input.npcId, stage: 'redact', ms: performance.now() - t0 }); } catch {}
+  return { text, actions };
 }
