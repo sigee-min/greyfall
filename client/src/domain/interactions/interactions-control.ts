@@ -4,6 +4,9 @@ import { getHostObject } from '../net-objects/registry.js';
 import { WORLD_POSITIONS_OBJECT_ID, WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
 import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
 import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
+import { triggers as questTriggers } from '../quest/triggers';
+import { questStateSync } from '../quest/sync';
+import { useQuestStore } from '../quest/store';
 
 type VoidState = null;
 
@@ -105,6 +108,12 @@ const control = defineSyncModel<VoidState>({
             // Simple trade: transfer first available item
             actors?.transferFirstAvailableItem(a.fromId, a.toId);
           }
+          // Quest: 상호작용(verb) 트리거로 연결 (호스트)
+          try {
+            questTriggers.onInteract(a.verb);
+            const snapshot = useQuestStore.getState().snapshot;
+            questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:interact');
+          } catch {}
         } catch (e) {
           // best-effort; avoid throwing from control plane
           console.warn('[interact] effect apply failed', e);

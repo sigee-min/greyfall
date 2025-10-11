@@ -1,5 +1,8 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { getHostObject } from '../net-objects/registry.js';
+import { triggers as questTriggers } from '../quest/triggers';
+import { questStateSync } from '../quest/sync';
+import { useQuestStore } from '../quest/store';
 import { WORLD_POSITIONS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostObject } from '../net-objects/types.js';
 import { getLimiter } from '../net-objects/policies.js';
@@ -48,6 +51,14 @@ const worldControl = defineSyncModel<VoidState>({
         if (!world) return;
         const ok = world.moveField(playerId, mapId, fromFieldId, toFieldId);
         if (!ok) console.warn('[move] rejected', { playerId, mapId, fromFieldId, toFieldId });
+        // Host: 위치 이동이 승인되면 방문 트리거 반영 및 스냅샷 브로드캐스트
+        if (ok) {
+          try {
+            questTriggers.onVisit(`${mapId}:${toFieldId}`);
+            const snapshot = useQuestStore.getState().snapshot;
+            questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:visit');
+          } catch {}
+        }
       }
     }
   ]

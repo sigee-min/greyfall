@@ -1,5 +1,8 @@
 import { defineSyncModel, registerSyncModel } from '../net-objects/index.js';
 import { getHostObject } from '../net-objects/registry.js';
+import { triggers as questTriggers } from '../quest/triggers';
+import { questStateSync } from '../quest/sync';
+import { useQuestStore } from '../quest/store';
 import { WORLD_ACTORS_OBJECT_ID, WORLD_POSITIONS_OBJECT_ID } from '../net-objects/object-ids.js';
 import { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { HostWorldPositionsObject } from '../net-objects/world-positions-host.js';
@@ -57,7 +60,15 @@ const actorsControl = defineSyncModel<VoidState>({
         actors?.ensure(fromId);
         actors?.ensure(toId);
         const ok = actors?.transferItem(fromId, toId, key, count);
-        if (ok) void narrateEffects([`item.transfer ${key} from p:${fromId} to p:${toId}`]);
+        if (ok) {
+          void narrateEffects([`item.transfer ${key} from p:${fromId} to p:${toId}`]);
+          // Host: 수령 성공을 수집 트리거로 반영하고 스냅샷 브로드캐스트
+          try {
+            questTriggers.onCollect(key);
+            const snapshot = useQuestStore.getState().snapshot;
+            questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:collect:transfer');
+          } catch {}
+        }
       }
     },
     {

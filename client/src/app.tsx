@@ -89,6 +89,33 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
   const setPreference = usePreferencesStore((state) => state.setPreference);
   const globalBus = useGlobalBus();
   const gameBus = useGameBus();
+  // Quest toasts: 수락/단계 전환/완료 감지
+  const questSnapshot = useQuestStore((s) => s.snapshot);
+  const prevQuestRef = useRef(questSnapshot);
+  useEffect(() => {
+    try {
+      const prev = prevQuestRef.current;
+      const cur = questSnapshot;
+      if (cur.updatedAt === prev.updatedAt) return;
+      // Index previous states
+      const prevMap = new Map(prev.quests.map((q) => [q.id, q] as const));
+      for (const q of cur.quests) {
+        const p = prevMap.get(q.id);
+        if (!p) {
+          globalBus.publish('toast:show', { status: 'info', title: '퀘스트 수락', message: q.id, durationMs: 1600 });
+          continue;
+        }
+        if (q.status !== p.status && q.status === 'completed') {
+          globalBus.publish('toast:show', { status: 'success', title: '퀘스트 완료', message: q.id, durationMs: 1800 });
+          continue;
+        }
+        if (q.stageIdx > p.stageIdx) {
+          globalBus.publish('toast:show', { status: 'info', title: '단계 전환', message: `${q.id} · stage ${q.stageIdx + 1}`, durationMs: 1400 });
+        }
+      }
+    } catch {}
+    prevQuestRef.current = questSnapshot;
+  }, [globalBus, questSnapshot]);
 
   const {
     participants,

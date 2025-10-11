@@ -98,6 +98,24 @@ export class HostWorldActorsObject implements HostObject {
     return this.transferItem(fromId, toId, item.key, 1);
   }
 
+  addItem(id: string, key: string, count = 1): boolean {
+    if (!key || count <= 0) return false;
+    const list = this.getAll();
+    const e = list.find((a) => a.id === id) ?? this.ensure(id);
+    const inv = this.adjustInventory(e.inventory, key, count);
+    return this.list.upsertMany([{ ...e, inventory: inv }], 'actors:inventory:add');
+  }
+
+  consumeItem(id: string, key: string, count = 1): boolean {
+    if (!key || count <= 0) return false;
+    const list = this.getAll();
+    const e = list.find((a) => a.id === id) ?? this.ensure(id);
+    const have = (e.inventory ?? []).find((i) => i.key === key)?.count ?? 0;
+    if (have < count) return false;
+    const inv = this.adjustInventory(e.inventory, key, -count);
+    return this.list.upsertMany([{ ...e, inventory: inv }], 'actors:inventory:consume');
+  }
+
   equipItem(actorId: string, key: string): boolean {
     if (!key) return false;
     const list = this.getAll();
