@@ -10,7 +10,15 @@ export type Ability = {
   cost?: number;
   cooldownMs: number;
   tags?: string[];
+  target?: 'self' | 'ally' | 'enemy' | 'area';
+  effects?: AbilityEffect[];
 };
+
+export type AbilityEffect =
+  | { kind: 'damage'; power?: number; damageKind?: string }
+  | { kind: 'heal'; power?: number }
+  | { kind: 'taunt'; durationMs?: number }
+  | { kind: 'buff' | 'debuff'; statusTag: string; durationMs: number };
 
 export type LootEntry = { itemKey: string; weight: number; min: number; max: number };
 
