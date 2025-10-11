@@ -5,37 +5,36 @@ import path from 'node:path';
 
 export default defineConfig({
   root: __dirname,
-  plugins: [react(), basicSsl()],
+  plugins: [
+    react(),
+    basicSsl(),
+    {
+      name: 'greyfall-coop-coep-cookie-toggle',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          try {
+            const cookie = req.headers['cookie'] || '';
+            const hasSession = typeof cookie === 'string' && /(?:^|;\s*)GREYFALLID=/.test(cookie);
+            res.setHeader('Vary', 'Cookie');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Cross-Origin-Opener-Policy', hasSession ? 'same-origin' : 'same-origin-allow-popups');
+            if (hasSession) {
+              res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+            } else {
+              // @ts-expect-error Node ServerResponse
+              if (typeof res.removeHeader === 'function') res.removeHeader('Cross-Origin-Embedder-Policy');
+            }
+          } catch {}
+          next();
+        });
+      }
+    }
+  ],
   optimizeDeps: {
     include: ['@react-oauth/google', 'jwt-decode']
   },
   server: {
     host: true,
-    // Dynamic COOP/COEP headers based on auth cookie presence (Option B)
-    // GREYFALLID present → apply cross-origin isolation; otherwise relax for Google Sign-In
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        try {
-          const cookie = req.headers['cookie'] || '';
-          const hasSession = typeof cookie === 'string' && /(?:^|;\s*)GREYFALLID=/.test(cookie);
-          res.setHeader('Vary', 'Cookie');
-          res.setHeader('X-Content-Type-Options', 'nosniff');
-          res.setHeader('Cross-Origin-Opener-Policy', hasSession ? 'same-origin' : 'same-origin-allow-popups');
-          if (hasSession) {
-            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-          } else {
-            // Clear COEP when unauthenticated to allow GSI popup/redirect messaging
-            if ('removeHeader' in res) {
-              // @ts-expect-error Node ServerResponse
-              res.removeHeader('Cross-Origin-Embedder-Policy');
-            } else {
-              res.setHeader('Cross-Origin-Embedder-Policy', '');
-            }
-          }
-        } catch {}
-        next();
-      });
-    },
     // no need to allow parent now that files are inside client/
     proxy: {
       // Signal server REST endpoints (register before generic /api)

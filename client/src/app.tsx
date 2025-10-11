@@ -144,7 +144,8 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
     const unsub1 = netBus.subscribe('equip:applied', ({ actorId, key }) => {
       const name = getItem(key)?.names?.[0]?.text ?? key;
       const slot = itemSlot(key);
-      globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${actorId})`, durationMs: 1500 });
+      const display = participants.find((p) => p.id === actorId)?.name || actorId;
+      globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${display})`, durationMs: 1500 });
     });
     const unsub2 = netBus.subscribe('equip:rejected', ({ reason }) => {
       const map: Record<string, string> = {
@@ -157,7 +158,7 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
       globalBus.publish('toast:show', { status: 'error', title: t('equip.toast.rejected'), message: t('equip.reason.publishFailed'), durationMs: 2000 });
     });
     return () => { unsub1(); unsub2(); unsub3(); };
-  }, [globalBus, t]);
+  }, [globalBus, t, participants]);
 
   // Equip toasts via lobby broadcast (host → all peers)
   useEffect(() => {
@@ -165,15 +166,18 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
       const { actorId, key, ok, reason } = msg.body;
       const name = getItem(key)?.names?.[0]?.text ?? key;
       const slot = itemSlot(key);
+      // Host will already see a local equip:applied toast; avoid duplicate
+      if (sessionMeta?.mode === 'host' && localParticipantId && actorId === localParticipantId) return;
+      const display = participants.find((p) => p.id === actorId)?.name || actorId;
       if (ok) {
-        globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${actorId})`, durationMs: 1500 });
+        globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${display})`, durationMs: 1500 });
       } else {
         const k = reason ? reasonToMessageKey(reason) : 'equip.reason.unknown';
         globalBus.publish('toast:show', { status: 'warning', title: t('equip.toast.rejected'), message: t(k), durationMs: 2000 });
       }
     });
     return unsub;
-  }, [globalBus, registerLobbyHandler, t]);
+  }, [globalBus, registerLobbyHandler, t, participants, sessionMeta?.mode, localParticipantId]);
 
   // Unequip toasts via lobby broadcast
   useEffect(() => {
@@ -181,15 +185,17 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
       const { actorId, key, ok, reason } = msg.body;
       const name = getItem(key)?.names?.[0]?.text ?? key;
       const slot = itemSlot(key);
+      // Host could create a local toast elsewhere; ensure consistent display name
+      const display = participants.find((p) => p.id === actorId)?.name || actorId;
       if (ok) {
-        globalBus.publish('toast:show', { status: 'success', title: t('unequip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${actorId})`, durationMs: 1500 });
+        globalBus.publish('toast:show', { status: 'success', title: t('unequip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${display})`, durationMs: 1500 });
       } else {
         const k = reason ? reasonToMessageKey(reason) : 'equip.reason.unknown';
         globalBus.publish('toast:show', { status: 'warning', title: t('unequip.toast.rejected'), message: t(k), durationMs: 2000 });
       }
     });
     return unsub;
-  }, [globalBus, registerLobbyHandler, t]);
+  }, [globalBus, registerLobbyHandler, t, participants]);
 
   // Remote mission start → transition for all clients
   useEffect(() => {
