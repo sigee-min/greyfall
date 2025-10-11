@@ -45,6 +45,16 @@ function run(workspace, script = 'dev') {
   });
 }
 
+/** Exec a binary within a workspace (npm exec), optionally with extra env */
+function execBin(workspace, bin, args = [], extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv };
+  return spawn('npm', ['-w', workspace, 'exec', bin, '--', ...args], {
+    stdio: 'inherit',
+    shell: true,
+    env,
+  });
+}
+
 /** Run multiple processes concurrently and handle cleanup */
 function runMany(tasks) {
   const children = tasks.map((t) => t());
@@ -101,7 +111,8 @@ switch (target) {
     runMany([
       () => run('shared/protocol', 'dev'),
       () => run('shared/auth', 'dev'),
-      () => run('signal', 'dev'),
+      // Use npm exec to resolve hoisted tsx; preload dotenv via NODE_OPTIONS
+      () => execBin('signal', 'tsx', ['watch', 'src/index.ts'], { NODE_OPTIONS: '--import=dotenv/config' }),
     ]);
     break;
   case 'shared':
@@ -130,7 +141,7 @@ switch (target) {
       add(run('shared/protocol', 'dev'));
       add(run('shared/auth', 'dev'));
       add(run('server', 'dev'));
-      add(run('signal', 'dev'));
+      add(execBin('signal', 'tsx', ['watch', 'src/index.ts'], { NODE_OPTIONS: '--import=dotenv/config' }));
 
       const ok = await waitFor('http://localhost:8080/api/config', { timeoutMs: 20000, intervalMs: 300 });
       if (!ok) console.warn('[dev] timed out waiting for /api/config; client may start with login disabled until server is ready');

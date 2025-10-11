@@ -457,6 +457,61 @@ const lobbyActorsEquipResultSchema = lobbyEnvelopeSchema.extend({
   })
 });
 
+// =====================
+// NPC domain (dialogue/combat)
+// =====================
+
+const lobbyNpcChatRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:chat:request'),
+  body: z.object({ npcId: z.string().min(1), fromId: z.string().min(1), text: z.string().min(1), mode: z.enum(['say', 'ask', 'request']).optional() })
+});
+
+const lobbyNpcChatResultSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:chat:result'),
+  body: z.object({ npcId: z.string().min(1), toId: z.string().min(1).optional(), text: z.string().min(1), actions: z.any().array().optional(), stateDiff: z.record(z.unknown()).optional() })
+});
+
+const lobbyNpcUseRequestSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:use:request'),
+  body: z.object({ npcId: z.string().min(1), abilityId: z.string().min(1), targetId: z.string().min(1).optional() })
+});
+
+const lobbyNpcSpawnSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:spawn'),
+  body: z.object({ npcId: z.string().min(1), profileRef: z.string().min(1), state: z.record(z.unknown()).optional() })
+});
+
+const lobbyNpcUpdateSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:update'),
+  body: z.object({ npcId: z.string().min(1), state: z.record(z.unknown()) })
+});
+
+const lobbyNpcDespawnSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:despawn'),
+  body: z.object({ npcId: z.string().min(1) })
+});
+
+const lobbyNpcCombatResultSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:combat:result'),
+  body: z.object({
+    npcId: z.string().min(1),
+    events: z.array(z.object({
+      type: z.enum(['damage', 'death', 'status']),
+      fromId: z.string().min(1).optional(),
+      toId: z.string().min(1),
+      amount: z.number().int().optional(),
+      kind: z.string().optional(),
+      status: z.string().optional()
+    })),
+    at: z.number().int().optional()
+  })
+});
+
+const lobbyNpcLootDroppedSchema = lobbyEnvelopeSchema.extend({
+  kind: z.literal('npc:loot:dropped'),
+  body: z.object({ npcId: z.string().min(1), items: z.array(z.object({ key: z.string().min(1), count: z.number().int().min(1) })), at: z.object({ mapId: z.string().min(1), fieldId: z.string().min(1) }) })
+});
+
 const lobbyActorsUnequipResultSchema = lobbyEnvelopeSchema.extend({
   kind: z.literal('actors:unequip:result'),
   body: z.object({
@@ -501,7 +556,15 @@ export const lobbyMessageSchema = z.discriminatedUnion('kind', [
   lobbyActorsEquipRequestSchema,
   lobbyActorsUnequipRequestSchema,
   lobbyActorsEquipResultSchema,
-  lobbyActorsUnequipResultSchema
+  lobbyActorsUnequipResultSchema,
+  lobbyNpcChatRequestSchema,
+  lobbyNpcChatResultSchema,
+  lobbyNpcUseRequestSchema,
+  lobbyNpcSpawnSchema,
+  lobbyNpcUpdateSchema,
+  lobbyNpcDespawnSchema,
+  lobbyNpcCombatResultSchema,
+  lobbyNpcLootDroppedSchema
 ]);
 
 export type LobbyMessage = z.infer<typeof lobbyMessageSchema>;
@@ -542,6 +605,14 @@ export type LobbyMessageBodies = {
   'actors:unequip:request': { actorId: string; key: string };
   'actors:equip:result': { actorId: string; key: string; ok: boolean; reason?: 'unauthorized' | 'cooldown' | 'unavailable' };
   'actors:unequip:result': { actorId: string; key: string; ok: boolean; reason?: 'unauthorized' | 'cooldown' | 'unavailable' };
+  'npc:chat:request': { npcId: string; fromId: string; text: string; mode?: 'say' | 'ask' | 'request' };
+  'npc:chat:result': { npcId: string; toId?: string; text: string; actions?: any[]; stateDiff?: Record<string, unknown> };
+  'npc:use:request': { npcId: string; abilityId: string; targetId?: string };
+  'npc:spawn': { npcId: string; profileRef: string; state?: Record<string, unknown> };
+  'npc:update': { npcId: string; state: Record<string, unknown> };
+  'npc:despawn': { npcId: string };
+  'npc:combat:result': { npcId: string; events: Array<{ type: 'damage' | 'death' | 'status'; fromId?: string; toId: string; amount?: number; kind?: string; status?: string }>; at?: number };
+  'npc:loot:dropped': { npcId: string; items: Array<{ key: string; count: number }>; at: { mapId: string; fieldId: string } };
 };
 
 // =====================
