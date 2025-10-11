@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { worldNpcs, type NpcPublicEntry } from '../../domain/net-objects/world-npcs';
 import type { PublishLobbyMessage, RegisterLobbyHandler } from '../../domain/chat/use-lobby-chat';
 import { useGlobalBus } from '../../bus/global-bus';
+import { worldActorsClient, type ActorEntry } from '../../domain/net-objects/world-actors-client';
 
 type Props = {
   localParticipantId: string | null;
@@ -11,11 +12,17 @@ type Props = {
 
 export function NpcPanel({ localParticipantId, publish, register }: Props) {
   const [list, setList] = useState<NpcPublicEntry[]>(() => worldNpcs.client.getList());
+  const [actors, setActors] = useState<ActorEntry[]>(() => worldActorsClient.getAll());
   const [inputByNpc, setInputByNpc] = useState<Record<string, string>>({});
   const bus = useGlobalBus();
 
   useEffect(() => {
     const unsub = worldNpcs.client.subscribe((next) => setList(next));
+    return () => { unsub(); };
+  }, []);
+
+  useEffect(() => {
+    const unsub = worldActorsClient.subscribe((next) => setActors(next as ActorEntry[]));
     return () => { unsub(); };
   }, []);
 
@@ -47,6 +54,11 @@ export function NpcPanel({ localParticipantId, publish, register }: Props) {
                 {n.hp && <span className="ml-2 text-muted-foreground">HP {n.hp.cur}/{n.hp.max}</span>}
               </div>
               <div className="text-muted-foreground">{n.stance} · {n.mood}</div>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {(actors.find((a) => a.id === n.id)?.status ?? []).slice(0, 4).map((s, i) => (
+                <span key={i} className="rounded bg-background/60 px-1 py-0.5 text-[10px] text-foreground/80 border border-border/60">{s}</span>
+              ))}
             </div>
             <div className="mt-2 flex gap-2">
               <input

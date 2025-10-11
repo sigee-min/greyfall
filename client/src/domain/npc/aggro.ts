@@ -1,5 +1,6 @@
 import { getHostObject } from '../net-objects/registry.js';
 import { worldNpcs } from '../net-objects/world-npcs.js';
+import { actorsMeta } from '../net-objects/actors-meta.js';
 import { WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { computeDamage } from '../combat/damage';
@@ -25,6 +26,48 @@ export function applyTaunt(targetNpcId: string, byActorId: string, durationMs = 
 export function addAggro(npcId: string, targetId: string, delta: number) {
   const st = getTickState(npcId);
   st.aggro.set(targetId, (st.aggro.get(targetId) ?? 0) + delta);
+}
+
+function resolveFactionOfActor(actorId: string): string | null {
+  try {
+    const raw = actorsMeta.host.getObject()?.getSnapshot()?.value as unknown;
+    const list = Array.isArray((raw as { list?: unknown })?.list)
+      ? ((raw as { list: Array<{ id: string; faction?: string }> }).list)
+      : [];
+    return (list.find((e) => e.id === actorId)?.faction ?? null) as string | null;
+  } catch { return null; }
+}
+
+export function addAggroToEnemies(targetId: string, delta: number, onlyEngaged = true) {
+  const faction = resolveFactionOfActor(targetId);
+  const raw = worldNpcs.host.getObject()?.getSnapshot()?.value as unknown;
+  const list = Array.isArray((raw as { list?: unknown })?.list)
+    ? ((raw as { list: Array<{ id: string; stance: string; faction: string; kind: string }> }).list)
+    : [];
+  for (const n of list) {
+    if (onlyEngaged && n.stance !== 'engage') continue;
+    // If faction differs or kind indicates enemy/boss, treat as hostile NPC
+    const hostile = (faction && n.faction && n.faction !== faction) || n.kind === 'enemy' || n.kind === 'boss';
+    if (!hostile) continue;
+    addAggro(n.id, targetId, delta);
+  }
+}
+
+export function tauntEnemies(taunterId: string, durationMs = 3000, onlyEngaged = true) {
+  const faction = resolveFactionOfActor(taunterId);
+  const raw = worldNpcs.host.getObject()?.getSnapshot()?.value as unknown;
+  const list = Array.isArray((raw as { list?: unknown })?.list)
+    ? ((raw as { list: Array<{ id: string; stance: string; faction: string; kind: string }> }).list)
+    : [];
+  const until = Date.now() + Math.max(500, durationMs);
+  for (const n of list) {
+    if (onlyEngaged && n.stance !== 'engage') continue;
+    const hostile = (faction && n.faction && n.faction !== faction) || n.kind === 'enemy' || n.kind === 'boss';
+    if (!hostile) continue;
+    const st = getTickState(n.id);
+    st.forcedTargetId = taunterId;
+    st.forcedUntil = until;
+  }
 }
 
 export function setCooldown(npcId: string, abilityId: string, until: number) {
@@ -67,4 +110,3 @@ export function startNpcTickScheduler() {
     } catch {}
   }, 1000);
 }
-

@@ -4,8 +4,13 @@ import { worldNpcs } from '../net-objects/world-npcs.js';
 import { WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { getProfileByActor } from './profile-registry';
+import { addAggroToEnemies, tauntEnemies } from './aggro';
+import { applyStatus } from './status-store';
 import { computeDamage } from '../combat/damage';
 import { runDialogue } from './pipeline/dialogue';
+import { triggers as questTriggers } from '../quest/triggers';
+import { questStateSync } from '../quest/sync';
+import { useQuestStore } from '../quest/store';
 import { proposeMemoryOps } from './memory/update';
 import { applyMemoryOps } from './memory/store';
 import { logNpcReply } from './logs';
@@ -36,6 +41,12 @@ const npcControl = defineSyncModel<VoidState>({
           applyMemoryOps(npcId, ops);
         } catch {}
         try { await logNpcReply(npcId, fromId, text, out.text); } catch {}
+        // Host: 대화 트리거를 퀘스트에 반영하고 스냅샷 브로드캐스트
+        try {
+          questTriggers.onTalk(npcId);
+          const snapshot = useQuestStore.getState().snapshot;
+          questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:talk');
+        } catch {}
       }
     },
     {
@@ -61,10 +72,9 @@ const npcControl = defineSyncModel<VoidState>({
         const cdMs = Math.max(500, ability?.cooldownMs ?? 1500);
         const state = getTickState(npcId);
         if (kind === 'taunt') {
-          // Taunt: force target to focus on attacker for a while
-          state.forcedTargetId = npcId;
-          state.forcedUntil = Date.now() + Math.max(1000, cdMs);
-          try { actors.statusAdd(targetId, 'taunted'); } catch {}
+          // AoE taunt: all hostile NPCs forced to focus on taunter
+          tauntEnemies(npcId, Math.max(1000, cdMs), true);
+          applyStatus(targetId, 'taunted', Math.max(1000, cdMs));
           state.cooldowns[abilityId] = Date.now() + cdMs;
           context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'status', fromId: npcId, toId: targetId, status: 'taunt' }] }, 'npc:combat:status');
           return;
@@ -75,8 +85,8 @@ const npcControl = defineSyncModel<VoidState>({
           const tgt = (kind === 'defend') ? npcId : targetId;
           actors.hpAdd(tgt, heal);
           state.cooldowns[abilityId] = Date.now() + cdMs;
-          // Aggro: small increase toward healer target (draw attention)
-          state.aggro.set(tgt, (state.aggro.get(tgt) ?? 0) + Math.ceil(heal / 2));
+          // Aggro: increase enemies' attention toward the healer
+          addAggroToEnemies(npcId, Math.ceil(heal / 2), true);
           context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'status', fromId: npcId, toId: tgt, status: 'heal', amount: heal }] }, 'npc:combat:heal');
           return;
         }

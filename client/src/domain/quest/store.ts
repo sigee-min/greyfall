@@ -53,7 +53,8 @@ export const useQuestStore = create<QuestStore>((set, get) => ({
     const idx = snapshot.quests.findIndex((q) => q.id === questId);
     if (idx === -1) return;
     const q = snapshot.quests[idx];
-    const stage = quest.stages[Math.max(0, q.stageIdx)];
+    const curStageIdx = Math.max(0, q.stageIdx);
+    const stage = quest.stages[curStageIdx];
     const required = stage?.objectives.find((o) => o.id === objectiveId);
     if (!required) return;
     const count = Math.max(1, required.count ?? 1);
@@ -63,9 +64,28 @@ export const useQuestStore = create<QuestStore>((set, get) => ({
     const nextObjs = q.objectives.some((o) => o.id === objectiveId)
       ? q.objectives.map((o) => (o.id === objectiveId ? nextObj : o))
       : [...q.objectives, nextObj];
+    // 모든 필수 목표 완료 시 자동 단계 전환/완료 처리
+    const now = Date.now();
+    const allDone = (stage?.objectives ?? [])
+      .filter((o) => !o.optional)
+      .every((o) => (o.count ?? 1) <= (nextObjs.find((x) => x.id === o.id)?.progress ?? 0));
+    let nextStageIdx = q.stageIdx;
+    let status = q.status;
+    let objectives = nextObjs;
+    if (allDone) {
+      // 다음 단계로 이동하거나 마지막 단계면 완료 처리
+      if (curStageIdx < quest.stages.length - 1) {
+        nextStageIdx = curStageIdx + 1;
+        objectives = []; // 단계 전환시 목표 진행 초기화
+      } else {
+        status = 'completed';
+      }
+    }
     const qs = [...snapshot.quests];
-    qs[idx] = { ...q, objectives: nextObjs, updatedAt: Date.now() };
-    set({ snapshot: { ...snapshot, quests: qs, updatedAt: Date.now() } });
+    qs[idx] = { ...q, status, stageIdx: nextStageIdx, objectives, updatedAt: now };
+    // 활성 퀘스트가 완료되면 비활성화
+    const activeQuestId = status === 'completed' && snapshot.activeQuestId === questId ? null : snapshot.activeQuestId;
+    set({ snapshot: { ...snapshot, quests: qs, activeQuestId, updatedAt: now } });
   },
 
   completeStage: (questId) => {
@@ -122,4 +142,3 @@ export function selectActiveQuest(state: QuestStore) {
   if (!id) return null;
   return { progress: snapshot.quests.find((q) => q.id === id) ?? null, quest: catalog[id] } as const;
 }
-
