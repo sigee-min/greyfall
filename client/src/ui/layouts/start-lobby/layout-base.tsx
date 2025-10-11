@@ -183,20 +183,12 @@ function StartLobbyLayoutBase({
                       <li
                         key={participant.id}
                         className={cn(
-                          'grid gap-4 rounded-xl border border-border/60 bg-background/75 px-5 py-4 shadow-sm transition sm:grid-cols-[auto,1fr,auto]',
+                          'grid gap-4 rounded-xl border border-border/60 bg-background/75 px-5 py-4 shadow-sm transition sm:grid-cols-[1fr,auto]',
                           isReady ? 'border-primary/70 ring-1 ring-primary/30' : undefined
                         )}
                       >
-                        <div
-                          className={cn(
-                            'flex h-10 w-10 items-center justify-center rounded-full border text-xs font-semibold uppercase tracking-[0.25em]',
-                            participant.role === 'host' ? 'border-primary/70 text-primary' : 'border-border/60 text-muted-foreground'
-                          )}
-                        >
-                          {participant.role === 'host' ? 'HOST' : 'GUEST'}
-                        </div>
                         <div className="min-w-0 flex items-center gap-3">
-                          <div className="h-9 w-9 overflow-hidden rounded-full border border-border/60 bg-background/60">
+                          <div className="relative h-9 w-9 overflow-hidden rounded-full border border-border/60 bg-background/60">
                             {participant.avatarUrl ? (
                               <img src={participant.avatarUrl} alt={participant.name} className="h-full w-full object-cover" />
                             ) : (
@@ -204,6 +196,19 @@ function StartLobbyLayoutBase({
                                 {(participant.name?.[0] ?? 'P').toUpperCase()}
                               </div>
                             )}
+                            {/* Role badge overlay (H/G) */}
+                            <span
+                              className={cn(
+                                'absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full border text-[10px] font-semibold',
+                                participant.role === 'host'
+                                  ? 'bg-primary text-primary-foreground border-primary/70'
+                                  : 'bg-muted text-muted-foreground border-border/60'
+                              )}
+                              aria-label={participant.role === 'host' ? 'Host' : 'Guest'}
+                              title={participant.role === 'host' ? 'Host' : 'Guest'}
+                            >
+                              {participant.role === 'host' ? 'H' : 'G'}
+                            </span>
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-foreground">

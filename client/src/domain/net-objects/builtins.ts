@@ -16,5 +16,6 @@ import '../interactions/interactions-session.js';
 import '../interactions/interactions-control.js';
 import './world-actors-host.js';
 import '../actors/actors-control.js';
+import '../npc/npc-control.js';
 import './actors-meta.js';
 import './world-npcs.js';

@@ -9,6 +9,7 @@ import { computeEquipmentSnapshot } from '../equipment/aggregator';
 import { getItemEffects } from '../equipment/effect-registry';
 import { RULES_VERSION } from '../equipment/rules';
 import type { StatKey } from '../stats/keys';
+import { npcBaseStats } from '../npc/base-stats';
 import { initEquipmentEffects } from '../equipment/bootstrap';
 import { characterLoadoutsHost } from '../character/character-sync';
 import { netBus } from '../../bus/net-bus';
@@ -152,22 +153,34 @@ export class HostWorldActorsObject implements HostObject {
       const equipped = Array.isArray(e.equipment) ? e.equipment : [];
       const effectsByItem: Record<string, ReturnType<typeof getItemEffects>> = {};
       for (const k of equipped) effectsByItem[k] = getItemEffects(k);
-      // Try to use authoritative character base stats from loadouts; fallback to zeros
+      // Try to use authoritative character base stats from loadouts or NPC map; fallback to zeros
       const loadouts = characterLoadoutsHost.get();
       const stats = (loadouts?.byId?.[actorId]?.stats ?? null) as Record<StatKey, number> | null;
-      const base: Record<StatKey, number> = stats ?? ({
+      let base: Record<StatKey, number> | null = stats;
+      if (!base) {
+        try {
+          const map = npcBaseStats.host.getObject()?.getSnapshot()?.value as Record<string, Record<StatKey, number>> | undefined;
+          base = (map && map[actorId]) ? map[actorId] as Record<StatKey, number> : null;
+        } catch {}
+      }
+      const baseStats: Record<StatKey, number> = base ?? ({
         Strength: 0,
         Agility: 0,
         Engineering: 0,
         Dexterity: 0,
         Medicine: 0
       } as Record<StatKey, number>);
-      const snap = computeEquipmentSnapshot({ base, equipped, effectsByItem, rulesVersion: RULES_VERSION }, { includeDerived: true, trace: false });
+      const snap = computeEquipmentSnapshot({ base: baseStats, equipped, effectsByItem, rulesVersion: RULES_VERSION }, { includeDerived: true, trace: false });
       const next: ActorEntry = { ...e, modifiers: snap.modifiers, derived: snap.derived, effectsHash: snap.effectsHash, schemaVersion: 1, setsProgress: snap.setsProgress } as any;
       this.list.upsertMany([next], 'actors:equipment:snapshot');
       // Local domain telemetry (host only)
       try { netBus.publish('equip:applied', { actorId, key: equipped[equipped.length - 1] ?? '', effectsHash: snap.effectsHash }); } catch {}
     } catch {}
+  }
+
+  // Expose snapshot recomputation for external callers (e.g., NPC spawns)
+  recomputeEquipmentSnapshot(actorId: string): void {
+    this.updateEquipmentSnapshot(actorId);
   }
 }
 
