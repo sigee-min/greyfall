@@ -6,6 +6,7 @@ import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js'
 import type { NpcProfile } from './types';
 import type { StatKey } from '../stats/keys';
 import { npcBaseStats } from './base-stats';
+import { mapActorToProfile, unmapActor } from './profile-registry';
 
 export type SpawnSeed = {
   id: string;
@@ -40,6 +41,7 @@ export function spawnNpc(profile: NpcProfile, seed: SpawnSeed): boolean {
     const next = { ...map, [id]: profile.baseStats } as Record<string, Record<StatKey, number>>;
     npcBaseStats.host.set?.(next, 'npc:spawn:base');
   } catch {}
+  try { mapActorToProfile(id, profile); } catch {}
   // 4) Ensure actor entry with initial equipment/inventory/hp
   const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
   if (!actors) return false;
@@ -62,5 +64,6 @@ export function despawnNpc(id: string): boolean {
       npcBaseStats.host.set?.(next, 'npc:despawn:base');
     }
   } catch {}
+  try { unmapActor(id); } catch {}
   return true;
 }

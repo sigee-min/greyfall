@@ -8,6 +8,13 @@ export type ToolCtx = {
   // Optional session-bound providers (wire actual game data here)
   providers?: {
     getChatHistory?: (limit: number, includeSystem?: boolean) => Promise<Array<{ author: string; role: 'user' | 'assistant' | 'system'; body: string; at: number }>>;
+    // Quest-related providers (host-authoritative)
+    isHost?: () => boolean;
+    getQuestSnapshot?: () => Promise<unknown>;
+    questAccept?: (questId: string) => Promise<boolean>;
+    questProgress?: (input: { questId: string; objectiveId: string; delta?: number }) => Promise<boolean>;
+    questComplete?: (questId: string) => Promise<boolean>;
+    questFail?: (input: { questId: string; reason?: string }) => Promise<boolean>;
   };
 };
 

@@ -2,9 +2,14 @@ import { InMemoryToolRegistry } from './registry';
 import { InMemoryToolsHost } from './host';
 import type { ToolCtx, ToolsHost } from './types';
 import { ChatHistoryTool } from './impl/chat-history';
+import { QuestAcceptTool, QuestProgressTool, QuestCompleteTool, QuestFailTool } from './impl/quest';
 
 // Pre-register built-in tools
 InMemoryToolRegistry.register(ChatHistoryTool);
+InMemoryToolRegistry.register(QuestAcceptTool);
+InMemoryToolRegistry.register(QuestProgressTool);
+InMemoryToolRegistry.register(QuestCompleteTool);
+InMemoryToolRegistry.register(QuestFailTool);
 
 export function makeDefaultToolsHost(base: Omit<ToolCtx, 'providers'> & { providers?: ToolCtx['providers'] }): ToolsHost {
   return new InMemoryToolsHost(InMemoryToolRegistry, base);
@@ -12,4 +17,3 @@ export function makeDefaultToolsHost(base: Omit<ToolCtx, 'providers'> & { provid
 
 export { InMemoryToolRegistry } from './registry';
 export * from './types';
-

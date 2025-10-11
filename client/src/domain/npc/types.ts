@@ -5,7 +5,7 @@ export type NpcKind = 'civilian' | 'ally' | 'enemy' | 'boss';
 export type Ability = {
   id: string;
   name: string;
-  kind: 'attack' | 'defend' | 'utility';
+  kind: 'attack' | 'defend' | 'utility' | 'taunt';
   power: number;
   cost?: number;
   cooldownMs: number;
@@ -52,4 +52,3 @@ export type NpcAction =
   | { type: 'loot'; npcId: string; fromId: string; items?: Array<{ key: string; count: number }> }
   | { type: 'set_flag'; npcId: string; key: string; value: unknown }
   | { type: 'change_stance'; npcId: string; stance: NpcState['stance'] };
-

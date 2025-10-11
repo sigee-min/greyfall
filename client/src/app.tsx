@@ -48,6 +48,10 @@ import { useAssetPreload } from './domain/assets/use-asset-preload';
 import { getItem } from './domain/items/registry';
 import { itemSlot } from './domain/world/equipment-rules';
 import { missionStateSync } from './domain/mission/mission-sync';
+import { questStateSync } from './domain/quest/sync';
+import { useQuestStore, selectQuestSnapshot, selectQuestCatalog } from './domain/quest/store';
+import { setQuestMappings } from './domain/quest/triggers';
+import { TutorialQuest } from './content/quests/tutorial';
 import { useMissionStore } from './domain/mission/state';
 import { getAuthUser, setAuthUser, clearAuthUser, type AuthUser } from './lib/auth';
 import { getMeDedup, getUsersMeDedup } from './lib/auth-session';
@@ -197,6 +201,19 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
     });
     return unsub;
   }, [globalBus, registerLobbyHandler, t, participants]);
+
+  // Combat events toasts
+  useEffect(() => {
+    const unsub = registerLobbyHandler('npc:combat:result', (msg) => {
+      const body = msg.body as { npcId: string; events: Array<{ type: string; fromId?: string; toId: string; amount?: number; kind?: string }> };
+      for (const ev of body.events) {
+        if (ev.type === 'damage' && typeof ev.amount === 'number') {
+          globalBus.publish('toast:show', { status: 'warning', title: '피해', message: `${ev.fromId ?? body.npcId} → ${ev.toId} : -${ev.amount}`, durationMs: 1200 });
+        }
+      }
+    });
+    return unsub;
+  }, [globalBus, registerLobbyHandler]);
 
   // Remote mission start → transition for all clients
   useEffect(() => {
@@ -647,9 +664,59 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
           body: m.body,
           at: m.at
         }));
+      },
+      isHost: () => sessionMeta?.mode === 'host',
+      getQuestSnapshot: async () => useQuestStore.getState().snapshot,
+      questAccept: async (questId: string) => {
+        if (sessionMeta?.mode !== 'host') return false;
+        useQuestStore.getState().accept(questId);
+        const snapshot = useQuestStore.getState().snapshot;
+        questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:accept');
+        return true;
+      },
+      questProgress: async ({ questId, objectiveId, delta = 1 }) => {
+        if (sessionMeta?.mode !== 'host') return false;
+        useQuestStore.getState().updateObjective(questId, objectiveId, delta);
+        const snapshot = useQuestStore.getState().snapshot;
+        questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:progress');
+        return true;
+      },
+      questComplete: async (questId: string) => {
+        if (sessionMeta?.mode !== 'host') return false;
+        useQuestStore.getState().completeQuest(questId);
+        const snapshot = useQuestStore.getState().snapshot;
+        questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:complete');
+        return true;
+      },
+      questFail: async ({ questId }) => {
+        if (sessionMeta?.mode !== 'host') return false;
+        useQuestStore.getState().failQuest(questId);
+        const snapshot = useQuestStore.getState().snapshot;
+        questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:fail');
+        return true;
       }
     });
-  }, [chatMessages]);
+  }, [chatMessages, sessionMeta?.mode]);
+
+  // Initialise quest catalog/mappings on host and broadcast snapshot
+  const questInitRef = useRef(false);
+  useEffect(() => {
+    if (sessionMeta?.mode !== 'host') return;
+    if (questInitRef.current) return;
+    questInitRef.current = true;
+    // Seed catalog & mappings (tutorial example)
+    useQuestStore.getState().setCatalog({ [TutorialQuest.id]: TutorialQuest });
+    setQuestMappings({
+      visit: { 'location.help.terminal': { questId: 'q.tutorial.1', objectiveId: 'obj.visit.terminal' } },
+      collect: { 'item.medkit': { questId: 'q.tutorial.1', objectiveId: 'obj.collect.medkit' } },
+      talk: { 'npc.brief.officer': { questId: 'q.tutorial.1', objectiveId: 'obj.talk.brief' } }
+    });
+    // Optionally auto-accept and set active to showcase
+    try { useQuestStore.getState().accept('q.tutorial.1'); } catch {}
+    try { useQuestStore.getState().setActive('q.tutorial.1'); } catch {}
+    const snapshot = useQuestStore.getState().snapshot;
+    questStateSync.host.set({ snapshot, version: 1, since: Date.now(), catalog: useQuestStore.getState().catalog }, 'quest:init');
+  }, [sessionMeta?.mode]);
 
   return (
     <>

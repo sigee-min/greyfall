@@ -3,6 +3,7 @@ import { getHostObject } from '../net-objects/registry.js';
 import { worldNpcs } from '../net-objects/world-npcs.js';
 import { WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
+import { getProfileByActor } from './profile-registry';
 import { computeDamage } from '../combat/damage';
 import { runDialogue } from './pipeline/dialogue';
 import { proposeMemoryOps } from './memory/update';
@@ -47,16 +48,21 @@ const npcControl = defineSyncModel<VoidState>({
       },
       authorize: () => true,
       handle: ({ payload, context }) => {
-        const { npcId, targetId } = payload as { npcId: string; abilityId: string; targetId?: string };
+        const { npcId, abilityId, targetId } = payload as { npcId: string; abilityId: string; targetId?: string };
         if (!targetId) return;
         const actors = getHostObject<HostWorldActorsObject>(WORLD_ACTORS_OBJECT_ID);
         if (!actors) return;
         const attacker = actors.getAll().find((a) => a.id === npcId);
         const defender = actors.getAll().find((a) => a.id === targetId);
         if (!attacker || !defender) return;
-        const dmg = computeDamage({ attackerDerived: attacker.derived ?? undefined, defenderResists: defender.modifiers?.resists ?? {} });
+        const prof = getProfileByActor(npcId);
+        const ability = prof?.abilities.find((ab) => ab.id === abilityId);
+        const dmg = computeDamage({ attackerDerived: attacker.derived ?? undefined, defenderResists: defender.modifiers?.resists ?? {}, ability: { kind: ability?.kind ?? 'attack', power: ability?.power ?? 5 } });
         actors.hpAdd(targetId, -dmg);
-        context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'damage', fromId: npcId, toId: targetId, amount: dmg, kind: 'blunt' }] }, 'npc:combat:damage');
+        const state = getTickState(npcId);
+        state.cooldowns[abilityId] = Date.now() + Math.max(500, ability?.cooldownMs ?? 1500);
+        state.aggro.set(targetId, (state.aggro.get(targetId) ?? 0) + Math.max(1, dmg));
+        context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'damage', fromId: npcId, toId: targetId, amount: dmg, kind: ability?.kind ?? 'attack' }] }, 'npc:combat:damage');
       }
     }
   ]
