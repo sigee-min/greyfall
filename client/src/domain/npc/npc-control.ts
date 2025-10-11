@@ -4,6 +4,9 @@ import { WORLD_ACTORS_OBJECT_ID } from '../net-objects/object-ids.js';
 import type { HostWorldActorsObject } from '../net-objects/world-actors-host.js';
 import { computeDamage } from '../combat/damage';
 import { runDialogue } from './pipeline/dialogue';
+import { proposeMemoryOps } from './memory/update';
+import { applyMemoryOps } from './memory/store';
+import { logNpcReply } from './logs';
 
 type VoidState = null;
 
@@ -26,6 +29,11 @@ const npcControl = defineSyncModel<VoidState>({
         const { npcId, fromId, text, mode } = payload as { npcId: string; fromId: string; text: string; mode?: 'say'|'ask'|'request' };
         const out = await runDialogue({ npcId, fromId, text, mode });
         context.router.sendLobbyMessage('npc:chat:result', { npcId, toId: fromId, text: out.text, actions: out.actions }, 'npc:chat:result');
+        try {
+          const ops = proposeMemoryOps({ npcId, fromId, playerText: text, npcReply: out.text });
+          applyMemoryOps(npcId, ops);
+        } catch {}
+        try { await logNpcReply(npcId, fromId, text, out.text); } catch {}
       }
     },
     {

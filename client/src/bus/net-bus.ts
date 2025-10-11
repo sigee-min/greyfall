@@ -16,6 +16,8 @@ export type NetBusEvents = {
   'equip:publishFailed': { actorId: string; key: string };
   'equip:applied': { actorId: string; key: string; effectsHash?: string };
   'equip:rejected': { actorId: string; key: string; reason: 'unauthorized' | 'cooldown' | 'unavailable' };
+  // npc pipeline metrics
+  'npc:pipeline:stage': { npcId: string; stage: string; ms: number; tokens?: number };
 };
 
 const bus = createEventBus<NetBusEvents>();
