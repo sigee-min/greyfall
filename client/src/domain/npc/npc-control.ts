@@ -57,12 +57,34 @@ const npcControl = defineSyncModel<VoidState>({
         if (!attacker || !defender) return;
         const prof = getProfileByActor(npcId);
         const ability = prof?.abilities.find((ab) => ab.id === abilityId);
-        const dmg = computeDamage({ attackerDerived: attacker.derived ?? undefined, defenderResists: defender.modifiers?.resists ?? {}, ability: { kind: ability?.kind ?? 'attack', power: ability?.power ?? 5 } });
-        actors.hpAdd(targetId, -dmg);
+        const kind = ability?.kind ?? 'attack';
+        const cdMs = Math.max(500, ability?.cooldownMs ?? 1500);
         const state = getTickState(npcId);
-        state.cooldowns[abilityId] = Date.now() + Math.max(500, ability?.cooldownMs ?? 1500);
+        if (kind === 'taunt') {
+          // Taunt: force target to focus on attacker for a while
+          state.forcedTargetId = npcId;
+          state.forcedUntil = Date.now() + Math.max(1000, cdMs);
+          try { actors.statusAdd(targetId, 'taunted'); } catch {}
+          state.cooldowns[abilityId] = Date.now() + cdMs;
+          context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'status', fromId: npcId, toId: targetId, status: 'taunt' }] }, 'npc:combat:status');
+          return;
+        }
+        if (kind === 'defend' || kind === 'utility') {
+          // Simple heal utility/defend: heal target or self
+          const heal = Math.max(1, Math.floor(ability?.power ?? 5));
+          const tgt = (kind === 'defend') ? npcId : targetId;
+          actors.hpAdd(tgt, heal);
+          state.cooldowns[abilityId] = Date.now() + cdMs;
+          // Aggro: small increase toward healer target (draw attention)
+          state.aggro.set(tgt, (state.aggro.get(tgt) ?? 0) + Math.ceil(heal / 2));
+          context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'status', fromId: npcId, toId: tgt, status: 'heal', amount: heal }] }, 'npc:combat:heal');
+          return;
+        }
+        const dmg = computeDamage({ attackerDerived: attacker.derived ?? undefined, defenderResists: defender.modifiers?.resists ?? {}, ability: { kind, power: ability?.power ?? 5 } });
+        actors.hpAdd(targetId, -dmg);
+        state.cooldowns[abilityId] = Date.now() + cdMs;
         state.aggro.set(targetId, (state.aggro.get(targetId) ?? 0) + Math.max(1, dmg));
-        context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'damage', fromId: npcId, toId: targetId, amount: dmg, kind: ability?.kind ?? 'attack' }] }, 'npc:combat:damage');
+        context.router.sendLobbyMessage('npc:combat:result', { npcId, events: [{ type: 'damage', fromId: npcId, toId: targetId, amount: dmg, kind }] }, 'npc:combat:damage');
       }
     }
   ]
@@ -72,7 +94,7 @@ registerSyncModel(npcControl);
 
 // Simple host-side combat tick scheduler (engaged NPCs)
 let _npcTickTimer: ReturnType<typeof setInterval> | null = null;
-type TickState = { cooldowns: Record<string, number>; aggro: Map<string, number> };
+type TickState = { cooldowns: Record<string, number>; aggro: Map<string, number>; forcedTargetId?: string; forcedUntil?: number };
 const npcTickState = new Map<string, TickState>();
 
 function getTickState(npcId: string): TickState {
@@ -101,8 +123,11 @@ function startNpcTickScheduler() {
         const state = getTickState(n.id);
         const cooldownUntil = state.cooldowns['basic'] ?? 0;
         if (now < cooldownUntil) continue;
-        // pick target by highest aggro
-        const targetId = Array.from(state.aggro.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+        // forced taunt override or highest aggro
+        let targetId = (state.forcedUntil && state.forcedUntil > now) ? state.forcedTargetId : undefined;
+        if (!targetId) {
+          targetId = Array.from(state.aggro.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+        }
         if (!targetId) continue;
         const attacker = actorList.find((a) => a.id === n.id);
         const defender = actorList.find((a) => a.id === targetId);

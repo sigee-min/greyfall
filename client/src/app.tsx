@@ -35,11 +35,13 @@ import { FieldGraph } from './ui/world/field-graph';
 import { MapMini } from './ui/world/map-mini';
 import { InteractionPanel } from './ui/world/interaction-panel';
 import { EquipmentHudBadge } from './ui/hud/equipment-hud-badge';
+import { QuestTracker } from './ui/hud/quest-tracker';
 import { CharacterBuilder } from './ui/character/character-builder';
 import { EquipmentPanel } from './ui/character/equipment-panel';
 import { NpcPanel } from './ui/npc/npc-panel';
 import { useCharacterStore } from './store/character';
 import { Toaster } from './ui/common/toaster';
+import { QuestJournal } from './ui/journal/quest-journal';
 import { useI18n } from './i18n';
 import { reasonToMessageKey } from './app/services/equipment-formatter';
 import { setToolsProviders } from './llm/tools/providers';
@@ -49,8 +51,8 @@ import { getItem } from './domain/items/registry';
 import { itemSlot } from './domain/world/equipment-rules';
 import { missionStateSync } from './domain/mission/mission-sync';
 import { questStateSync } from './domain/quest/sync';
-import { useQuestStore, selectQuestSnapshot, selectQuestCatalog } from './domain/quest/store';
-import { setQuestMappings } from './domain/quest/triggers';
+import { useQuestStore } from './domain/quest/store';
+import { setQuestMappings, triggers as questTriggers } from './domain/quest/triggers';
 import { TutorialQuest } from './content/quests/tutorial';
 import { useMissionStore } from './domain/mission/state';
 import { getAuthUser, setAuthUser, clearAuthUser, type AuthUser } from './lib/auth';
@@ -70,6 +72,7 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
   const [scene, setScene] = useState<SceneKey>('mainLobby');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
   const [developerOpen, setDeveloperOpen] = useState(false);
   const [netmonOpen, setNetmonOpen] = useState(false);
   const [llmMonitorOpen, setLlmMonitorOpen] = useState(false);
@@ -137,10 +140,18 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
 
   useEffect(() => {
     const unsubscribeShow = globalBus.subscribe('error:show', ({ message }) => setErrorMessage(message));
+    // Simple keyboard shortcut: J to open/close Journal
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'j' || e.key === 'J') {
+        setJournalOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
     const unsubscribeClear = globalBus.subscribe('error:clear', () => setErrorMessage(null));
     return () => {
       unsubscribeShow();
       unsubscribeClear();
+      window.removeEventListener('keydown', onKey);
     };
   }, [globalBus]);
 
@@ -151,6 +162,14 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
       const slot = itemSlot(key);
       const display = participants.find((p) => p.id === actorId)?.name || actorId;
       globalBus.publish('toast:show', { status: 'success', title: t('equip.toast.applied'), message: `${name} · ${t(`slot.${slot}`)} (${display})`, durationMs: 1500 });
+      // Treat successful equip as proof of possession for simple collect objectives (host only)
+      try {
+        if (sessionMeta?.mode === 'host') {
+          questTriggers.onCollect(key);
+          const snapshot = useQuestStore.getState().snapshot;
+          questStateSync.host.set({ snapshot, version: 1, since: Date.now() }, 'quest:collect:equip');
+        }
+      } catch {}
     });
     const unsub2 = netBus.subscribe('equip:rejected', ({ reason }) => {
       const map: Record<string, string> = {
@@ -205,10 +224,14 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
   // Combat events toasts
   useEffect(() => {
     const unsub = registerLobbyHandler('npc:combat:result', (msg) => {
-      const body = msg.body as { npcId: string; events: Array<{ type: string; fromId?: string; toId: string; amount?: number; kind?: string }> };
+      const body = msg.body as { npcId: string; events: Array<{ type: string; fromId?: string; toId: string; amount?: number; kind?: string; status?: string }> };
       for (const ev of body.events) {
         if (ev.type === 'damage' && typeof ev.amount === 'number') {
           globalBus.publish('toast:show', { status: 'warning', title: '피해', message: `${ev.fromId ?? body.npcId} → ${ev.toId} : -${ev.amount}`, durationMs: 1200 });
+        } else if (ev.type === 'status') {
+          const name = ev.status === 'taunt' ? '도발' : ev.status === 'heal' ? '치유' : ev.status || '상태';
+          const msgText = ev.status === 'heal' && ev.amount ? `+${ev.amount}` : name;
+          globalBus.publish('toast:show', { status: 'info', title: '상태', message: `${ev.fromId ?? body.npcId} → ${ev.toId} : ${msgText}`, durationMs: 1200 });
         }
       }
     });
@@ -540,7 +563,7 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
         publishLobbyMessage={publishLobbyMessage}
         registerLobbyHandler={registerLobbyHandler}
       >
-        <div className="pointer-events-none absolute inset-0">
+          <div className="pointer-events-none absolute inset-0">
           <Toaster />
           {/* Global toasts */}
           <div className="pointer-events-none">
@@ -552,6 +575,8 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
               <h1 className="text-2xl font-semibold">{t('lobby.title.line1')} {t('lobby.title.line2')}</h1>
             </div>
             <div className="flex items-center gap-6">
+              {/* Quest tracker (compact) */}
+              <QuestTracker onOpenJournal={() => setJournalOpen(true)} />
               <div className="flex gap-4 text-sm font-semibold">
                 <span className="text-primary">{t('resources.glow')} {resources.glow}</span>
                 <span className="text-destructive">{t('resources.corruption')} {resources.corruption}</span>
@@ -604,6 +629,10 @@ function App({ hasGoogleClient = false }: { hasGoogleClient?: boolean }) {
 
         {scene === 'game' && (
           <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        )}
+
+        {scene === 'game' && (
+          <QuestJournal open={journalOpen} onClose={() => setJournalOpen(false)} />
         )}
 
         {scene === 'game' && showCharBuilder && (
